@@ -1,29 +1,12 @@
-import { useState, useEffect} from 'react'
 import './App.css'
 import ProductList from './components/ProductList';
 
 function App() {
-  const [data, setData] = useState([]);
-
-  useEffect(() => {
-   
-    fetch('http://localhost:8000/api/people/') 
-      .then(response => response.json())
-      .then(data => setData(data))
-      .catch(error => console.error('Error fetching data:', error));
-  }, []);
-
   return (
-    
-    <div class = "name">
-      <h1>ข้อมูลสินค้า</h1>
-      <ul>
-        {data.map(person => (
-          <li key={person.id}>{person.name} - {person.age} ปี</li>
-        ))}
-      </ul>
+    <div className="App">
+      <h1>ยินดีต้อนรับสู่ร้านค้าของฉัน</h1>
+      {/* เรียกใช้ Component แสดงรายการสินค้า */}
       <ProductList /> 
-     
     </div>
   );
 }

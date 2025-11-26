@@ -1,44 +1,44 @@
-from django.shortcuts import render, redirect
-from myapp.models import Person
+from django.shortcuts import render
+from django.http import HttpResponse, JsonResponse
 import requests
 from .models import Product, ProductImage
-from django.http import HttpResponse
-from .models import Product, ProductImage
 
+# ฟังก์ชันดึงข้อมูลจาก DummyJSON มาเก็บลง Database
 def fetch_products():
-    url = "https://dummyjson.com/products/1"   # เปลี่ยนเป็น /products?limit=100 ได้
-    data = requests.get(url).json()
+    url = "https://dummyjson.com/products?limit=30"
+    response = requests.get(url)
+    data = response.json()
+    
+    products_list = data.get("products", [])
 
-    product, created = Product.objects.update_or_create(
-        id=data["id"],
-        defaults={
-            "title": data["title"],
-            "description": data["description"],
-            "category": data["category"],
-            "price": data["price"],
-            "discount": data["discountPercentage"],
-            "rating": data["rating"],
-            "stock": data["stock"],
-            "brand": data["brand"],
-            "thumbnail": data["thumbnail"],
-        }
-    )
+    for item in products_list:
+        product, created = Product.objects.update_or_create(
+            id=item["id"],
+            defaults={
+                "title": item["title"],
+                "description": item["description"],
+                "category": item["category"],
+                "price": item["price"],
+                "rating": item["rating"],
+                "stock": item["stock"],
+                "brand": item.get("brand", ""),
+                "thumbnail": item["thumbnail"],
+            }
+        )
+        
+        # ลบรูปเก่าแล้วบันทึกใหม่
+        ProductImage.objects.filter(product=product).delete()
+        for img_url in item.get("images", []):
+            ProductImage.objects.create(product=product, image_url=img_url)
 
-    # เก็บรูป images
-    ProductImage.objects.filter(product=product).delete()
-    for img in data["images"]:
-        ProductImage.objects.create(product=product, image_url=img)
+    return len(products_list)
 
-    return product
-
-
-
+# View สำหรับเรียกใช้งาน Trigger การดึงข้อมูล
 def fetch_api(request):
-    fetch_products()
-    return HttpResponse("Import API success!")
-from django.shortcuts import render
-from .models import Product
+    count = fetch_products()
+    return HttpResponse(f"Import API success! Saved {count} products.")
 
+# API สำหรับส่งข้อมูลให้ Frontend
 def api_products(request):
     products = list(Product.objects.values())
     return JsonResponse({"products": products})

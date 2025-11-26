@@ -17,7 +17,7 @@ DATABASES = {
         # ดึงค่าจาก Environment Variables
         'NAME': os.environ.get('DATABASE_NAME', 'django_db'),
         'USER': os.environ.get('DATABASE_USER', 'django_user'),
-        'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'secret'),
+        'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'MyStrongPass123'),
         'HOST': os.environ.get('DATABASE_HOST', 'localhost'), # ใน Container ใช้ชื่อ Service 'db'
         'PORT': os.environ.get('DATABASE_PORT', '3306'),
         # ตั้งค่าเพิ่มเติมสำหรับ MySQL (ถ้าจำเป็น)
@@ -94,13 +94,6 @@ WSGI_APPLICATION = 'myporject.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
 
 
 # Password validation

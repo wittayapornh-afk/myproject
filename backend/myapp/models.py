@@ -9,8 +9,10 @@ class Product(models.Model):
     category = models.CharField(max_length=100)
     price = models.FloatField()
     thumbnail = models.URLField()
-    images = models.JSONField(null=True, blank=True)
-
+    rating = models.FloatField(null=True, blank=True)
+    stock = models.IntegerField(null=True, blank=True)
+    brand = models.CharField(max_length=100, null=True, blank=True)
+    
     def __str__(self):
         return self.title
 

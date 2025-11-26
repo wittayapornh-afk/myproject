@@ -1,5 +1,5 @@
-version: '3.8'
 
+version: '3.8'
 services:
   # -------------------- 1. Frontend Service (React/Vite) --------------------
   frontend:
@@ -36,19 +36,22 @@ services:
       - app-network
     depends_on:
       - db
-
+  
   # -------------------- 3. Database Service (MySQL) --------------------
   db:
     image: mysql:8.0
     container_name: mysql_db
     volumes:
-      - mysql_data:/var/lib/mysql # เก็บข้อมูลถาวร
+      - mysql_data:/var/lib/mysql
     environment:
-      # ตั้งค่า Credentials ที่ MySQL จะสร้าง User และรหัสผ่าน
       - MYSQL_DATABASE=django_db
       - MYSQL_USER=django_user
-      - MYSQL_PASSWORD=MyStrongPass123  # <--- ต้องตรงกับรหัสผ่านใน Backend Service
-      - MYSQL_ROOT_PASSWORD=root_secret # สำหรับ Admin
+      - MYSQL_PASSWORD=MyStrongPass123
+      - MYSQL_ROOT_PASSWORD=root_secret
+    # --- เพิ่มส่วนนี้เข้าไปครับ ---
+    ports:
+      - "3306:3306"
+    # --------------------------
     networks:
       - app-network
 
