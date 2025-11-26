@@ -9,7 +9,23 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+import os
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        # ดึงค่าจาก Environment Variables
+        'NAME': os.environ.get('DATABASE_NAME', 'django_db'),
+        'USER': os.environ.get('DATABASE_USER', 'django_user'),
+        'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'secret'),
+        'HOST': os.environ.get('DATABASE_HOST', 'localhost'), # ใน Container ใช้ชื่อ Service 'db'
+        'PORT': os.environ.get('DATABASE_PORT', '3306'),
+        # ตั้งค่าเพิ่มเติมสำหรับ MySQL (ถ้าจำเป็น)
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        }
+    }
+}
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -28,11 +44,14 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173", # นี่คือ URL ของ Vite Dev Server
+    "http://localhost:3000",
+    "http://127.0.0.1:3000", # นี่คือ URL ของ Vite Dev Server
 ]
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
+    'rest_framework',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -43,6 +62,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # **สำคัญ**
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

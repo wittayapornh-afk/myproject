@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # -------------------- 1. Frontend Service (React/Vite) --------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: react_frontend
+    ports:
+      - "3000:80"
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+  # -------------------- 2. Backend Service (Django) --------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: django_backend
+    volumes:
+      - ./backend:/usr/src/app
+    ports:
+      - "8000:8000"
+    environment:
+      # ตั้งค่า Environment Variables ให้ Django เชื่อมต่อกับ MySQL
+      - DATABASE_HOST=db
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=django_db
+      - DATABASE_USER=django_user
+      - DATABASE_PASSWORD=MyStrongPass123  # <--- รหัสผ่านที่ใช้สำหรับ Django
+    command: python manage.py runserver 0.0.0.0:8000
+    networks:
+      - app-network
+    depends_on:
+      - db
+
+  # -------------------- 3. Database Service (MySQL) --------------------
+  db:
+    image: mysql:8.0
+    container_name: mysql_db
+    volumes:
+      - mysql_data:/var/lib/mysql # เก็บข้อมูลถาวร
+    environment:
+      # ตั้งค่า Credentials ที่ MySQL จะสร้าง User และรหัสผ่าน
+      - MYSQL_DATABASE=django_db
+      - MYSQL_USER=django_user
+      - MYSQL_PASSWORD=MyStrongPass123  # <--- ต้องตรงกับรหัสผ่านใน Backend Service
+      - MYSQL_ROOT_PASSWORD=root_secret # สำหรับ Admin
+    networks:
+      - app-network
+
+  # -------------------- 4. phpMyAdmin Service --------------------
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin_service
+    environment:
+      - PMA_HOST=db
+      - PMA_PORT=3306
+      - PMA_ARBITRARY=1
+    ports:
+      - "8080:80"
+    networks:
+      - app-network
+    depends_on:
+      - db
+
+# -------------------- Volume และ Network --------------------
+volumes:
+  mysql_data:
+
+networks:
+  app-network:
+    driver: bridge

@@ -12,7 +12,7 @@ function ProductList() {
     
     const fetchProducts = async () => {
       try {
-        const response = await fetch('https://dummyjson.com/products');
+        const response = await fetch('https://dummyjson.com/api/products');
         
         
         if (!response.ok) {
@@ -50,7 +50,9 @@ function ProductList() {
           <h3>{product.title}</h3>
           <p><strong>ราคา:</strong> ${product.price}</p>
           <p>{product.description}</p>
-          <img src={product.thumbnail} alt={product.title} style={{ width: '100px', height: '100px' }} />
+          {product.images?.map(img => (
+  <img src={img} width="80" />
+))}
         </div>
       ))}
     </div>
