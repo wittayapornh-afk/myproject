@@ -1,8 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 import requests
 from .models import Product, ProductImage
 
+
+def api_product_detail(request, product_id):
+    product = get_object_or_404(Product, id=product_id)
 # ฟังก์ชันดึงข้อมูลจาก DummyJSON มาเก็บลง Database
 def fetch_products():
     url = "https://dummyjson.com/products?limit=30"
@@ -42,3 +45,23 @@ def fetch_api(request):
 def api_products(request):
     products = list(Product.objects.values())
     return JsonResponse({"products": products})
+
+def api_product_detail(request, product_id):
+    # ตอนนี้คำสั่งนี้จะทำงานได้แล้ว เพราะเรา import มาแล้ว
+    product = get_object_or_404(Product, id=product_id)
+    
+    images = [img.image_url for img in product.images.all()]
+    
+    data = {
+        "id": product.id,
+        "title": product.title,
+        "description": product.description,
+        "category": product.category,
+        "price": product.price,
+        "rating": product.rating,
+        "stock": product.stock,
+        "brand": product.brand,
+        "thumbnail": product.thumbnail,
+        "images": images,
+    }
+    return JsonResponse(data)

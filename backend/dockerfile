@@ -14,8 +14,8 @@ WORKDIR /usr/src/app
 # 2. mysqlclient สำหรับเชื่อมต่อกับ MySQL (ต้องติดตั้ง Headers สำหรับ C/C++ build tools ด้วย)
 RUN apt-get update && \
     apt-get install -y default-libmysqlclient-dev gcc pkg-config && \
-    # *** เพิ่ม django-cors-headers เข้าไปในรายการติดตั้ง ***
-    pip install --no-cache-dir django djangorestframework mysqlclient django-cors-headers
+    # *** เพิ่ม django-cors-headers เข้าไปในรายการติดตั้ง ***django-cors-headers
+    pip install --no-cache-dir django djangorestframework mysqlclient django-cors-headers requests
 # คัดลอกโค้ดโปรเจกต์ Django ทั้งหมด
 COPY . /usr/src/app/
 

@@ -21,6 +21,8 @@ FROM nginx:alpine as production-stage
 # คัดลอกไฟล์ Build ที่ได้จาก Stage 1 มาไว้ใน Nginx web root
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 # เปิดพอร์ตสำหรับภายนอก (พอร์ต 80 ใน Container จะถูก Map ไป 3000 ของ Host)
 EXPOSE 80
 
