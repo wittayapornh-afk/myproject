@@ -12,4 +12,5 @@ urlpatterns = [
    # 👇 เพิ่มบรรทัดนี้ครับ
    path("api/products/<int:product_id>/", views.api_product_detail),
    path("api/checkout/", views.api_checkout),
+   
 ]
