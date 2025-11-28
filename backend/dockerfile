@@ -1,23 +1,16 @@
-# ใช้ Python เวอร์ชันที่ต้องการเป็น Base Image
 FROM python:3.13-slim
 
-# ตั้งค่า Environment variables
 ENV PYTHONUNBUFFERED 1
 ENV DJANGO_SETTINGS_MODULE myporject.settings
 
-# สร้าง Work Directory ใน Container
 WORKDIR /usr/src/app
 
-# *** ขั้นตอนนี้คือการติดตั้ง Dependencies โดยตรงแทน requirements.txt ***
-# ติดตั้ง Packages ที่จำเป็น:
-# 1. djangorestframework สำหรับ API
-# 2. mysqlclient สำหรับเชื่อมต่อกับ MySQL (ต้องติดตั้ง Headers สำหรับ C/C++ build tools ด้วย)
+# ติดตั้ง dependencies ทีเดียวจบ
 RUN apt-get update && \
     apt-get install -y default-libmysqlclient-dev gcc pkg-config && \
-    # *** เพิ่ม django-cors-headers เข้าไปในรายการติดตั้ง ***django-cors-headers
     pip install --no-cache-dir django djangorestframework mysqlclient django-cors-headers requests
-# คัดลอกโค้ดโปรเจกต์ Django ทั้งหมด
+
 COPY . /usr/src/app/
 
-# ตั้งค่าให้รัน Django Server
+# สั่งรัน Server
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

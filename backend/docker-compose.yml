@@ -1,0 +1,64 @@
+# ไฟล์: backend/docker-compose.yml
+version: '3.8'
+
+services:
+  # 1. Django API
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shop_backend
+    volumes:
+      - .:/usr/src/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=django_db
+      - DATABASE_USER=django_user
+      - DATABASE_PASSWORD=MyStrongPass123
+    command: python manage.py runserver 0.0.0.0:8000
+    networks:
+      - shop-net
+    depends_on:
+      - db
+
+  # 2. MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: shop_db
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=django_db
+      - MYSQL_USER=django_user
+      - MYSQL_PASSWORD=MyStrongPass123
+      - MYSQL_ROOT_PASSWORD=root_secret
+    ports:
+      - "3306:3306"
+    networks:
+      - shop-net
+
+  # 3. phpMyAdmin
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: shop_pma
+    environment:
+      - PMA_HOST=db
+      - PMA_PORT=3306
+      - PMA_ARBITRARY=1
+    ports:
+      - "8080:80"
+    networks:
+      - shop-net
+    depends_on:
+      - db
+
+volumes:
+  mysql_data:
+
+networks:
+  shop-net:
+    name: shop-network  # ตั้งชื่อ Network ให้ชัดเจน เพื่อให้ Frontend มองเห็น
+    driver: bridge

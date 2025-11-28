@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom'; // นำเข้า Link เพื่อกดไปหน้าอื่น
+import { Link } from 'react-router-dom';
 
 function ProductList() {
-  // State สำหรับเก็บข้อมูล
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // State สำหรับช่องค้นหา
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // 👇 1. เพิ่ม State สำหรับเก็บหมวดหมู่ที่เลือก (เริ่มต้นเลือก "ทั้งหมด")
+  const [selectedCategory, setSelectedCategory] = useState("All");
+
   const searchInputRef = useRef(null);
 
-  // ดึงข้อมูลจาก API
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -27,70 +27,129 @@ function ProductList() {
     fetchProducts();
   }, []);
 
-  // Auto Focus ช่องค้นหาตอนเปิดหน้าเว็บ
   useEffect(() => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
+    if (searchInputRef.current) searchInputRef.current.focus();
   }, []);
 
-  // Logic การกรองสินค้า (Filter)
+  const handleDelete = async (id) => {
+    if (confirm("ยืนยันจะลบสินค้านี้ใช่ไหม?")) {
+      try {
+        const response = await fetch(`http://localhost:8000/api/products/${id}/`, { method: 'DELETE' });
+        if (response.ok) setProducts(products.filter(p => p.id !== id));
+      } catch (error) { console.error("ลบไม่สำเร็จ:", error); }
+    }
+  };
+
+  // 👇 2. ดึงรายชื่อหมวดหมู่ทั้งหมดจากสินค้าที่มี (ไม่ให้ซ้ำกัน)
+  const categories = ["All", ...new Set(products.map(p => p.category))];
+
+  // 👇 3. อัพเกรดระบบกรอง: เช็คทั้ง "คำค้นหา" และ "หมวดหมู่"
   const filteredProducts = products.filter(product => {
-    return product.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-           product.brand?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          product.brand?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
+
+    return matchesSearch && matchesCategory;
   });
 
-  if (loading) return <div style={{textAlign: 'center', marginTop: '20px'}}>กำลังโหลดสินค้า...</div>;
+  if (loading) return <div className="text-center mt-10 text-primary/60 animate-pulse">กำลังโหลดสินค้า...</div>;
 
   return (
-    <div className="product-list-container" style={{ padding: '20px' }}>
+    <div className="max-w-6xl mx-auto p-6">
       
-      {/* --- ส่วนช่องค้นหา (Search Bar) --- */}
-      <div style={{ marginBottom: '30px', textAlign: 'center' }}>
-        <h2>รายการสินค้า (จาก MySQL Database)</h2>
-        <input 
-          ref={searchInputRef}
-          type="text" 
-          placeholder="🔍 ค้นหาชื่อสินค้า หรือแบรนด์..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            padding: '10px 15px',
-            width: '100%',
-            maxWidth: '400px',
-            borderRadius: '20px',
-            border: '1px solid #ccc',
-            fontSize: '16px',
-            outline: 'none',
-            boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-          }}
-        />
+      {/* ส่วนหัว + ช่องค้นหา */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h2 className="text-2xl font-bold text-primary">รายการสินค้าแนะนำ 🔥</h2>
+        
+        <div className="flex gap-4 w-full md:w-auto">
+            <div className="relative w-full md:w-80">
+                <input 
+                ref={searchInputRef}
+                type="text" 
+                placeholder="🔍 ค้นหาสินค้า..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-4 pr-4 py-2 rounded-full border border-primary/20 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition shadow-sm bg-white"
+                />
+            </div>
+            <Link to="/product/add">
+                <button className="bg-secondary hover:bg-primary text-white px-4 py-2 rounded-full shadow-md transition flex items-center gap-2 whitespace-nowrap font-medium">
+                    + เพิ่มสินค้า
+                </button>
+            </Link>
+        </div>
       </div>
 
-      {/* แจ้งเตือนเมื่อค้นไม่เจอ */}
+      {/* 👇 4. แถบเลือกหมวดหมู่ (Category Bar) */}
+      <div className="flex gap-3 overflow-x-auto pb-4 mb-6 scrollbar-hide">
+        {categories.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition whitespace-nowrap border ${
+              selectedCategory === cat 
+                ? 'bg-primary text-white border-primary shadow-md' // สีตอนเลือก
+                : 'bg-white text-primary border-primary/20 hover:bg-primary/10' // สีตอนไม่เลือก
+            }`}
+          >
+            {cat === "All" ? "ทั้งหมด" : cat}
+          </button>
+        ))}
+      </div>
+
+      {/* แจ้งเตือนเมื่อไม่เจอของ */}
       {filteredProducts.length === 0 && (
-        <div style={{ textAlign: 'center', color: '#888' }}>
-          ไม่พบสินค้าที่ค้นหา: "{searchTerm}"
+        <div className="text-center py-16 text-gray-500 bg-white/50 rounded-3xl border border-dashed border-primary/20">
+          <p className="text-lg">ไม่พบสินค้าที่ค้นหา 😿</p>
+          <button onClick={() => {setSearchTerm(""); setSelectedCategory("All");}} className="mt-2 text-secondary hover:underline">
+            ล้างตัวกรองทั้งหมด
+          </button>
         </div>
       )}
 
-      {/* --- ส่วนแสดงรายการสินค้า (Grid) --- */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
+      {/* Grid สินค้า */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {filteredProducts.map(product => (
-          <div key={product.id} style={{ border: '1px solid #ddd', borderRadius: '10px', padding: '15px', textAlign: 'center', backgroundColor: 'white', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+          <div key={product.id} className="bg-card rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-primary/5 flex flex-col overflow-hidden group">
             
-            <img src={product.thumbnail} alt={product.title} style={{ width: '100%', height: '150px', objectFit: 'contain', borderRadius: '5px' }} />
-            <h3 style={{ fontSize: '1.1rem', margin: '10px 0' }}>{product.title}</h3>
-            <p style={{ color: '#666', fontSize: '0.9rem' }}>แบรนด์: {product.brand}</p>
-            <p style={{ color: '#27ae60', fontWeight: 'bold', fontSize: '1.1rem' }}>${product.price}</p>
-            
-            {/* ปุ่มกดไปดูรายละเอียด */}
-            <Link to={`/product/${product.id}`}>
-                <button style={{ backgroundColor: '#007bff', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '5px', cursor: 'pointer', transition: 'background 0.3s' }}>
-                  ดูรายละเอียด
-                </button>
+            {/* รูปภาพ */}
+            <Link to={`/product/${product.id}`} className="block relative pt-[75%] overflow-hidden bg-[#FAFAF5]">
+                <img 
+                  src={product.thumbnail} 
+                  alt={product.title} 
+                  className="absolute top-0 left-0 w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-110" 
+                />
+                <span className="absolute top-2 right-2 bg-primary/90 text-white text-[10px] uppercase px-2 py-1 rounded shadow-sm tracking-wider">
+                    {product.category}
+                </span>
             </Link>
-
+            
+            {/* เนื้อหา */}
+            <div className="p-4 flex flex-col flex-grow">
+                <h3 className="text-lg font-bold text-primary mb-1 line-clamp-1 group-hover:text-secondary transition">
+                    {product.title}
+                </h3>
+                <p className="text-sm text-gray-500 mb-3 line-clamp-1">{product.brand || "No Brand"}</p>
+                
+                <div className="flex items-center justify-between mt-auto">
+                    <span className="text-xl font-bold text-secondary">${product.price}</span>
+                    
+                    <div className="flex gap-1">
+                         <Link to={`/product/edit/${product.id}`} className="p-2 text-gray-400 hover:text-accent transition" title="แก้ไข">
+                            ✏️
+                        </Link>
+                        <button onClick={() => handleDelete(product.id)} className="p-2 text-gray-400 hover:text-red-500 transition" title="ลบ">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                
+                <Link to={`/product/${product.id}`}>
+                    <button className="w-full mt-3 bg-[#F2F0E4] hover:bg-highlight text-primary py-2 rounded-xl font-bold transition text-sm">
+                        ดูรายละเอียด
+                    </button>
+                </Link>
+            </div>
           </div>
         ))}
       </div>

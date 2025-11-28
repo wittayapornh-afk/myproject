@@ -45,7 +45,8 @@ ALLOWED_HOSTS = []
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "http://127.0.0.1:3000", # นี่คือ URL ของ Vite Dev Server
+    "http://127.0.0.1:3000",
+    "http://localhost:5173", # นี่คือ URL ของ Vite Dev Server
 ]
 # Application definition
 
