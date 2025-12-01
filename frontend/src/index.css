@@ -1,9 +1,28 @@
+/* frontend/src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  /* ใช้สี background ใหม่ที่ตั้งไว้ (สีครีมอ่อน) */
-  background-color: #F2F0E4; 
-  color: #305949; /* เปลี่ยนสีตัวหนังสือหลักเป็นเขียวเข้ม */
+  background-color: #F8FAFC; /* สีพื้นหลังใหม่ */
+  color: #0F172A; /* สีตัวหนังสือหลัก */
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

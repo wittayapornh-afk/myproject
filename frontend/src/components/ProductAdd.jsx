@@ -1,27 +1,61 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import Swal from 'sweetalert2'; // นำเข้า SweetAlert2
 
 function ProductAdd() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    title: "", price: "", brand: "", stock: "", category: "", description: "", thumbnail: ""
+    title: "", price: "", brand: "", stock: "", category: "", description: ""
   });
+  const [imageFile, setImageFile] = useState(null);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  
+  const handleImageChange = (e) => {
+      setImageFile(e.target.files[0]);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // สร้าง FormData เพื่อส่งไฟล์
+    const data = new FormData();
+    data.append('title', formData.title);
+    data.append('price', formData.price);
+    data.append('brand', formData.brand);
+    data.append('stock', formData.stock);
+    data.append('category', formData.category);
+    data.append('description', formData.description);
+    if (imageFile) {
+    data.append('image', imageFile); // ✅ ถูก: ชื่อตรงกับ Backend แล้ว
+  }
+
     try {
       const response = await fetch('http://localhost:8000/api/products/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: data // ส่ง FormData แทน JSON
       });
+
       if (response.ok) {
-        alert("✨ เพิ่มสินค้าเรียบร้อย!");
-        navigate('/');
+        // ใช้ SweetAlert2 แจ้งเตือนสวยๆ
+        Swal.fire({
+            title: 'สำเร็จ!',
+            text: 'เพิ่มสินค้าเรียบร้อยแล้ว ✨',
+            icon: 'success',
+            confirmButtonColor: '#305949',
+            confirmButtonText: 'ตกลง'
+        }).then(() => {
+            navigate('/');
+        });
       }
-    } catch (error) { console.error("Error:", error); }
+    } catch (error) { 
+        console.error("Error:", error);
+        Swal.fire({
+            title: 'เกิดข้อผิดพลาด',
+            text: 'ไม่สามารถเพิ่มสินค้าได้',
+            icon: 'error'
+        });
+    }
   };
 
   return (
@@ -30,7 +64,6 @@ function ProductAdd() {
         <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">📦 ลงขายสินค้าใหม่</h2>
         
         <form onSubmit={handleSubmit} className="space-y-5">
-          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อสินค้า</label>
             <input type="text" name="title" required onChange={handleChange} 
@@ -63,10 +96,11 @@ function ProductAdd() {
             </div>
           </div>
 
+          {/* เปลี่ยนช่องกรอก URL เป็นช่องอัปโหลดไฟล์ */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ลิงก์รูปภาพ (URL)</label>
-            <input type="text" name="thumbnail" onChange={handleChange} 
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition" placeholder="https://..." />
+            <label className="block text-sm font-medium text-gray-700 mb-1">รูปภาพสินค้า</label>
+            <input type="file" accept="image/*" onChange={handleImageChange} 
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition" />
           </div>
 
           <div>
@@ -81,11 +115,10 @@ function ProductAdd() {
                 ยืนยันการขาย
             </button>
           </div>
-
         </form>
       </div>
     </div>
   );
-}
+} // <--- ปีกกาปิดที่หายไปคือตัวนี้ครับ
 
 export default ProductAdd;

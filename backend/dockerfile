@@ -8,9 +8,11 @@ WORKDIR /usr/src/app
 # ติดตั้ง dependencies ทีเดียวจบ
 RUN apt-get update && \
     apt-get install -y default-libmysqlclient-dev gcc pkg-config && \
-    pip install --no-cache-dir django djangorestframework mysqlclient django-cors-headers requests
+    pip install --no-cache-dir django djangorestframework mysqlclient django-cors-headers requests Pillow
+    
 
 COPY . /usr/src/app/
 
 # สั่งรัน Server
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
