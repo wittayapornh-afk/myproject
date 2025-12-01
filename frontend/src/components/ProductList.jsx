@@ -1,164 +1,271 @@
-// frontend/src/components/ProductList.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+
+import { Link } from "react-router-dom";
+
+import HeroSection from "./HeroSection";
+
+import { useSearch } from "../context/SearchContext";
+
+import { useCart } from "../context/CartContext";
 
 function ProductList() {
   const [products, setProducts] = useState([]);
+
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const searchInputRef = useRef(null);
+
+  const { searchQuery } = useSearch();
+
+  const { addToCart } = useCart();
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/products/');
-        if (!response.ok) throw new Error('Failed to fetch');
-        const data = await response.json();
-        setProducts(data.products); 
+    fetch("http://localhost:8000/api/products/")
+      .then((res) => res.json())
+
+      .then((data) => {
+        // ... (ส่วน Logic การเปลี่ยนรูปสินค้าและสีพื้นหลัง คงเดิม) ...
+
+        let modifiedProducts = [...data.products];
+
+        if (modifiedProducts.length > 1) {
+          modifiedProducts[1] = {
+            ...modifiedProducts[1],
+
+            id: 999,
+
+            title: "Classic Wooden Dining Chair",
+
+            category: "furniture",
+
+            price: 129,
+
+            rating: 4.5,
+
+            stock: 10,
+
+            brand: "WoodCraft",
+
+            description:
+              "เก้าอี้ไม้ดีไซน์คลาสสิก แข็งแรงทนทาน เหมาะสำหรับโต๊ะอาหาร",
+
+            thumbnail:
+              "https://www.pngarts.com/files/3/Wooden-Chair-PNG-Image-Background.png", // รูปเก้าอี้ไม้
+          };
+        }
+
+        modifiedProducts = modifiedProducts.map((product, index) => {
+          if (index === 0) return { ...product, bgColor: "#FEE2E2" };
+
+          if (product.id === 999) return { ...product, bgColor: "#F3EBE0" };
+
+          return { ...product, bgColor: "#FAFAF8" };
+        });
+
+        setProducts(modifiedProducts);
+
         setLoading(false);
-      } catch (error) {
-        console.error("Error:", error);
-        setLoading(false); 
-      }
-    };
-    fetchProducts();
+      })
+
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
   }, []);
 
   const handleDelete = async (id, e) => {
-    e.preventDefault(); // ป้องกันลิงก์ทำงาน
-    if (confirm("ต้องการลบสินค้านี้ใช่หรือไม่?")) {
+    e.preventDefault();
+
+    if (id === 999) {
+      setProducts(products.filter((p) => p.id !== id));
+
+      return;
+    }
+
+    if (confirm("ยืนยันการลบสินค้า?")) {
       try {
-        const response = await fetch(`http://localhost:8000/api/products/${id}/`, { method: 'DELETE' });
-        if (response.ok) setProducts(products.filter(p => p.id !== id));
-      } catch (error) { console.error("Error:", error); }
+        await fetch(`http://localhost:8000/api/products/${id}/`, {
+          method: "DELETE",
+        });
+
+        setProducts(products.filter((p) => p.id !== id));
+      } catch (err) {
+        console.error("Failed to delete", err);
+      }
     }
   };
 
-  const categories = ["All", ...new Set(products.map(p => p.category))];
+  // ✅ จุดสำคัญที่ต้องแก้: ประกาศตัวแปรนี้ไว้นอก useEffect และก่อน return เพื่อให้ JSX มองเห็น
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          product.brand?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+  const categories = ["All", ...new Set(products.map((p) => p.category))];
+
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory =
+      selectedCategory === "All" || product.category === selectedCategory;
+
+    const matchesSearch = product.title
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
   });
 
-  if (loading) return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-        <p className="text-textMuted font-medium">กำลังโหลดสินค้า...</p>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="h-screen w-full flex items-center justify-center text-primary font-bold text-xl">
+        Loading...
+      </div>
+    );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
-        <div>
-            <h1 className="text-3xl font-bold text-secondary mb-2">Discover Products</h1>
-            <p className="text-textMuted">คัดสรรสินค้าคุณภาพเพื่อคุณ</p>
-        </div>
-        
-        <div className="flex gap-3 w-full md:w-auto">
-            <div className="relative group w-full md:w-72">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-primary transition">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                </div>
-                <input 
-                ref={searchInputRef}
-                type="text" 
-                placeholder="ค้นหาสินค้า..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition shadow-sm"
-                />
+    <>
+      <HeroSection />
+
+      <div id="shop-section" className="w-full py-24 px-6 bg-background">
+        <div className="max-w-6xl mx-auto">
+          {/* Header & Filter */}
+
+          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+            <div>
+              <h2 className="text-3xl font-bold text-textMain mb-2 flex items-center gap-2">
+                สินค้าแนะนำ <span className="text-2xl">🔥</span>
+              </h2>
+
+              <div className="w-12 h-1 bg-secondary rounded-full"></div>
             </div>
-            <Link to="/product/add">
-                <button className="bg-secondary hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-200 transition flex items-center gap-2 font-medium whitespace-nowrap">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    เพิ่มสินค้า
+
+            <div className="flex flex-wrap gap-3 justify-center">
+              {categories.slice(0, 6).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${
+                    selectedCategory === cat
+                      ? "bg-primary text-white border-primary shadow-md"
+                      : "bg-white text-textMuted border-transparent hover:bg-white hover:text-primary hover:shadow-sm"
+                  }`}
+                >
+                  {cat}
                 </button>
-            </Link>
-        </div>
-      </div>
-
-      {/* Category Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-4 mb-8 scrollbar-hide">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-5 py-2 rounded-full text-sm font-medium transition whitespace-nowrap ${
-              selectedCategory === cat 
-                ? 'bg-secondary text-white shadow-md' 
-                : 'bg-white text-textMuted hover:bg-gray-100 border border-transparent'
-            }`}
-          >
-            {cat === "All" ? "ทั้งหมด" : cat}
-          </button>
-        ))}
-      </div>
-
-      {/* Empty State */}
-      {filteredProducts.length === 0 && (
-        <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-          <div className="inline-block p-4 rounded-full bg-gray-50 mb-4 text-4xl">🔍</div>
-          <p className="text-lg font-medium text-secondary">ไม่พบสินค้าที่คุณค้นหา</p>
-          <button onClick={() => {setSearchTerm(""); setSelectedCategory("All");}} className="mt-2 text-primary hover:underline font-medium">
-            ล้างตัวกรอง
-          </button>
-        </div>
-      )}
-
-      {/* Product Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        {filteredProducts.map(product => (
-          <div key={product.id} className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden relative">
-            
-            {/* Image */}
-            <Link to={`/product/${product.id}`} className="block relative pt-[80%] overflow-hidden bg-gray-50">
-                <img 
-                  src={product.thumbnail} 
-                  alt={product.title} 
-                  className="absolute top-0 left-0 w-full h-full object-contain p-6 transition-transform duration-500 group-hover:scale-105" 
-                />
-                <div className="absolute top-3 left-3">
-                   <span className="bg-white/90 backdrop-blur text-xs font-bold px-2 py-1 rounded-md shadow-sm text-secondary uppercase tracking-wider">
-                     {product.category}
-                   </span>
-                </div>
-            </Link>
-            
-            {/* Content */}
-            <div className="p-5 flex flex-col flex-grow">
-                <div className="mb-2">
-                    <p className="text-xs text-textMuted mb-1 font-medium">{product.brand || "Generic"}</p>
-                    <Link to={`/product/${product.id}`}>
-                        <h3 className="text-base font-bold text-secondary line-clamp-1 group-hover:text-primary transition">
-                            {product.title}
-                        </h3>
-                    </Link>
-                </div>
-                
-                <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50">
-                    <span className="text-lg font-bold text-primary">${product.price.toLocaleString()}</span>
-                    
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-300">
-                         <Link to={`/product/edit/${product.id}`} className="p-2 bg-gray-50 rounded-lg text-textMuted hover:bg-primary hover:text-white transition">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                        </Link>
-                        <button onClick={(e) => handleDelete(product.id, e)} className="p-2 bg-red-50 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                    </div>
-                </div>
+              ))}
             </div>
           </div>
-        ))}
+
+          {/* --- Product List --- */}
+
+          <div className="space-y-10">
+            {/* ✅ เรียกใช้ filteredProducts ได้แล้ว เพราะประกาศไว้ด้านบนแล้ว */}
+
+            {filteredProducts.map((product) => (
+              <div
+                key={product.id}
+                className="group bg-white rounded-[3rem] p-5 shadow-soft hover:shadow-xl transition-all duration-500 relative overflow-hidden flex flex-col md:flex-row gap-8 items-center border border-white/50"
+              >
+                {/* Image Section (ใช้ bgColor จากที่เรากำหนด) */}
+
+                <div
+                  className="w-full md:w-80 h-72 rounded-[2.5rem] flex-shrink-0 relative overflow-hidden transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: product.bgColor || "#FAFAF8" }}
+                >
+                  <span className="absolute top-6 left-6 bg-white text-gray-800 text-[10px] px-3 py-1.5 rounded-full font-bold uppercase tracking-wider z-10 shadow-sm border border-gray-100">
+                    {product.category}
+                  </span>
+
+                  <Link
+                    to={`/product/${product.id}`}
+                    className="block w-full h-full p-8 flex items-center justify-center"
+                  >
+                    <img
+                      src={
+                        product.thumbnail ||
+                        "https://placehold.co/600x600/305949/ffffff?text=Product"
+                      }
+                      alt={product.title}
+                      className="max-w-full max-h-full object-contain transition duration-700 group-hover:scale-110 drop-shadow-xl"
+                    />
+                  </Link>
+                </div>
+
+                {/* Details Section */}
+
+                <div className="flex-1 w-full text-center md:text-left flex flex-col justify-center py-2 pr-4 md:pr-8">
+                  <div className="mb-4">
+                    <p className="text-xs font-bold text-secondary uppercase tracking-[0.2em] mb-2">
+                      {product.brand || "GENERIC BRAND"}
+                    </p>
+
+                    <Link to={`/product/${product.id}`} className="block">
+                      <h3 className="text-3xl md:text-4xl font-bold text-textMain hover:text-primary transition duration-300 leading-tight uppercase">
+                        {product.title}
+                      </h3>
+                    </Link>
+                  </div>
+
+                  <p className="text-gray-400 text-sm leading-relaxed mb-8 line-clamp-2 md:line-clamp-3 font-light">
+                    {product.description ||
+                      "รายละเอียดสินค้าคุณภาพดี คัดสรรมาเพื่อคุณโดยเฉพาะ เหมาะสำหรับการใช้งานในทุกรูปแบบ..."}
+                  </p>
+
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6 mt-auto">
+                    <div className="flex items-center gap-4">
+                      <span className="text-4xl font-bold text-primary">
+                        ${product.price}
+                      </span>
+
+                      {product.stock > 0 ? (
+                        <span className="text-xs text-secondary bg-secondary/10 px-3 py-1 rounded-md font-bold">
+                          In Stock
+                        </span>
+                      ) : (
+                        <span className="text-xs text-danger bg-red-100 px-3 py-1 rounded-md font-bold">
+                          Out of Stock
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                      <button
+                        onClick={() => addToCart(product, 1)}
+                        className="flex-1 md:flex-none btn-primary px-8 py-3 text-sm"
+                      >
+                        Add to Cart
+                      </button>
+
+                      <Link
+                        to={`/product/edit/${product.id}`}
+                        className="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-white hover:bg-primary transition shadow-sm"
+                      >
+                        ✎
+                      </Link>
+
+                      <button
+                        onClick={(e) => handleDelete(product.id, e)}
+                        className="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-white hover:bg-danger transition shadow-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-24 text-gray-400 border border-dashed border-gray-200 rounded-[3rem]">
+              <p className="text-xl font-light">ไม่พบสินค้าที่คุณค้นหา</p>
+
+              <button
+                onClick={() => setSelectedCategory("All")}
+                className="text-secondary mt-3 underline font-bold hover:text-primary transition"
+              >
+                ดูสินค้าทั้งหมด
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

@@ -1,4 +1,3 @@
-// frontend/tailwind.config.js
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -8,17 +7,22 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Inter"', 'sans-serif'], // ใช้ฟอนต์ Inter ให้ดูทันสมัย
+        sans: ['"Poppins"', 'sans-serif'],
       },
       colors: {
-        primary: '#4F46E5',    // Indigo-600 (สีหลัก: ปุ่ม, หัวข้อสำคัญ)
-        primaryHover: '#4338CA', // Indigo-700
-        secondary: '#1E293B',  // Slate-800 (สีรอง: ตัวหนังสือเข้ม)
-        accent: '#F59E0B',     // Amber-500 (สีเน้น: ดาว, แจ้งเตือน)
-        background: '#F8FAFC', // Slate-50 (พื้นหลังเว็บ: เทาอ่อนสบายตา)
-        card: '#FFFFFF',       // ขาว (พื้นหลังการ์ด)
-        textMain: '#0F172A',   // Slate-900
-        textMuted: '#64748B',  // Slate-500
+        // ชุดสีจากรูปภาพ Nature Green
+        primary: '#325343',    // เขียวป่าลึก (Hero Background)
+        secondary: '#749B6B',  // เขียวใบไม้ (Buttons)
+        accent: '#B5D69E',     // เขียวอ่อน (Highlight Text)
+        background: '#F4F4F0', // ครีมไข่ไก่ (Web Background)
+        card: '#FFFFFF',       // ขาว
+        
+        textMain: '#263A33',   // สีตัวหนังสือเขียวเข้มเกือบดำ
+        textMuted: '#889F96',  // สีตัวหนังสือรอง
+        danger: '#EF4444',     // แดง (Delete)
+      },
+      boxShadow: {
+        'soft': '0 10px 40px rgba(50, 83, 67, 0.08)', // เงาสีเขียวจางๆ
       }
     },
   },

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import SuccessModal from './SuccessModal'; // นำเข้า Modal
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 
 function ProductEdit() {
   const { id } = useParams();
@@ -9,26 +8,56 @@ function ProductEdit() {
   const [formData, setFormData] = useState({
     title: "", price: "", brand: "", stock: "", category: "", description: "", thumbnail: ""
   });
+  const [previewImage, setPreviewImage] = useState(null);
   
-  // State สำหรับควบคุม Modal
-  const [showModal, setShowModal] = useState(false);
+  // ✅ State Gallery
+  const [galleryImages, setGalleryImages] = useState([]);
+  
+  const fileInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
+  // ดึงข้อมูลเก่า (รวมถึงรูป Gallery)
   useEffect(() => {
     fetch(`http://localhost:8000/api/products/${id}/`)
       .then(res => res.json())
       .then(data => {
-        setFormData({
-            title: data.title,
-            price: data.price,
-            brand: data.brand || "",
-            stock: data.stock || 0,
-            category: data.category || "",
-            description: data.description || "",
-            thumbnail: data.thumbnail || ""
-        });
+        setFormData(data);
+        setPreviewImage(data.thumbnail);
+        setGalleryImages(data.images || []); // ดึงรูป Gallery มาใส่
       })
-      .catch(err => console.error("Error loading product:", err));
+      .catch(err => console.error(err));
   }, [id]);
+
+  // Main Image
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setPreviewImage(reader.result);
+            setFormData(prev => ({ ...prev, thumbnail: reader.result }));
+        };
+        reader.readAsDataURL(file);
+    }
+  };
+
+  // ✅ Gallery Image
+  const handleGalleryChange = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setGalleryImages(prev => [...prev, reader.result]);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+  };
+
+  const removeGalleryImage = (index) => {
+    setGalleryImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,113 +66,133 @@ function ProductEdit() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // ส่งข้อมูล + รูป Gallery ใหม่ไป
+      const payload = { ...formData, images: galleryImages };
+      
       const response = await fetch(`http://localhost:8000/api/products/${id}/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
-        // แทนที่จะ alert ให้แสดง Modal แทน
-        setShowModal(true);
+        alert("✅ แก้ไขเรียบร้อย!");
+        navigate(`/product/${id}`);
+      } else {
+        alert("บันทึกไม่สำเร็จ");
       }
     } catch (error) {
-      console.error("Error updating:", error);
-      alert("เกิดข้อผิดพลาดในการบันทึก");
+      alert("เกิดข้อผิดพลาด");
     }
   };
 
+  const styles = {
+    label: "block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1",
+    input: "w-full bg-[#FAFAF8] text-primary font-medium px-6 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-secondary/30 transition-all placeholder-gray-300 border border-transparent focus:bg-white focus:shadow-sm"
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50/50">
-      
-      {/* เรียกใช้ Modal */}
-      <SuccessModal 
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title="บันทึกสำเร็จ!"
-        message="ข้อมูลสินค้าถูกแก้ไขเรียบร้อยแล้ว"
-        linkTo={`/product/${id}`} // พอกดตกลง ให้กลับไปหน้า Detail
-        linkText="ดูสินค้าที่แก้ไข"
-      />
+    <div className="min-h-screen bg-[#F2F0E4] flex flex-col items-center justify-center py-16 px-4">
+        <h1 className="text-3xl font-bold text-[#305949] uppercase tracking-widest mb-8 text-center">
+            EDIT PRODUCT
+        </h1>
 
-      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 w-full max-w-2xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-primary/5 px-8 py-6 border-b border-primary/10 flex justify-between items-center">
-            <div>
-                <h2 className="text-2xl font-bold text-secondary">✏️ แก้ไขสินค้า</h2>
-                <p className="text-sm text-textMuted mt-1">แก้ไขรายละเอียดสินค้า ID: {id}</p>
-            </div>
-            {/* ปุ่มปิดมุมขวา */}
-            <Link to={`/product/${id}`} className="p-2 hover:bg-white rounded-full transition text-gray-400 hover:text-red-500">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </Link>
+        <div className="bg-white p-8 md:p-12 rounded-[2rem] shadow-lg w-full max-w-4xl border border-white">
+            <form onSubmit={handleSubmit} className="space-y-6">
+
+                {/* Main Image */}
+                <div>
+                    <label className={styles.label}>MAIN IMAGE</label>
+                    <div 
+                        onClick={() => fileInputRef.current.click()}
+                        className={`relative border-2 border-dashed rounded-3xl h-64 flex flex-col items-center justify-center cursor-pointer transition-all group overflow-hidden bg-gray-50 hover:bg-white hover:border-[#305949] ${previewImage ? 'border-[#305949]' : 'border-gray-300'}`}
+                    >
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+                        
+                        {previewImage ? (
+                            <div className="relative w-full h-full p-4 flex items-center justify-center">
+                                <img src={previewImage} alt="Preview" className="max-h-full object-contain" />
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <p className="text-white font-bold">คลิกเพื่อเปลี่ยนรูป</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="font-bold text-gray-400">คลิกเพื่ออัปโหลดรูปภาพ</p>
+                        )}
+                    </div>
+                </div>
+
+                {/* ✅ Gallery Images Section */}
+                <div>
+                    <label className={styles.label}>GALLERY IMAGES</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div 
+                            onClick={() => galleryInputRef.current.click()}
+                            className="aspect-square rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-[#305949] hover:bg-gray-50 transition-all"
+                        >
+                            <input type="file" ref={galleryInputRef} onChange={handleGalleryChange} className="hidden" accept="image/*" multiple />
+                            <span className="text-3xl text-gray-300">+</span>
+                            <span className="text-xs text-gray-400 font-bold mt-1">ADD MORE</span>
+                        </div>
+
+                        {galleryImages.map((img, index) => (
+                            <div key={index} className="relative aspect-square rounded-2xl overflow-hidden shadow-sm border border-gray-100 group">
+                                <img src={img} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
+                                <button 
+                                    type="button"
+                                    onClick={() => removeGalleryImage(index)}
+                                    className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Inputs */}
+                <div>
+                    <label className={styles.label}>Product Title</label>
+                    <input type="text" name="title" value={formData.title} onChange={handleChange} className={styles.input} required />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label className={styles.label}>Price ($)</label>
+                        <input type="number" name="price" value={formData.price} onChange={handleChange} className={styles.input} required />
+                    </div>
+                    <div>
+                        <label className={styles.label}>Stock</label>
+                        <input type="number" name="stock" value={formData.stock} onChange={handleChange} className={styles.input} />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label className={styles.label}>Brand</label>
+                        <input type="text" name="brand" value={formData.brand} onChange={handleChange} className={styles.input} />
+                    </div>
+                    <div>
+                        <label className={styles.label}>Category</label>
+                        <input type="text" name="category" value={formData.category} onChange={handleChange} className={styles.input} />
+                    </div>
+                </div>
+
+                <div>
+                    <label className={styles.label}>Description</label>
+                    <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className={`${styles.input} resize-none`}></textarea>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                    <button type="button" onClick={() => navigate(-1)} className="flex-1 py-4 border-2 border-gray-200 text-gray-500 rounded-2xl font-bold uppercase tracking-widest hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" className="flex-[2] bg-[#305949] text-white py-4 rounded-2xl font-bold uppercase tracking-widest hover:bg-[#234236] transition-all shadow-lg">
+                        SAVE CHANGES
+                    </button>
+                </div>
+            </form>
         </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          
-          {/* ชื่อสินค้า */}
-          <div>
-            <label className="block text-sm font-semibold text-secondary mb-2">ชื่อสินค้า</label>
-            <input type="text" name="title" value={formData.title} onChange={handleChange} 
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition bg-gray-50 focus:bg-white" />
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label className="block text-sm font-semibold text-secondary mb-2">ราคา ($)</label>
-                <input type="number" name="price" value={formData.price} onChange={handleChange} 
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition bg-gray-50 focus:bg-white" />
-            </div>
-            <div>
-                <label className="block text-sm font-semibold text-secondary mb-2">สต็อก (ชิ้น)</label>
-                <input type="number" name="stock" value={formData.stock} onChange={handleChange} 
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition bg-gray-50 focus:bg-white" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div>
-                <label className="block text-sm font-semibold text-secondary mb-2">แบรนด์</label>
-                <input type="text" name="brand" value={formData.brand} onChange={handleChange} 
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition bg-gray-50 focus:bg-white" />
-            </div>
-            <div>
-                <label className="block text-sm font-semibold text-secondary mb-2">หมวดหมู่</label>
-                <input type="text" name="category" value={formData.category} onChange={handleChange} 
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition bg-gray-50 focus:bg-white" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-secondary mb-2">ลิงก์รูปภาพ (URL)</label>
-            <div className="flex gap-4 items-center">
-                <input type="text" name="thumbnail" value={formData.thumbnail} onChange={handleChange} 
-                    className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition bg-gray-50 focus:bg-white" />
-                {formData.thumbnail && (
-                    <img src={formData.thumbnail} alt="preview" className="w-12 h-12 rounded-lg object-cover border border-gray-200 shadow-sm" />
-                )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-secondary mb-2">รายละเอียดสินค้า</label>
-            <textarea name="description" rows="4" value={formData.description} onChange={handleChange} 
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition bg-gray-50 focus:bg-white"></textarea>
-          </div>
-
-          <div className="pt-4 flex gap-4">
-            <Link to={`/product/${id}`} className="flex-1 py-3.5 text-center bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition font-bold">
-                ยกเลิก
-            </Link>
-            <button type="submit" className="flex-[2] bg-primary hover:bg-primaryHover text-white py-3.5 rounded-xl shadow-lg shadow-primary/25 transition font-bold flex justify-center items-center gap-2">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                บันทึกการเปลี่ยนแปลง
-            </button>
-          </div>
-
-        </form>
-      </div>
     </div>
   );
 }

@@ -1,14 +1,13 @@
-/* frontend/src/index.css */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  background-color: #F8FAFC; /* สีพื้นหลังใหม่ */
-  color: #0F172A; /* สีตัวหนังสือหลัก */
-  font-family: 'Inter', sans-serif;
+  background-color: #F2F0E4; /* สีครีม */
+  color: #2C3E50;
+  font-family: 'Sarabun', 'Poppins', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -17,12 +16,24 @@ body {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #F2F0E4;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #305949;
   border-radius: 4px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+
+/* Button Styles */
+.btn-primary {
+  @apply bg-[#305949] text-white px-6 py-2 rounded-full font-bold shadow-md hover:bg-[#234236] transition-all transform hover:-translate-y-0.5 active:scale-95;
+}
+
+/* ✅ แก้ไข Input ให้ชัดเจนที่สุด */
+.input-field-custom {
+  @apply w-full bg-white text-gray-900 font-medium px-6 py-4 rounded-2xl outline-none border border-gray-200 focus:border-[#305949] focus:ring-1 focus:ring-[#305949] transition-all placeholder-gray-400 shadow-sm text-base;
+}
+
+/* Label ให้ชัดขึ้น */
+.label-text {
+  @apply block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1;
 }
