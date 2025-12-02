@@ -8,29 +8,31 @@ import Navbar from './components/Navbar';
 import ProductAdd from './components/ProductAdd';
 import CartPage from './components/CartPage';
 import CheckoutPage from './components/CheckoutPage';
-import HeroSection from './components/HeroSection'; // นำเข้า Hero
+import HeroSection from './components/HeroSection';
+import Footer from './components/Footer'; // ✅ 1. นำเข้า Footer
 
 function App() {
   return (
-    <div className="App min-h-screen bg-[#030014]">
+    <div className="App min-h-screen bg-[#F4F4F0] flex flex-col font-sans"> {/* ปรับ bg และ flex */}
       <Navbar />
       
-      <Routes>
-        <Route path="/" element={
-            <>
-                {/* หน้าแรกมี Hero + สินค้า */}
-                <HeroSection />
-                <ProductList />
-            </>
-        } />
-        
-        {/* หน้าอื่นๆ ไม่ต้องมี Hero */}
-        <Route path="/product/:id" element={<div className="pt-20"><ProductDetail /></div>} />
-        <Route path="/product/add" element={<div className="pt-20"><ProductAdd /></div>} />
-        <Route path="/product/edit/:id" element={<div className="pt-20"><ProductEdit /></div>} />
-        <Route path="/cart" element={<div className="pt-20"><CartPage /></div>} />
-        <Route path="/checkout" element={<div className="pt-20"><CheckoutPage /></div>} />
-      </Routes>
+      <div className="flex-1"> {/* ให้เนื้อหาขยายเต็มพื้นที่ */}
+        <Routes>
+            <Route path="/" element={
+                <>
+                    <HeroSection />
+                    <ProductList />
+                </>
+            } />
+            <Route path="/product/:id" element={<div className="pt-10"><ProductDetail /></div>} />
+            <Route path="/product/add" element={<div className="pt-10"><ProductAdd /></div>} />
+            <Route path="/product/edit/:id" element={<div className="pt-10"><ProductEdit /></div>} />
+            <Route path="/cart" element={<div className="pt-10"><CartPage /></div>} />
+            <Route path="/checkout" element={<div className="pt-10"><CheckoutPage /></div>} />
+        </Routes>
+      </div>
+
+      <Footer /> {/* ✅ 2. ใส่ Footer ไว้ล่างสุด */}
     </div>
   );
 }

@@ -5,11 +5,10 @@ class Product(models.Model):
     description = models.TextField()
     category = models.CharField(max_length=100)
     price = models.FloatField()
+    thumbnail = models.ImageField(upload_to='products/', null=True, blank=True)
     
-    # ⚠️ แก้ตรงนี้: เปลี่ยนจาก URLField เป็น TextField เพื่อรองรับ Base64 Image
-    thumbnail = models.TextField() 
-    
-    rating = models.FloatField(null=True, blank=True)
+    # ✅ เพิ่ม default=0
+    rating = models.FloatField(null=True, blank=True, default=0)
     stock = models.IntegerField(null=True, blank=True)
     brand = models.CharField(max_length=100, null=True, blank=True)
     
@@ -18,7 +17,18 @@ class Product(models.Model):
 
 class ProductImage(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images")
-    image_url = models.TextField() # อันนี้เป็น TextField อยู่แล้ว OK
+    image = models.ImageField(upload_to='products/gallery/', null=True, blank=True)
 
     def __str__(self):
-        return self.image_url
+        return f"{self.product.title} Image"
+
+# ✅ เพิ่ม Model ใหม่: Review
+class Review(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews")
+    user = models.CharField(max_length=100)  # ชื่อคนรีวิว
+    rating = models.IntegerField(default=5)  # คะแนน 1-5
+    comment = models.TextField(blank=True)   # ข้อความรีวิว
+    created_at = models.DateTimeField(auto_now_add=True) # วันที่รีวิว
+
+    def __str__(self):
+        return f"{self.user} - {self.product.title} ({self.rating})"

@@ -1,4 +1,3 @@
-# ไฟล์: backend/docker-compose.yml
 version: '3.8'
 
 services:
@@ -21,8 +20,12 @@ services:
     command: python manage.py runserver 0.0.0.0:8000
     networks:
       - shop-net
+    # ✅ แก้ไขจุดที่ 1: สั่งให้รอจนกว่า db จะสถานะ 'healthy' (พร้อมใช้งานจริง)
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    # ✅ แถม: ถ้าเกิด error อื่นๆ ให้ลอง restart เองอัตโนมัติ
+    restart: on-failure
 
   # 2. MySQL Database
   db:
@@ -39,6 +42,13 @@ services:
       - "3306:3306"
     networks:
       - shop-net
+    # ✅ แก้ไขจุดที่ 2: เพิ่ม Healthcheck เพื่อตรวจสอบว่า Database พร้อมรับ connection หรือยัง
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # 3. phpMyAdmin
   phpmyadmin:
@@ -60,5 +70,5 @@ volumes:
 
 networks:
   shop-net:
-    name: shop-network  # ตั้งชื่อ Network ให้ชัดเจน เพื่อให้ Frontend มองเห็น
+    name: shop-network
     driver: bridge

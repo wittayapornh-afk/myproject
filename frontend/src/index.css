@@ -28,12 +28,12 @@ body {
   @apply bg-[#305949] text-white px-6 py-2 rounded-full font-bold shadow-md hover:bg-[#234236] transition-all transform hover:-translate-y-0.5 active:scale-95;
 }
 
-/* ✅ แก้ไข Input ให้ชัดเจนที่สุด */
+/* ✅ แก้ไข Input ให้ชัดเจนที่สุด (เพิ่ม Border) */
 .input-field-custom {
-  @apply w-full bg-white text-gray-900 font-medium px-6 py-4 rounded-2xl outline-none border border-gray-200 focus:border-[#305949] focus:ring-1 focus:ring-[#305949] transition-all placeholder-gray-400 shadow-sm text-base;
+  @apply w-full bg-white text-gray-900 font-medium px-6 py-4 rounded-2xl outline-none border-2 border-gray-300 focus:border-[#305949] focus:ring-1 focus:ring-[#305949] transition-all placeholder-gray-400 shadow-sm text-base;
 }
 
-/* Label ให้ชัดขึ้น */
+/* Label ให้ชัดขึ้น (สีเข้มขึ้น) */
 .label-text {
-  @apply block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1;
+  @apply block text-xs font-bold text-gray-700 uppercase tracking-widest mb-2 ml-1;
 }

@@ -5,5 +5,6 @@ urlpatterns = [
    path("fetch/", views.fetch_api),
    path("api/products/", views.api_products),
    path("api/products/<int:product_id>/", views.api_product_detail),
+   path("api/products/<int:product_id>/reviews/", views.api_add_review), # ✅ เพิ่มบรรทัดนี้
    path("api/checkout/", views.api_checkout),
 ]
