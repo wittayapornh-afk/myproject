@@ -22,10 +22,9 @@ function Navbar() {
   const menuItems = [
     { name: "หน้าแรก", path: "/" },
     { name: "สินค้าทั้งหมด", path: "/" },
-    { name: "คอลเลกชัน", path: "/" },
-    { name: "เพิ่มสินค้า", path: "/product/add" },
-  ];
-
+    { name: "ติดตามสถานะ", path: "/order-history" }, // ✅ เมนูใหม่
+    { name: "ลงขายสินค้า", path: "/product/add" },
+];
   return (
     <nav className="bg-primary sticky top-0 z-50 h-20 flex items-center shadow-lg">
       <div className="max-w-7xl mx-auto px-6 w-full flex justify-between items-center relative">

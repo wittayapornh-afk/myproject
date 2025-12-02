@@ -2,37 +2,81 @@ from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
-from django.db.models import Avg # ✅ เพิ่ม import นี้
+from django.db.models import Avg
 from django.core.files.base import ContentFile
 import json
 import requests
-from .models import Product, ProductImage, Review
+from .models import Product, ProductImage, Review, Order, OrderItem
 
-# ... (ฟังก์ชัน fetch_products และ fetch_api คงเดิม ไม่ต้องแก้) ...
+# --- 1. ระบบดึงข้อมูลตัวอย่าง (Seeding) ---
 def fetch_products():
-    # (คงโค้ดเดิมไว้)
-    pass 
-def fetch_api(request):
-    # (คงโค้ดเดิมไว้)
-    pass
+    url = "https://dummyjson.com/products?limit=30"
+    response = requests.get(url)
+    data = response.json()
+    products_list = data.get("products", [])
+    
+    count = 0
+    for item in products_list:
+        product, created = Product.objects.update_or_create(
+            id=item["id"],
+            defaults={
+                "title": item["title"],
+                "description": item["description"],
+                "category": item["category"],
+                "price": item["price"],
+                "rating": item.get("rating", 0),
+                "stock": item.get("stock", 0),
+                "brand": item.get("brand", ""),
+            }
+        )
 
+        # Download Thumbnail
+        thumb_url = item.get("thumbnail")
+        if thumb_url and not product.thumbnail:
+            try:
+                img_resp = requests.get(thumb_url)
+                if img_resp.status_code == 200:
+                    fname = thumb_url.split("/")[-1]
+                    product.thumbnail.save(fname, ContentFile(img_resp.content), save=True)
+            except Exception as e:
+                print(f"Error downloading thumbnail: {e}")
+
+        # Download Gallery Images
+        ProductImage.objects.filter(product=product).delete()
+        for img_url in item.get("images", []):
+            try:
+                img_resp = requests.get(img_url)
+                if img_resp.status_code == 200:
+                    fname = img_url.split("/")[-1]
+                    new_img = ProductImage(product=product)
+                    new_img.image.save(fname, ContentFile(img_resp.content), save=True)
+            except Exception as e:
+                print(f"Error downloading gallery: {e}")
+        count += 1
+    return count
+
+def fetch_api(request):
+    try:
+        count = fetch_products()
+        return HttpResponse(f"Import API success! Saved {count} products.")
+    except Exception as e:
+        return HttpResponse(f"Error: {str(e)}", status=500)
+
+# --- 2. API สินค้า (Products) ---
 @csrf_exempt
 def api_products(request):
     if request.method == "GET":
-        # เริ่มต้นดึงสินค้าทั้งหมด
         products_queryset = Product.objects.all()
 
-        # 🔍 1. กรองตามหมวดหมู่ (Category)
+        # Filtering
         category = request.GET.get('category')
         if category and category != "ทั้งหมด":
             products_queryset = products_queryset.filter(category=category)
 
-        # 🔍 2. ค้นหา (Search)
         search = request.GET.get('search')
         if search:
             products_queryset = products_queryset.filter(title__icontains=search)
 
-        # 🔍 3. กรองช่วงราคา (Price Range)
         min_price = request.GET.get('min_price')
         max_price = request.GET.get('max_price')
         if min_price:
@@ -40,7 +84,7 @@ def api_products(request):
         if max_price:
             products_queryset = products_queryset.filter(price__lte=max_price)
 
-        # 🔃 4. เรียงลำดับ (Sort)
+        # Sorting
         sort = request.GET.get('sort')
         if sort == 'price_asc':
             products_queryset = products_queryset.order_by('price')
@@ -49,15 +93,14 @@ def api_products(request):
         elif sort == 'newest':
             products_queryset = products_queryset.order_by('-id')
         else:
-            products_queryset = products_queryset.order_by('-id') # Default
+            products_queryset = products_queryset.order_by('-id')
 
-        # แปลงข้อมูลส่งกลับ
         products_data = []
         for p in products_queryset:
             image_url = ""
             if p.thumbnail:
                 image_url = request.build_absolute_uri(p.thumbnail.url)
-                
+            
             products_data.append({
                 "id": p.id,
                 "title": p.title,
@@ -72,7 +115,6 @@ def api_products(request):
         return JsonResponse({"products": products_data})
 
     elif request.method == "POST":
-        # (คงโค้ด POST เดิมไว้)
         try:
             data = request.POST
             files = request.FILES
@@ -103,8 +145,7 @@ def api_product_detail(request, product_id):
     if request.method == "GET":
         images = [request.build_absolute_uri(img.image.url) for img in product.images.all() if img.image]
         thumbnail_url = request.build_absolute_uri(product.thumbnail.url) if product.thumbnail else ""
-
-        # ✅ ดึงรีวิวของสินค้านี้
+        
         reviews = list(product.reviews.values('user', 'rating', 'comment', 'created_at').order_by('-created_at'))
 
         data = {
@@ -118,12 +159,11 @@ def api_product_detail(request, product_id):
             "rating": product.rating,
             "thumbnail": thumbnail_url,
             "images": images,
-            "reviews": reviews # ส่งรีวิวกลับไปด้วย
+            "reviews": reviews
         }
         return JsonResponse(data)
     
     elif request.method == "PUT":
-        # (คงโค้ด PUT เดิมไว้)
         try:
             data = json.loads(request.body)
             product.title = data.get("title", product.title)
@@ -141,7 +181,7 @@ def api_product_detail(request, product_id):
         product.delete()
         return JsonResponse({"message": "Deleted successfully"})
 
-# ✅ เพิ่ม API สำหรับเขียนรีวิว
+# --- 3. API รีวิว (Reviews) ---
 @csrf_exempt
 def api_add_review(request, product_id):
     if request.method == "POST":
@@ -149,7 +189,6 @@ def api_add_review(request, product_id):
             data = json.loads(request.body)
             product = Product.objects.get(id=product_id)
             
-            # บันทึกรีวิว
             Review.objects.create(
                 product=product,
                 user=data.get("name", "Anonymous"),
@@ -157,7 +196,7 @@ def api_add_review(request, product_id):
                 comment=data.get("comment", "")
             )
 
-            # คำนวณคะแนนเฉลี่ยใหม่
+            # Recalculate Average Rating
             avg_rating = product.reviews.aggregate(Avg('rating'))['rating__avg']
             product.rating = round(avg_rating, 1) if avg_rating else 0
             product.save()
@@ -166,21 +205,78 @@ def api_add_review(request, product_id):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
 
+# --- 4. API สั่งซื้อ & ประวัติ (Order & History) ---
 @csrf_exempt
 def api_checkout(request):
-    # (คงโค้ด Checkout เดิมไว้)
     if request.method == "POST":
         try:
             data = json.loads(request.body)
             items = data.get("items", [])
+            customer = data.get("customer", {})
+            
+            total_price = sum(item['price'] * item['quantity'] for item in items)
+
             with transaction.atomic():
+                # Create Order
+                order = Order.objects.create(
+                    customer_name=customer.get('name'),
+                    customer_tel=customer.get('tel'),
+                    address=customer.get('address'),
+                    total_price=total_price,
+                    status='Processing'
+                )
+
+                # Create OrderItems & Update Stock
                 for item in items:
                     product = Product.objects.select_for_update().get(id=item["id"])
                     if product.stock is not None and product.stock < item["quantity"]:
                         raise Exception(f"สินค้า {product.title} หมดหรือมีไม่พอ")
+                    
                     if product.stock is not None:
                         product.stock -= item["quantity"]
                         product.save()
-            return JsonResponse({"message": "Order placed successfully"})
+                    
+                    OrderItem.objects.create(
+                        order=order,
+                        product=product,
+                        quantity=item["quantity"],
+                        price=item["price"]
+                    )
+
+            return JsonResponse({"message": "Order placed successfully", "order_id": order.id})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
+
+@csrf_exempt
+def api_order_history(request):
+    if request.method == "GET":
+        tel = request.GET.get('tel')
+        if not tel:
+            return JsonResponse({"error": "Phone number required"}, status=400)
+        
+        orders = Order.objects.filter(customer_tel=tel).order_by('-created_at')
+        
+        orders_data = []
+        for order in orders:
+            items = []
+            for item in order.items.all():
+                thumb = ""
+                if item.product.thumbnail:
+                    thumb = request.build_absolute_uri(item.product.thumbnail.url)
+                
+                items.append({
+                    "product_title": item.product.title,
+                    "quantity": item.quantity,
+                    "price": item.price,
+                    "thumbnail": thumb
+                })
+            
+            orders_data.append({
+                "id": order.id,
+                "status": order.get_status_display(),
+                "total_price": order.total_price,
+                "created_at": order.created_at,
+                "items": items
+            })
+            
+        return JsonResponse({"orders": orders_data})

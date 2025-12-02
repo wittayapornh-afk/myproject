@@ -10,6 +10,8 @@ import CartPage from './components/CartPage';
 import CheckoutPage from './components/CheckoutPage';
 import HeroSection from './components/HeroSection';
 import Footer from './components/Footer'; // ✅ 1. นำเข้า Footer
+import PaymentPage from './components/PaymentPage'; // ✅ เพิ่ม
+import OrderHistory from './components/OrderHistory'; // ✅ เพิ่ม
 
 function App() {
   return (
@@ -29,6 +31,8 @@ function App() {
             <Route path="/product/edit/:id" element={<div className="pt-10"><ProductEdit /></div>} />
             <Route path="/cart" element={<div className="pt-10"><CartPage /></div>} />
             <Route path="/checkout" element={<div className="pt-10"><CheckoutPage /></div>} />
+            <Route path="/payment" element={<div className="pt-10"><PaymentPage /></div>} /> {/* ✅ เพิ่ม */}
+            <Route path="/order-history" element={<div className="pt-10"><OrderHistory /></div>} /> {/* ✅ เพิ่ม */}
         </Routes>
       </div>
 
