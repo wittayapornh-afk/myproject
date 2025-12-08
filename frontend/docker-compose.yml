@@ -1,0 +1,18 @@
+# ไฟล์: frontend/docker-compose.yml
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shop_frontend
+    ports:
+      - "3000:80"
+    networks:
+      - shop-net
+
+networks:
+  shop-net:
+    external: true      # สำคัญ! บอกว่า Network นี้มีอยู่แล้ว (Backend สร้างไว้)
+    name: shop-network  # ชื่อต้องตรงกับที่ตั้งใน Backend

@@ -1,0 +1,16 @@
+# ไฟล์ฐานข้อมูล (ไม่ควรเอาขึ้น เพราะข้อมูลจะทับกัน)
+*.sqlite3
+db.sqlite3
+
+# โฟลเดอร์ Library ที่หนักๆ (คนอื่นโหลดเองได้จาก package.json)
+node_modules/
+dist/
+build/
+
+# ไฟล์ขยะของ Python (ถ้ามี)
+__pycache__/
+*.pyc
+
+# ไฟล์ Environment Variables (เก็บรหัสลับ)
+.env
+.DS_Store
