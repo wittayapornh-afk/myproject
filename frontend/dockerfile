@@ -2,10 +2,14 @@
 FROM node:20 as build-stage
 WORKDIR /app
 COPY package*.json ./
+<<<<<<< HEAD
 
 # ✅ แก้บรรทัดนี้: เพิ่ม --legacy-peer-deps เพื่อข้ามปัญหา version ตีกัน
 RUN npm install --legacy-peer-deps
 
+=======
+RUN npm install
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 COPY . .
 RUN npm run build
 

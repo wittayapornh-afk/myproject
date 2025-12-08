@@ -11,7 +11,10 @@ function PaymentPage() {
   const [paymentMethod, setPaymentMethod] = useState('qrcode');
   const [isProcessing, setIsProcessing] = useState(false);
 
+<<<<<<< HEAD
   // ถ้าไม่มีข้อมูลการสั่งซื้อส่งมา (เช่น พิมพ์ URL เข้ามาเอง) ให้ดีดกลับหน้าแรก
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
   if (!location.state) {
       navigate('/');
       return null;
@@ -20,20 +23,27 @@ function PaymentPage() {
   const handlePayment = async () => {
     setIsProcessing(true);
     
+<<<<<<< HEAD
     // 1. ดึงข้อมูล User จาก LocalStorage (ถ้ามี)
     const user = JSON.parse(localStorage.getItem('user'));
 
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
     // จำลองเวลาประมวลผลธนาคาร 2 วินาที
     setTimeout(async () => {
         try {
             const response = await fetch('http://localhost:8000/api/checkout/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+<<<<<<< HEAD
                 body: JSON.stringify({ 
                     items: cartItems, 
                     customer: customer,
                     user_id: user ? user.id : null // ✅ ส่ง user_id ไปด้วย (ถ้าล็อกอินอยู่)
                 })
+=======
+                body: JSON.stringify({ items: cartItems, customer: customer })
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
             });
             const result = await response.json();
 

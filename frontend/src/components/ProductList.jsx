@@ -3,7 +3,10 @@ import { Link } from "react-router-dom";
 import { useSearch } from "../context/SearchContext";
 import { useCart } from "../context/CartContext";
 import Swal from 'sweetalert2';
+<<<<<<< HEAD
 const [user, setUser] = useState(null);
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 
 function ProductList() {
   const [products, setProducts] = useState([]);
@@ -13,7 +16,10 @@ function ProductList() {
   const [sortOption, setSortOption] = useState("newest");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+<<<<<<< HEAD
   const [categories, setCategories] = useState(["ทั้งหมด"]); // ✅ Dynamic Categories
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
   const [selectedCategory, setSelectedCategory] = useState("ทั้งหมด");
 
   const { searchQuery } = useSearch();
@@ -32,7 +38,11 @@ function ProductList() {
     }
   });
 
+<<<<<<< HEAD
   // ฟังก์ชันโหลดข้อมูลสินค้า
+=======
+  // ฟังก์ชันโหลดข้อมูลแบบมีเงื่อนไข
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
   const fetchProducts = () => {
     setLoading(true);
     let url = `http://localhost:8000/api/products/?sort=${sortOption}`;
@@ -53,6 +63,7 @@ function ProductList() {
         setLoading(false);
       });
   };
+<<<<<<< HEAD
   
 useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -62,6 +73,8 @@ useEffect(() => {
     fetch('http://localhost:8000/api/categories/')
       // ...
   }, []);
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 
   useEffect(() => {
     fetchProducts();
@@ -96,14 +109,26 @@ useEffect(() => {
     }
   };
 
+<<<<<<< HEAD
+=======
+  const categories = ["ทั้งหมด", "beauty", "fragrances", "furniture", "groceries", "IT","cleaning product"];
+
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
   return (
     <div id="shop-section" className="w-full py-16 px-6 bg-background">
       <div className="max-w-6xl mx-auto">
         
+<<<<<<< HEAD
         {/* --- Filter & Sort Bar --- */}
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-10 flex flex-col md:flex-row gap-6 items-center justify-between">
           
           {/* หมวดหมู่ (Dynamic) */}
+=======
+        {/* --- 🛠️ Filter & Sort Bar (ส่วนใหม่) --- */}
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-10 flex flex-col md:flex-row gap-6 items-center justify-between">
+          
+          {/* หมวดหมู่ */}
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
           <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto scrollbar-thin">
               {categories.map(cat => (
                   <button 
@@ -160,6 +185,7 @@ useEffect(() => {
                            </span>
                            {product.price > 1000 && <span className="bg-[#FFD700] text-black text-[10px] px-3 py-1.5 rounded-full font-bold uppercase tracking-wider shadow-sm">🏆 Premium</span>}
                            {product.id > 20 && <span className="bg-[#FF6B6B] text-white text-[10px] px-3 py-1.5 rounded-full font-bold uppercase tracking-wider shadow-sm">✨ New</span>}
+<<<<<<< HEAD
 
                            {/* ✅ ป้ายสถานะสต็อก */}
                            {product.stock === 0 ? (
@@ -171,6 +197,8 @@ useEffect(() => {
                                     🔥 เหลือเพียง {product.stock} ชิ้น
                                 </span>
                            ) : null}
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
                       </div>
                       
                       <div className="w-full md:w-80 h-72 rounded-[2rem] flex-shrink-0 relative overflow-hidden transition-colors flex items-center justify-center bg-[#FAFAF8]">
@@ -193,6 +221,7 @@ useEffect(() => {
                               <span className="text-3xl font-bold text-primary">฿{product.price?.toLocaleString()}</span>
                               </div>
                               <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+<<<<<<< HEAD
                               {/* ✅ ปุ่มใส่ตะกร้า (พร้อม Logic ปิดปุ่มถ้าของหมด) */}
                               <button 
                                   onClick={() => handleAddToCart(product)} 
@@ -206,6 +235,11 @@ useEffect(() => {
                                   {product.stock === 0 ? 'หมด' : 'ใส่ตะกร้า'}
                               </button>
                               
+=======
+                              <button onClick={() => handleAddToCart(product)} className="flex-1 md:flex-none bg-primary hover:bg-[#234236] text-white px-8 py-3 rounded-full font-bold shadow-md transition-all active:scale-95">
+                                  ใส่ตะกร้า
+                              </button>
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
                               <Link to={`/product/edit/${product.id}`} className="w-12 h-12 rounded-full border-2 border-gray-100 flex items-center justify-center text-gray-400 hover:text-white hover:bg-primary hover:border-primary transition shadow-sm">✎</Link>
                               <button onClick={(e) => handleDelete(product.id, e)} className="w-12 h-12 rounded-full border-2 border-gray-100 flex items-center justify-center text-gray-400 hover:text-white hover:bg-red-500 hover:border-red-500 transition shadow-sm">✕</button>
                               </div>

@@ -2,15 +2,23 @@ from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
+<<<<<<< HEAD
 from django.db.models import Avg, Sum, Count # ✅ เพิ่ม Sum, Count
 from django.contrib.auth.models import User # ✅ เพิ่ม User
 from django.contrib.auth import authenticate # ✅ เพิ่ม authenticate
+=======
+from django.db.models import Avg
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 from django.core.files.base import ContentFile
 import json
 import requests
 from .models import Product, ProductImage, Review, Order, OrderItem
 
+<<<<<<< HEAD
 # --- 1. Seeding Data ---
+=======
+# --- 1. ระบบดึงข้อมูลตัวอย่าง (Seeding) ---
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 def fetch_products():
     url = "https://dummyjson.com/products?limit=30"
     response = requests.get(url)
@@ -31,7 +39,11 @@ def fetch_products():
                 "brand": item.get("brand", ""),
             }
         )
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
         # Download Thumbnail
         thumb_url = item.get("thumbnail")
         if thumb_url and not product.thumbnail:
@@ -43,7 +55,11 @@ def fetch_products():
             except Exception as e:
                 print(f"Error downloading thumbnail: {e}")
 
+<<<<<<< HEAD
         # Download Gallery
+=======
+        # Download Gallery Images
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
         ProductImage.objects.filter(product=product).delete()
         for img_url in item.get("images", []):
             try:
@@ -64,12 +80,20 @@ def fetch_api(request):
     except Exception as e:
         return HttpResponse(f"Error: {str(e)}", status=500)
 
+<<<<<<< HEAD
 # --- 2. Products API ---
+=======
+# --- 2. API สินค้า (Products) ---
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 @csrf_exempt
 def api_products(request):
     if request.method == "GET":
         products_queryset = Product.objects.all()
 
+<<<<<<< HEAD
+=======
+        # Filtering
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
         category = request.GET.get('category')
         if category and category != "ทั้งหมด":
             products_queryset = products_queryset.filter(category=category)
@@ -85,21 +109,47 @@ def api_products(request):
         if max_price:
             products_queryset = products_queryset.filter(price__lte=max_price)
 
+<<<<<<< HEAD
+=======
+        # Sorting
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
         sort = request.GET.get('sort')
         if sort == 'price_asc':
             products_queryset = products_queryset.order_by('price')
         elif sort == 'price_desc':
             products_queryset = products_queryset.order_by('-price')
+<<<<<<< HEAD
+=======
+        elif sort == 'newest':
+            products_queryset = products_queryset.order_by('-id')
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
         else:
             products_queryset = products_queryset.order_by('-id')
 
         products_data = []
         for p in products_queryset:
+<<<<<<< HEAD
             image_url = request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else ""
             products_data.append({
                 "id": p.id, "title": p.title, "description": p.description,
                 "category": p.category, "price": p.price, "rating": p.rating,
                 "stock": p.stock, "brand": p.brand, "thumbnail": image_url,
+=======
+            image_url = ""
+            if p.thumbnail:
+                image_url = request.build_absolute_uri(p.thumbnail.url)
+            
+            products_data.append({
+                "id": p.id,
+                "title": p.title,
+                "description": p.description,
+                "category": p.category,
+                "price": p.price,
+                "rating": p.rating,
+                "stock": p.stock,
+                "brand": p.brand,
+                "thumbnail": image_url,
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
             })
         return JsonResponse({"products": products_data})
 
@@ -134,6 +184,7 @@ def api_product_detail(request, product_id):
     if request.method == "GET":
         images = [request.build_absolute_uri(img.image.url) for img in product.images.all() if img.image]
         thumbnail_url = request.build_absolute_uri(product.thumbnail.url) if product.thumbnail else ""
+<<<<<<< HEAD
         reviews = list(product.reviews.values('user', 'rating', 'comment', 'created_at').order_by('-created_at'))
 
         data = {
@@ -141,6 +192,23 @@ def api_product_detail(request, product_id):
             "price": product.price, "category": product.category, "brand": product.brand,
             "stock": product.stock, "rating": product.rating, "thumbnail": thumbnail_url,
             "images": images, "reviews": reviews
+=======
+        
+        reviews = list(product.reviews.values('user', 'rating', 'comment', 'created_at').order_by('-created_at'))
+
+        data = {
+            "id": product.id,
+            "title": product.title,
+            "description": product.description,
+            "price": product.price,
+            "category": product.category,
+            "brand": product.brand,
+            "stock": product.stock,
+            "rating": product.rating,
+            "thumbnail": thumbnail_url,
+            "images": images,
+            "reviews": reviews
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
         }
         return JsonResponse(data)
     
@@ -162,18 +230,23 @@ def api_product_detail(request, product_id):
         product.delete()
         return JsonResponse({"message": "Deleted successfully"})
 
+<<<<<<< HEAD
 # --- 3. Categories API ---
 def api_categories(request):
     categories = Product.objects.values_list('category', flat=True).distinct().order_by('category')
     return JsonResponse({"categories": ["ทั้งหมด"] + list(categories)})
 
 # --- 4. Review API ---
+=======
+# --- 3. API รีวิว (Reviews) ---
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 @csrf_exempt
 def api_add_review(request, product_id):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
             product = Product.objects.get(id=product_id)
+<<<<<<< HEAD
             Review.objects.create(
                 product=product, user=data.get("name", "Anonymous"),
                 rating=int(data.get("rating", 5)), comment=data.get("comment", "")
@@ -186,6 +259,26 @@ def api_add_review(request, product_id):
             return JsonResponse({"error": str(e)}, status=400)
 
 # --- 5. Checkout & Order API ---
+=======
+            
+            Review.objects.create(
+                product=product,
+                user=data.get("name", "Anonymous"),
+                rating=int(data.get("rating", 5)),
+                comment=data.get("comment", "")
+            )
+
+            # Recalculate Average Rating
+            avg_rating = product.reviews.aggregate(Avg('rating'))['rating__avg']
+            product.rating = round(avg_rating, 1) if avg_rating else 0
+            product.save()
+
+            return JsonResponse({"message": "Review added successfully", "new_rating": product.rating})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+# --- 4. API สั่งซื้อ & ประวัติ (Order & History) ---
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 @csrf_exempt
 def api_checkout(request):
     if request.method == "POST":
@@ -193,19 +286,28 @@ def api_checkout(request):
             data = json.loads(request.body)
             items = data.get("items", [])
             customer = data.get("customer", {})
+<<<<<<< HEAD
             user_id = data.get("user_id") # รับ user_id
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
             
             total_price = sum(item['price'] * item['quantity'] for item in items)
 
             with transaction.atomic():
+<<<<<<< HEAD
                 order = Order.objects.create(
                     user_id=user_id,
+=======
+                # Create Order
+                order = Order.objects.create(
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
                     customer_name=customer.get('name'),
                     customer_tel=customer.get('tel'),
                     address=customer.get('address'),
                     total_price=total_price,
                     status='Processing'
                 )
+<<<<<<< HEAD
                 for item in items:
                     product = Product.objects.select_for_update().get(id=item["id"])
                     if product.stock is not None and product.stock < item["quantity"]:
@@ -216,12 +318,34 @@ def api_checkout(request):
                     OrderItem.objects.create(order=order, product=product, quantity=item["quantity"], price=item["price"])
 
             return JsonResponse({"message": "Order success", "order_id": order.id})
+=======
+
+                # Create OrderItems & Update Stock
+                for item in items:
+                    product = Product.objects.select_for_update().get(id=item["id"])
+                    if product.stock is not None and product.stock < item["quantity"]:
+                        raise Exception(f"สินค้า {product.title} หมดหรือมีไม่พอ")
+                    
+                    if product.stock is not None:
+                        product.stock -= item["quantity"]
+                        product.save()
+                    
+                    OrderItem.objects.create(
+                        order=order,
+                        product=product,
+                        quantity=item["quantity"],
+                        price=item["price"]
+                    )
+
+            return JsonResponse({"message": "Order placed successfully", "order_id": order.id})
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
 
 @csrf_exempt
 def api_order_history(request):
     if request.method == "GET":
+<<<<<<< HEAD
         user_id = request.GET.get('user_id')
         tel = request.GET.get('tel')
         
@@ -231,18 +355,33 @@ def api_order_history(request):
             orders = Order.objects.filter(customer_tel=tel).order_by('-created_at')
         else:
             return JsonResponse({"error": "User ID or Phone required"}, status=400)
+=======
+        tel = request.GET.get('tel')
+        if not tel:
+            return JsonResponse({"error": "Phone number required"}, status=400)
+        
+        orders = Order.objects.filter(customer_tel=tel).order_by('-created_at')
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
         
         orders_data = []
         for order in orders:
             items = []
             for item in order.items.all():
+<<<<<<< HEAD
                 thumb = request.build_absolute_uri(item.product.thumbnail.url) if item.product.thumbnail else ""
+=======
+                thumb = ""
+                if item.product.thumbnail:
+                    thumb = request.build_absolute_uri(item.product.thumbnail.url)
+                
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
                 items.append({
                     "product_title": item.product.title,
                     "quantity": item.quantity,
                     "price": item.price,
                     "thumbnail": thumb
                 })
+<<<<<<< HEAD
             orders_data.append({
                 "id": order.id, "status": order.get_status_display(),
                 "total_price": order.total_price, "created_at": order.created_at, "items": items
@@ -298,3 +437,15 @@ def api_dashboard_stats(request):
         "low_stock_products": low_stock_products,
         "recent_orders": recent_orders
     })
+=======
+            
+            orders_data.append({
+                "id": order.id,
+                "status": order.get_status_display(),
+                "total_price": order.total_price,
+                "created_at": order.created_at,
+                "items": items
+            })
+            
+        return JsonResponse({"orders": orders_data})
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6

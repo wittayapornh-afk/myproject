@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+version: '3.8'
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 
 services:
   # 1. Django API
@@ -15,7 +19,11 @@ services:
       - DATABASE_PORT=3306
       - DATABASE_NAME=django_db
       - DATABASE_USER=django_user
+<<<<<<< HEAD
       - DATABASE_PASSWORD=django_password
+=======
+      - DATABASE_PASSWORD=MyStrongPass123
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
     command: python manage.py runserver 0.0.0.0:8000
     networks:
       - shop-net
@@ -35,11 +43,18 @@ services:
     environment:
       - MYSQL_DATABASE=django_db
       - MYSQL_USER=django_user
+<<<<<<< HEAD
       - MYSQL_PASSWORD=django_password
       - MYSQL_ROOT_PASSWORD=root_secret
     ports:
       - "3306:3306"
 
+=======
+      - MYSQL_PASSWORD=MyStrongPass123
+      - MYSQL_ROOT_PASSWORD=root_secret
+    ports:
+      - "3306:3306"
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
     networks:
       - shop-net
     # ✅ แก้ไขจุดที่ 2: เพิ่ม Healthcheck เพื่อตรวจสอบว่า Database พร้อมรับ connection หรือยัง
@@ -59,7 +74,11 @@ services:
       - PMA_PORT=3306
       - PMA_ARBITRARY=1
     ports:
+<<<<<<< HEAD
       - "8081:80"
+=======
+      - "8080:80"
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
     networks:
       - shop-net
     depends_on:

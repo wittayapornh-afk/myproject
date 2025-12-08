@@ -1,9 +1,14 @@
 // frontend/src/components/ProductAdd.jsx
+<<<<<<< HEAD
 import React, { useState, useRef, useEffect } from 'react';
+=======
+import React, { useState, useRef } from 'react';
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2'; // ✅ Import
 
 function ProductAdd() {
+<<<<<<< HEAD
     
     useEffect(() => {
       const user = JSON.parse(localStorage.getItem('user'));
@@ -13,6 +18,8 @@ function ProductAdd() {
       }
   }, []);
   
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
   const navigate = useNavigate();
   const [formData, setFormData] = useState({});
   const [thumbnailFile, setThumbnailFile] = useState(null);
@@ -87,7 +94,10 @@ function ProductAdd() {
         Swal.fire('Error', 'เชื่อมต่อ Server ไม่ได้', 'error');
     }
   };
+<<<<<<< HEAD
   
+=======
+>>>>>>> 6b750db946e3753df985d60eabebb30c65417bd6
 
   const styles = {
     label: "block text-sm font-bold text-gray-600 mb-2 ml-1", 
