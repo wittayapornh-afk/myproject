@@ -1,196 +1,180 @@
-from django.shortcuts import render, get_object_or_404
-from django.http import HttpResponse, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.db import transaction
-from django.db.models import Avg, Sum, Count
+from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate
-from django.core.files.base import ContentFile
-import json
-import requests
-from .models import Product, ProductImage, Review, Order, OrderItem
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework.permissions import IsAdminUser, AllowAny
+from django.db.models import Sum, Count
+from django.utils import timezone
+from datetime import timedelta
+from .models import Product, Order, OrderItem, Review
 
-def fetch_api(request):
-    try:
-        url = "https://dummyjson.com/products?limit=30"
-        response = requests.get(url)
-        data = response.json()
-        for item in data.get("products", []):
-            product, _ = Product.objects.update_or_create(
-                id=item["id"],
-                defaults={
-                    "title": item["title"],
-                    "description": item["description"],
-                    "category": item["category"],
-                    "price": item["price"],
-                    "rating": item.get("rating", 0),
-                    "stock": item.get("stock", 0),
-                    "brand": item.get("brand", ""),
-                }
-            )
-            if item.get("thumbnail") and not product.thumbnail:
-                try:
-                    img_resp = requests.get(item.get("thumbnail"))
-                    if img_resp.status_code == 200:
-                        fname = item.get("thumbnail").split("/")[-1]
-                        product.thumbnail.save(fname, ContentFile(img_resp.content), save=True)
-                except: pass
-        return HttpResponse("Import API success!")
-    except Exception as e:
-        return HttpResponse(f"Error: {str(e)}", status=500)
+# ==========================================
+# 🛒 ส่วนของ Public API (ใครก็เข้าถึงได้)
+# ==========================================
 
-@csrf_exempt
-def api_products(request):
-    if request.method == "GET":
-        qs = Product.objects.all()
-        cat = request.GET.get('category')
-        if cat and cat != "ทั้งหมด": qs = qs.filter(category=cat)
-        search = request.GET.get('search')
-        if search: qs = qs.filter(title__icontains=search)
-        
-        min_price = request.GET.get('min_price')
-        max_price = request.GET.get('max_price')
-        if min_price: qs = qs.filter(price__gte=min_price)
-        if max_price: qs = qs.filter(price__lte=max_price)
-
-        sort = request.GET.get('sort')
-        if sort == 'price_asc': qs = qs.order_by('price')
-        elif sort == 'price_desc': qs = qs.order_by('-price')
-        else: qs = qs.order_by('-id')
-        
-        products_data = []
-        for p in qs:
-            img = request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else ""
-            products_data.append({
-                "id": p.id, "title": p.title, "description": p.description,
-                "category": p.category, "price": p.price, "rating": p.rating,
-                "stock": p.stock, "brand": p.brand, "thumbnail": img,
-            })
-        return JsonResponse({"products": products_data})
-    
-    elif request.method == "POST":
-        try:
-            data = request.POST
-            files = request.FILES
-            product = Product.objects.create(
-                title=data.get("title"), description=data.get("description"),
-                category=data.get("category"), price=float(data.get("price", 0)),
-                stock=int(data.get("stock", 0)), brand=data.get("brand"),
-                thumbnail=files.get("thumbnail")
-            )
-            if "images" in files:
-                for f in files.getlist("images"):
-                    ProductImage.objects.create(product=product, image=f)
-            return JsonResponse({"message": "Success", "id": product.id}, status=201)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=400)
-
-@csrf_exempt
-def api_product_detail(request, product_id):
-    try:
-        p = Product.objects.get(id=product_id)
-    except Product.DoesNotExist:
-        return JsonResponse({"error": "Not found"}, status=404)
-
-    if request.method == "GET":
-        images = [request.build_absolute_uri(i.image.url) for i in p.images.all() if i.image]
-        thumb = request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else ""
-        reviews = list(p.reviews.values('user', 'rating', 'comment', 'created_at').order_by('-created_at'))
-        return JsonResponse({
-            "id": p.id, "title": p.title, "description": p.description,
-            "price": p.price, "category": p.category, "stock": p.stock,
-            "rating": p.rating, "thumbnail": thumb, "images": images, "reviews": reviews
-        })
-    elif request.method == "PUT":
-        data = json.loads(request.body)
-        p.title = data.get("title", p.title)
-        p.price = data.get("price", p.price)
-        p.stock = data.get("stock", p.stock)
-        p.category = data.get("category", p.category)
-        p.description = data.get("description", p.description)
-        p.save()
-        return JsonResponse({"message": "Updated"})
-    elif request.method == "DELETE":
-        p.delete()
-        return JsonResponse({"message": "Deleted"})
-
-def api_categories(request):
-    cats = Product.objects.values_list('category', flat=True).distinct().order_by('category')
-    return JsonResponse({"categories": ["ทั้งหมด"] + list(cats)})
-
-@csrf_exempt
-def api_add_review(request, product_id):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        p = Product.objects.get(id=product_id)
-        Review.objects.create(product=p, user=data.get("name"), rating=int(data.get("rating")), comment=data.get("comment"))
-        p.rating = round(p.reviews.aggregate(Avg('rating'))['rating__avg'] or 0, 1)
-        p.save()
-        return JsonResponse({"message": "Review added"})
-
-@csrf_exempt
-def api_checkout(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        items = data.get("items", [])
-        customer = data.get("customer", {})
-        user_id = data.get("user_id")
-        
-        total = sum(i['price'] * i['quantity'] for i in items)
-        try:
-            with transaction.atomic():
-                order = Order.objects.create(
-                    user_id=user_id, customer_name=customer.get('name'),
-                    customer_tel=customer.get('tel'), address=customer.get('address'),
-                    total_price=total, status='Processing'
-                )
-                for i in items:
-                    p = Product.objects.select_for_update().get(id=i["id"])
-                    if p.stock < i["quantity"]: raise Exception(f"Product {p.title} out of stock")
-                    p.stock -= i["quantity"]
-                    p.save()
-                    OrderItem.objects.create(order=order, product=p, quantity=i["quantity"], price=i["price"])
-            return JsonResponse({"message": "Order success", "order_id": order.id})
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=400)
-
-@csrf_exempt
-def api_order_history(request):
-    user_id = request.GET.get('user_id')
-    tel = request.GET.get('tel')
-    if user_id: orders = Order.objects.filter(user_id=user_id).order_by('-created_at')
-    elif tel: orders = Order.objects.filter(customer_tel=tel).order_by('-created_at')
-    else: return JsonResponse({"error": "Required user_id or tel"}, status=400)
-    
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def products_api(request):
+    products = Product.objects.all()
     data = []
-    for o in orders:
-        items = [{"product_title": i.product.title, "quantity": i.quantity, "price": i.price} for i in o.items.all()]
-        data.append({"id": o.id, "status": o.get_status_display(), "total_price": o.total_price, "created_at": o.created_at, "items": items})
-    return JsonResponse({"orders": data})
+    for p in products:
+        data.append({
+            "id": p.id,
+            "title": p.title,
+            "category": p.category,
+            "price": p.price,
+            "stock": p.stock,
+            "thumbnail": p.thumbnail.url if p.thumbnail else "",
+        })
+    return Response(data)
 
-@csrf_exempt
-def api_register(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        if User.objects.filter(username=data.get("username")).exists():
-            return JsonResponse({"error": "Username taken"}, status=400)
-        user = User.objects.create_user(username=data.get("username"), password=data.get("password"), email=data.get("email"), first_name=data.get("first_name"))
-        return JsonResponse({"message": "Success", "user_id": user.id})
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def products_api(request):
+    products = Product.objects.all()
+    
+    # ส่วนกรองข้อมูล (Filter)
+    category = request.query_params.get('category')
+    search = request.query_params.get('search')
+    min_price = request.query_params.get('min_price')
+    max_price = request.query_params.get('max_price')
+    sort = request.query_params.get('sort')
 
-@csrf_exempt
-def api_login(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        user = authenticate(username=data.get("username"), password=data.get("password"))
-        if user:
-            return JsonResponse({"message": "Success", "user": {"id": user.id, "username": user.username, "first_name": user.first_name, "is_superuser": user.is_superuser}})
-        return JsonResponse({"error": "Invalid credentials"}, status=401)
+    if category and category != "ทั้งหมด":
+        products = products.filter(category=category)
+    
+    if search:
+        products = products.filter(title__icontains=search)
+    
+    if min_price:
+        products = products.filter(price__gte=min_price)
+        
+    if max_price:
+        products = products.filter(price__lte=max_price)
 
-def api_dashboard_stats(request):
-    return JsonResponse({
-        "total_sales": Order.objects.aggregate(Sum('total_price'))['total_price__sum'] or 0,
-        "total_orders": Order.objects.count(),
-        "total_products": Product.objects.count(),
-        "low_stock_products": list(Product.objects.filter(stock__lt=5).values('id', 'title', 'stock')),
-        "recent_orders": list(Order.objects.order_by('-created_at')[:5].values('id', 'customer_name', 'total_price', 'status'))
+    # ส่วนเรียงลำดับ (Sort)
+    if sort == 'price_asc':
+        products = products.order_by('price')
+    elif sort == 'price_desc':
+        products = products.order_by('-price')
+    else: # newest
+        products = products.order_by('-id')
+
+    data = []
+    for p in products:
+        data.append({
+            "id": p.id,
+            "title": p.title,
+            "category": p.category,
+            "price": p.price,
+            "stock": p.stock,
+            "description": p.description,
+            "rating": p.rating,
+            "thumbnail": p.thumbnail.url if p.thumbnail else "",
+        })
+        
+    # ✅ แก้ไขตรงนี้: ห่อ data ด้วย {"products": ...}
+    return Response({"products": data})
+
+    
+
+# ==========================================
+# 👮 ส่วนของ Admin API (ต้องเป็น Superuser)
+# ==========================================
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def get_admin_stats(request):
+    # --- ข้อมูลสรุปยอดรวม ---
+    total_sales = Order.objects.filter(status='Delivered').aggregate(Sum('total_price'))['total_price__sum'] or 0
+    total_orders = Order.objects.count()
+    total_products = Product.objects.count()
+    
+    # สินค้าใกล้หมด (น้อยกว่า 5 ชิ้น)
+    low_stock_products = Product.objects.filter(stock__lt=5).values('id', 'title', 'stock')
+
+    # --- 1. กราฟยอดขาย 7 วัน (Logic ใหม่: แม่นยำกว่า) ---
+    today = timezone.now()
+    # ตัดเวลาทิ้งเอาแต่วันที่ เพื่อการเปรียบเทียบที่แน่นอน
+    last_7_days = today.date() - timedelta(days=6)
+
+    # ดึงข้อมูลเฉพาะวันที่ที่มีการขายจริง (สถานะ Delivered เท่านั้น)
+    sales_data = Order.objects.filter(
+        status='Delivered',
+        created_at__date__gte=last_7_days
+    ).values('created_at__date').annotate(total=Sum('total_price')).order_by('created_at__date')
+
+    # สร้าง Dictionary จับคู่วันที่กับยอดขาย เพื่อความเร็วในการค้นหา
+    sales_dict = {item['created_at__date']: item['total'] for item in sales_data}
+
+    graph_sales = []
+    # Loop ย้อนหลัง 7 วัน (รวมวันนี้) เพื่อสร้างแกน X ให้ครบทุกวัน
+    for i in range(6, -1, -1):
+        date_cursor = today.date() - timedelta(days=i)
+        day_name = date_cursor.strftime('%d/%m') # แปลงเป็นชื่อวัน เช่น 25/12
+        
+        # ดึงยอดขายจาก Dict ถ้าไม่มีให้ใส่ 0
+        total = sales_dict.get(date_cursor, 0)
+        graph_sales.append({'name': day_name, 'total': total})
+
+    # --- 2. กราฟหมวดหมู่สินค้าขายดี ---
+    category_data = OrderItem.objects.filter(order__status='Delivered')\
+        .values('product__category')\
+        .annotate(total_qty=Sum('quantity'))\
+        .order_by('-total_qty')[:5]
+    
+    graph_category = [
+        {'name': item['product__category'], 'value': item['total_qty']} 
+        for item in category_data
+    ]
+
+    # --- 3. ออเดอร์ล่าสุด ---
+    recent_orders = Order.objects.all().order_by('-created_at')[:5].values(
+        'id', 'customer_name', 'total_price', 'status', 'created_at'
+    )
+
+    return Response({
+        "total_sales": total_sales,
+        "total_orders": total_orders,
+        "total_products": total_products,
+        "low_stock_products": low_stock_products,
+        "graph_sales": graph_sales,       # ข้อมูลกราฟเส้น (แก้ไขแล้ว)
+        "graph_category": graph_category, # ข้อมูลกราฟแท่ง
+        "recent_orders": recent_orders
     })
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_api(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    
+    user = authenticate(request, username=username, password=password)
+    
+    if user is not None:
+        login(request, user)
+        return Response({
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "is_superuser": user.is_superuser
+            }
+        })
+    else:
+        return Response({"error": "Invalid credentials"}, status=400)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_api(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    email = request.data.get('email', '')
+
+    if User.objects.filter(username=username).exists():
+        return Response({"error": "Username already exists"}, status=400)
+
+    user = User.objects.create_user(username=username, password=password, email=email)
+    return Response({"message": "User created successfully"})
