@@ -5,6 +5,8 @@ ENV DJANGO_SETTINGS_MODULE myporject.settings
 
 WORKDIR /usr/src/app
 
+ENV PYTHONUNBUFFERED=1
+
 # ติดตั้ง dependencies ทีเดียวจบ
 RUN apt-get update && \
     apt-get install -y default-libmysqlclient-dev gcc pkg-config && \

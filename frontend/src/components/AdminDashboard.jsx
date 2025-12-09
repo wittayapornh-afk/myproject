@@ -26,7 +26,7 @@ function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#F2F0E4] py-10 px-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto min-w-0">
         <h1 className="text-3xl font-bold text-[#305949] mb-8">📊 แดชบอร์ดผู้ดูแลระบบ</h1>
 
         {/* --- 1. สรุปยอดรวม --- */}
@@ -49,53 +49,74 @@ function AdminDashboard() {
             </div>
         </div>
 
-        {/* --- 2. กราฟแสดงผล (แก้ความสูงให้แล้ว) --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+      {/* --- 2. กราฟแสดงผล (แก้ไขแล้ว) --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10 min-w-0">
             {/* กราฟยอดขาย 7 วัน */}
-            <div className="bg-white p-8 rounded-[2rem] shadow-sm">
+            {/* ✅ 1. ใส่ min-w-0 ที่นี่ เพื่อแก้ปัญหากราฟล้น/คำนวณผิดใน Grid */}
+            <div className="bg-white p-8 rounded-[2rem] shadow-sm min-w-0">
                 <h3 className="text-xl font-bold text-gray-800 mb-6">📈 แนวโน้มยอดขาย (7 วันล่าสุด)</h3>
                 
-                {/* ✅ ใช้ style กำหนดความสูงตรงๆ แก้ปัญหากราฟไม่ขึ้น/Error */}
-                <div className='h-96 w-full'></div>
-                <div style={{ width: '100%', height: 300, minWidth: 0 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={stats.graph_sales}>
-                            <defs>
-                                <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#305949" stopOpacity={0.8}/>
-                                    <stop offset="95%" stopColor="#305949" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                            <XAxis dataKey="name" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `฿${value}`} />
-                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                            <Area type="monotone" dataKey="total" stroke="#305949" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
+                {/* ✅ 2. ลบ <div className='h-96 w-full'></div> ออก เพราะมันไปดันที่กราฟ */}
+                
+                {/* ตรวจสอบข้อมูลก่อนแสดงกราฟ */}
+                {stats.graph_sales && stats.graph_sales.length > 0 ? (
+                    /* ✅ 3. กำหนดความสูงที่แน่นอน (h-[300px]) ให้ wrapper */
+                    <div className="w-full h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={stats.graph_sales}>
+                                <defs>
+                                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#305949" stopOpacity={0.8}/>
+                                        <stop offset="95%" stopColor="#305949" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                                <XAxis dataKey="name" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `฿${value}`} />
+                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                                <Area type="monotone" dataKey="total" stroke="#305949" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                ) : (
+                    <div className="h-[300px] flex items-center justify-center text-gray-400">
+                        ไม่มีข้อมูลยอดขาย
+                    </div>
+                )}
             </div>
 
             {/* กราฟสินค้าขายดีตามหมวด */}
-            <div className="bg-white p-8 rounded-[2rem] shadow-sm">
+            {/* ✅ ใส่ min-w-0 ที่นี่ด้วย */}
+            <div className="bg-white p-8 rounded-[2rem] shadow-sm min-w-0">
                 <h3 className="text-xl font-bold text-gray-800 mb-6">🏆 หมวดหมู่ขายดี</h3>
                 
-                {/* ✅ ใช้ style กำหนดความสูงตรงๆ เช่นกัน */}
-                <div className='h-96 w-full'></div>
-                <div style={{ width: '100%', height: 300, minWidth: 0 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={stats.graph_category} layout="vertical" margin={{ left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#eee" />
-                            <XAxis type="number" hide />
-                            <YAxis dataKey="name" type="category" width={100} stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
-                            <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                            <Bar dataKey="value" fill="#749B6B" radius={[0, 6, 6, 0]} barSize={24} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
+                {stats.graph_category && stats.graph_category.length > 0 ? (
+                    <div className="w-full h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.graph_category} layout="vertical" margin={{ left: 0, right: 30 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#eee" />
+                                <XAxis type="number" hide />
+                                <YAxis 
+                                    dataKey="name" 
+                                    type="category" 
+                                    width={80} 
+                                    stroke="#888" 
+                                    fontSize={12} 
+                                    tickLine={false} 
+                                    axisLine={false} 
+                                />
+                                <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                                <Bar dataKey="value" fill="#749B6B" radius={[0, 6, 6, 0]} barSize={24} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                ) : (
+                    <div className="h-[300px] flex items-center justify-center text-gray-400">
+                        ไม่มีข้อมูลหมวดหมู่
+                    </div>
+                )}
             </div>
         </div>
-
         {/* --- 3. ตารางข้อมูล (ออเดอร์ & สต็อก) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white p-8 rounded-[2rem] shadow-sm">
