@@ -1,106 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 
 function Navbar() {
   const { cartItems } = useCart();
-  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const location = useLocation();
-  const navigate = useNavigate();
-  
-  const [showSearch, setShowSearch] = useState(false);
   const { searchQuery, setSearchQuery } = useSearch();
-  const [user, setUser] = useState(null);
 
-  useEffect(() => {
-      const savedUser = localStorage.getItem('user');
-      if (savedUser) setUser(JSON.parse(savedUser));
-  }, []);
-
-  const handleLogout = () => {
-      localStorage.removeItem('user');
-      setUser(null);
-      navigate('/login');
-      window.location.reload();
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    setShowSearch(false);
-    if (location.pathname !== '/') navigate('/');
-  };
-
-  const menuItems = [
-    { name: "หน้าแรก", path: "/" },
-    { name: "สินค้าทั้งหมด", path: "/" },
-    { name: "ติดตามสถานะ", path: "/order-history" }, 
-  ];
-
-  if (user && user.is_superuser) {
-      menuItems.push({ name: "ลงขายสินค้า", path: "/product/add" });
-  }
+  // นับจำนวนสินค้าในตะกร้า
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <nav className="bg-primary sticky top-0 z-50 h-20 flex items-center shadow-lg transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-6 w-full flex justify-between items-center relative">
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="text-3xl filter drop-shadow-md">🥦</span>
-          <span className="text-2xl font-bold tracking-tight text-white group-hover:text-accent transition-colors">My Shop</span>
-        </Link>
+    <nav className="fixed top-0 left-0 w-full z-50 bg-[#F2F0E4]/80 backdrop-blur-md border-b border-white/20 shadow-sm transition-all duration-300">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
         
-        <div className="hidden md:flex gap-8 text-sm font-bold tracking-wide text-white/90">
-          {menuItems.map((item) => (
-            <Link key={item.name} to={item.path} className={`hover:text-white transition relative py-2 ${location.pathname === item.path ? 'text-white border-b-2 border-accent' : ''}`}>
-              {item.name}
-            </Link>
-          ))}
+        {/* Logo */}
+        <Link to="/" className="text-2xl font-bold tracking-tighter text-[#305949] flex items-center gap-2 hover:opacity-80 transition">
+          <span className="bg-[#305949] text-[#F2F0E4] w-10 h-10 flex items-center justify-center rounded-xl text-xl">S</span>
+          SHOP
+        </Link>
+
+        {/* Search Bar */}
+        <div className="flex-1 max-w-lg hidden md:block">
+          <div className="relative group">
+            <input 
+              type="text" 
+              placeholder="ค้นหาสินค้า..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white pl-12 pr-4 py-3 rounded-full border border-transparent outline-none focus:border-[#305949] focus:ring-2 focus:ring-[#305949]/20 transition-all shadow-sm group-hover:shadow-md"
+            />
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#305949] transition">🔍</span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4 text-white">
-          <button onClick={() => setShowSearch(!showSearch)} className="hover:text-accent transition transform hover:scale-110 p-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          </button>
-          
-          <Link to="/cart" className="relative hover:text-accent transition transform hover:scale-110 group p-2 mr-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+        {/* Menu Right */}
+        <div className="flex items-center gap-3">
+          {/* ปุ่ม Admin Dashboard (แสดงตลอดไปก่อนในช่วงทดสอบ) */}
+          <Link to="/admin" className="p-3 rounded-full hover:bg-white/50 text-gray-600 transition" title="Admin Dashboard">
+            📊
+          </Link>
+
+          {/* Cart Button */}
+          <Link to="/cart" className="relative p-3 rounded-full bg-white hover:bg-[#305949] hover:text-white text-[#305949] shadow-sm transition-all duration-300 group">
+            <span className="text-xl">🛒</span>
             {totalItems > 0 && (
-              <span className="absolute top-0 right-0 bg-secondary text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-md border border-primary animate-bounce">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-[#F2F0E4]">
                 {totalItems}
               </span>
             )}
           </Link>
-
-          <div className="pl-4 border-l border-white/20 flex items-center gap-3">
-              {user ? (
-                  <>
-                      {user.is_superuser && (
-                          <Link to="/admin" className="hidden lg:flex items-center gap-1 text-xs font-bold bg-yellow-400 text-black px-3 py-1.5 rounded-full shadow-md hover:bg-yellow-300 transition">
-                              <span>👑</span> Dashboard
-                          </Link>
-                      )}
-                      <div className="text-right hidden lg:block">
-                          <p className="text-[10px] text-accent uppercase tracking-wider font-bold">Welcome</p>
-                          <p className="text-sm font-bold truncate max-w-[100px] leading-tight">{user.first_name || user.username}</p>
-                      </div>
-                      <button onClick={handleLogout} className="bg-white/10 hover:bg-red-500 hover:text-white text-white p-2 rounded-full transition shadow-sm" title="Logout">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                      </button>
-                  </>
-              ) : (
-                  <Link to="/login" className="text-sm font-bold bg-white text-primary hover:bg-accent hover:text-white px-5 py-2 rounded-full transition shadow-md">
-                      Login
-                  </Link>
-              )}
-          </div>
-        </div>
-
-        <div className={`absolute top-full left-0 w-full bg-white/95 backdrop-blur-md p-4 transition-all duration-300 shadow-xl border-t border-gray-100 ${showSearch ? 'scale-y-100 opacity-100 visible' : 'scale-y-0 opacity-0 invisible origin-top'}`}>
-            <form onSubmit={handleSearchSubmit} className="max-w-2xl mx-auto flex items-center bg-gray-100 rounded-full px-4 py-2 border-2 border-transparent focus-within:border-primary focus-within:bg-white transition-all">
-                <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <input type="text" placeholder="ค้นหาสินค้าที่คุณต้องการ..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="flex-1 outline-none text-gray-700 bg-transparent placeholder-gray-400 text-sm md:text-base" autoFocus={showSearch} />
-                <button type="submit" className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full hover:bg-primary hover:text-white transition">ค้นหา</button>
-            </form>
         </div>
       </div>
     </nav>
