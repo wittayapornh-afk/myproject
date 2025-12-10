@@ -13,10 +13,4 @@ from django.core.wsgi import get_wsgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myporject.settings')
 
-
 application = get_wsgi_application()
-import os
-
-STATIC_URL = 'static/'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

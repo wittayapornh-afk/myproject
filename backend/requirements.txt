@@ -1,0 +1,7 @@
+django>=5.0,<6.0
+djangorestframework
+mysqlclient
+django-cors-headers
+requests
+Pillow
+gunicorn  # เพิ่มตัวนี้เพื่อความเสถียรในการรัน Server แบบ Production (ถ้าต้องการ)

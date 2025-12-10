@@ -5,14 +5,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true, // เปิดให้ Docker เข้าถึงได้ (0.0.0.0)
-    port: 80,   // ต้องตรงกับ docker-compose
-    watch: {
-      usePolling: true, // แก้ปัญหา Windows Docker ไม่เห็นการแก้ไฟล์
+    host: true, // สำคัญสำหรับ Docker
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000', // 'backend' คือชื่อ service ใน docker-compose
+        changeOrigin: true,
+        secure: false,
+      },
     },
-  },
-  resolve: {
-    // บังคับให้ใช้ React ตัวเดียวกัน เพื่อแก้ปัญหา useState Error
-    dedupe: ['react', 'react-dom'],
   },
 })

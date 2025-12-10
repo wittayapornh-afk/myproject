@@ -1,17 +1,29 @@
-# ✅ ใช้ Python 3.11-slim (Debian Bookworm) ที่เสถียรที่สุดตอนนี้
+# backend/Dockerfile
 FROM python:3.11-slim
 
+# ป้องกัน Python เขียน .pyc และให้ Output ออกทาง Console ทันที
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DJANGO_SETTINGS_MODULE=myporject.settings
 
 WORKDIR /usr/src/app
 
-# สั่งอัปเดตและติดตั้ง dependencies (รับรองว่าผ่านแน่นอน)
-RUN apt-get update && \
-    apt-get install -y default-libmysqlclient-dev gcc pkg-config && \
-    pip install --no-cache-dir django djangorestframework mysqlclient django-cors-headers requests Pillow
+# ติดตั้ง System Dependencies ที่จำเป็นสำหรับ MySQL และการ Compile
+RUN apt-get update && apt-get install -y \
+    default-libmysqlclient-dev \
+    gcc \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY . /usr/src/app/
+# Copy และติดตั้ง Python Dependencies (ทำก่อน Copy โค้ดเพื่อให้ Docker cache layer นี้ได้)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# สั่งรัน Server
+# Copy โค้ดทั้งหมด
+COPY . .
+
+# เปิด Port
+EXPOSE 8000
+
+# ใช้ command นี้เพื่อความง่ายใน Dev (ถ้าขึ้น Prod แนะนำให้เปลี่ยนเป็น gunicorn)
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
