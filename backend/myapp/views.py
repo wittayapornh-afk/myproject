@@ -1,21 +1,18 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.pagination import PageNumberPagination
+from .models import Product, Order, OrderItem
 from django.db.models import Sum
 from django.utils import timezone
 from datetime import timedelta
-from .models import Product, Order, OrderItem
-
-# ==========================================
-# 🛒 Public API (สินค้า & หมวดหมู่)
-# ==========================================
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def products_api(request):
-    # 1. ดึงข้อมูลและกรอง
     products = Product.objects.all()
     
+    # Filter Logic
     category = request.query_params.get('category')
     search = request.query_params.get('search')
     min_price = request.query_params.get('min_price')
@@ -24,17 +21,14 @@ def products_api(request):
 
     if category and category != "ทั้งหมด":
         products = products.filter(category=category)
-    
     if search:
         products = products.filter(title__icontains=search)
-    
     if min_price:
         products = products.filter(price__gte=min_price)
-        
     if max_price:
         products = products.filter(price__lte=max_price)
 
-    # 2. เรียงลำดับ
+    # Sort
     if sort == 'price_asc':
         products = products.order_by('price')
     elif sort == 'price_desc':
@@ -42,9 +36,16 @@ def products_api(request):
     else:
         products = products.order_by('-id')
 
-    # 3. เตรียมข้อมูลส่งกลับ
+    # ✅ Pagination (ตัวสำคัญ)
+    paginator = PageNumberPagination()
+    paginator.page_size = 12
+    result_page = paginator.paginate_queryset(products, request)
+
+    # เตรียม Data
     data = []
-    for p in products:
+    source = result_page if result_page is not None else products
+    
+    for p in source:
         data.append({
             "id": p.id,
             "title": p.title,
@@ -53,19 +54,31 @@ def products_api(request):
             "stock": p.stock,
             "description": p.description,
             "rating": p.rating,
-            "thumbnail": p.thumbnail.url if p.thumbnail else "",
+            "thumbnail": request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else "",
         })
         
-    return Response({"products": data})
+    return paginator.get_paginated_response(data)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def product_detail_api(request, product_id):
-    # ✅ ฟังก์ชันนี้ต้องมี! (ถ้าไม่มี Server จะพัง)
     try:
         p = Product.objects.get(id=product_id)
-        gallery_images = [img.image.url for img in p.images.all()]
         
+        gallery_images = []
+        for img in p.images.all():
+            try:
+                gallery_images.append(request.build_absolute_uri(img.image.url))
+            except:
+                pass
+        
+        thumbnail_url = ""
+        if p.thumbnail:
+            try:
+                thumbnail_url = request.build_absolute_uri(p.thumbnail.url)
+            except:
+                pass
+
         reviews = p.reviews.all().order_by('-created_at')
         reviews_data = [{
             "id": r.id,
@@ -84,7 +97,7 @@ def product_detail_api(request, product_id):
             "stock": p.stock,
             "brand": getattr(p, 'brand', ''), 
             "rating": p.rating,
-            "thumbnail": p.thumbnail.url if p.thumbnail else "",
+            "thumbnail": thumbnail_url,
             "images": gallery_images,
             "reviews": reviews_data
         }
@@ -95,13 +108,8 @@ def product_detail_api(request, product_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def categories_api(request):
-    # ดึงรายชื่อหมวดหมู่ทั้งหมด
     categories = Product.objects.values_list('category', flat=True).distinct()
     return Response({"categories": ["ทั้งหมด"] + list(categories)})
-
-# ==========================================
-# 👮 Admin API (Dashboard) - เปิด Public ชั่วคราว
-# ==========================================
 
 @api_view(['GET'])
 @permission_classes([AllowAny]) 

@@ -1,145 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// 🎨 1. ฟังก์ชันเลือกธีมสีตามหมวดหมู่สินค้า
-const getThemeStyle = (category) => {
-    switch (category) {
-        case 'smartphones':
-        case 'laptops':
-        case 'electronics':
-        case 'mens-watches':
-            // 🟠 ธีมส้มอิฐ (สำหรับสินค้า IT)
-            return { bg: '#9A3412', accent: '#FDBA74', text: 'white', btnBg: 'white', btnText: '#9A3412' };
-        
-        case 'furniture':
-        case 'home-decoration':
-        case 'lighting':
-            // ⚪️ ธีมครีม/ขาว (สำหรับเฟอร์นิเจอร์) - ตัวหนังสือสีเขียวเข้ม
-            return { bg: '#F5F5F0', accent: '#325343', text: '#263A33', btnBg: '#325343', btnText: 'white' };
-        
-        case 'beauty':
-        case 'skincare':
-        case 'fragrances':
-            // 🔴 ธีมชมพูเข้ม/แดง (สำหรับความงาม)
-            return { bg: '#831843', accent: '#FBCFE8', text: 'white', btnBg: 'white', btnText: '#831843' };
-            
-        case 'groceries':
-            // 🥦 ธีมเขียวสด (สำหรับของกิน)
-            return { bg: '#14532D', accent: '#86EFAC', text: 'white', btnBg: 'white', btnText: '#14532D' };
-            
-        default:
-            // 🟢 ธีมเขียวมาตรฐาน (Default)
-            return { bg: '#325343', accent: '#B5D69E', text: 'white', btnBg: 'white', btnText: '#325343' };
-    }
-};
-
-// 🧱 2. Component ย่อย: สำหรับแสดงผล 1 บล็อก
-const HeroBlock = ({ product, isReversed }) => {
-    const navigate = useNavigate();
-    
-    // ถ้าข้อมูลยังไม่มา ให้แสดง Loading
-    if (!product) return (
-        <div className="w-full h-[450px] flex items-center justify-center bg-gray-100 animate-pulse">
-            <span className="text-4xl text-gray-300">⏳ Loading...</span>
-        </div>
-    );
-
-    const theme = getThemeStyle(product.category);
-
-    // กดแล้วไปหน้ารายละเอียดสินค้านั้นๆ
-    const handleBuyNow = () => {
-        navigate(`/product/${product.id}`);
-    };
-
-    return (
-        <div 
-            className="relative w-full h-[450px] md:h-[500px] overflow-hidden flex items-center transition-colors duration-1000"
-            style={{ backgroundColor: theme.bg }}
-        >
-            {/* Effect พื้นหลังจางๆ */}
-            <div className="absolute inset-0 opacity-20" 
-                 style={{ background: `linear-gradient(120deg, transparent 40%, ${theme.text} 150%)` }}>
-            </div>
-
-            <div className={`max-w-7xl mx-auto px-6 w-full flex flex-col md:flex-row items-center gap-12 relative z-10 ${isReversed ? 'md:flex-row-reverse' : ''}`}>
-                
-                {/* ส่วนข้อความ */}
-                <div className={`w-full md:w-1/2 text-center ${isReversed ? 'md:text-right' : 'md:text-left'}`}>
-                    <span className="inline-block px-3 py-1 mb-4 text-xs font-bold uppercase tracking-widest rounded-full border opacity-80" 
-                          style={{ color: theme.text, borderColor: theme.text }}>
-                        {product.category}
-                    </span>
-                    
-                    <h2 className="text-4xl md:text-6xl font-bold mb-6 leading-tight drop-shadow-sm" style={{ color: theme.text }}>
-                        {product.title}
-                    </h2>
-                    
-                    <p className="text-sm md:text-lg mb-8 opacity-90 line-clamp-2 max-w-md mx-auto md:mx-0" 
-                       style={{ color: theme.text, marginLeft: isReversed ? 'auto' : '0' }}>
-                        {product.description}
-                    </p>
-                    
-                    <button 
-                        onClick={handleBuyNow}
-                        className="px-8 py-3 rounded-full font-bold shadow-lg transform hover:-translate-y-1 transition-all active:scale-95"
-                        style={{ backgroundColor: theme.btnBg, color: theme.btnText }}
-                    >
-                        ช้อปเลย
-                    </button>
-                </div>
-
-                {/* ส่วนรูปภาพ */}
-                <div className="w-full md:w-1/2 flex justify-center">
-                    <img 
-                        src={product.thumbnail} 
-                        alt={product.title} 
-                        className="h-[250px] md:h-[380px] object-contain drop-shadow-2xl hover:scale-105 transition duration-700 cursor-pointer"
-                        style={{ filter: "drop-shadow(0 20px 30px rgba(0,0,0,0.3))" }}
-                        onClick={handleBuyNow}
-                    />
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// 🏠 3. Component หลัก: ดึงข้อมูลและวนลูปแสดงผล
 function HeroSection() {
-  const [productsToShow, setProductsToShow] = useState([]);
-
-  useEffect(() => {
-    fetch('http://localhost:8000/api/products/')
-      .then(res => res.json())
-      .then(data => {
-        if (data.products && data.products.length >= 2) {
-            // 🎯 Logic: พยายามหาสินค้า 2 ชิ้นที่ "ต่างหมวดหมู่กัน"
-            
-            // ชิ้นที่ 1: หาพวก IT/Electronics ก่อน
-            let first = data.products.find(p => ['smartphones', 'laptops', 'electronics'].includes(p.category));
-            if (!first) first = data.products[0]; // ถ้าไม่มีเอาตัวแรกสุด
-
-            // ชิ้นที่ 2: หาพวก Furniture/Home ที่ไม่ใช่ชิ้นแรก
-            let second = data.products.find(p => ['furniture', 'home-decoration'].includes(p.category) && p.id !== first.id);
-            if (!second) second = data.products.find(p => p.id !== first.id); // ถ้าไม่มีเอาตัวถัดไปที่ไม่ซ้ำ
-
-            setProductsToShow([first, second].filter(Boolean));
-        } else if (data.products.length > 0) {
-            setProductsToShow([data.products[0]]);
-        }
-      })
-      .catch(err => console.error("Error fetching hero products:", err));
-  }, []);
+  const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col w-full">
-        {/* Loop แสดง HeroBlock ตามจำนวนสินค้าที่เลือกมา (สูงสุด 2) */}
-        {productsToShow.map((product, index) => (
-            <HeroBlock 
-                key={product.id} 
-                product={product} 
-                isReversed={index % 2 !== 0} // ถ้าเป็นตัวที่ 2 ให้สลับฝั่งรูป (Zig-Zag)
-            />
-        ))}
+    <div className="relative w-full bg-[#F2F0E4] overflow-hidden pt-10 pb-20 md:pt-20 md:pb-24">
+      {/* Background Graphic Elements */}
+      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#E8E6D9] to-transparent opacity-60 rounded-l-[10rem] -mr-20"></div>
+      <div className="absolute bottom-0 left-10 w-64 h-64 bg-[#305949]/5 rounded-full blur-3xl"></div>
+
+      <div className="max-w-7xl mx-auto px-6 relative z-10 flex flex-col md:flex-row items-center gap-12">
+        
+        {/* Left Content */}
+        <div className="flex-1 text-center md:text-left space-y-6">
+            <div className="inline-block px-4 py-1.5 bg-white border border-[#305949]/20 rounded-full text-[#305949] text-xs font-bold uppercase tracking-widest shadow-sm mb-2 animate-fade-in-up">
+                New Collection 2025
+            </div>
+            <h1 className="text-5xl md:text-7xl font-black text-[#263A33] leading-tight tracking-tight">
+                ค้นพบสไตล์<br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#305949] to-[#5C8D75]">ที่เป็นคุณ</span>
+            </h1>
+            <p className="text-gray-600 text-lg md:text-xl max-w-lg mx-auto md:mx-0 leading-relaxed">
+                แหล่งรวมสินค้าคุณภาพดีไซน์มินิมอล ที่คัดสรรมาเพื่อยกระดับไลฟ์สไตล์ของคุณ ช้อปง่าย ส่งไว มั่นใจได้ 100%
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
+                <button onClick={() => navigate('/shop')} className="px-8 py-4 bg-[#305949] text-white rounded-full font-bold shadow-lg shadow-[#305949]/30 hover:bg-[#234236] hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                    ช้อปสินค้าเลย 🛍️
+                </button>
+                <button className="px-8 py-4 bg-white text-[#263A33] border border-gray-200 rounded-full font-bold shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-300">
+                    ดูโปรโมชั่น 🔥
+                </button>
+            </div>
+        </div>
+
+        {/* Right Image (Hero) */}
+        <div className="flex-1 w-full flex justify-center relative">
+            <div className="relative w-[300px] md:w-[450px] aspect-[4/5] bg-white rounded-[3rem] shadow-2xl p-4 rotate-3 hover:rotate-0 transition-transform duration-700 ease-out border-8 border-white/50">
+                <img 
+                    src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1999&auto=format&fit=crop" 
+                    alt="Hero Product" 
+                    className="w-full h-full object-cover rounded-[2.5rem]"
+                />
+                {/* Floating Badge */}
+                <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-2xl shadow-xl border border-gray-100 flex items-center gap-3 animate-bounce-slow">
+                    <span className="text-3xl">⚡</span>
+                    <div>
+                        <p className="text-xs text-gray-400 font-bold uppercase">Special Offer</p>
+                        <p className="text-lg font-bold text-[#263A33]">ลดสูงสุด 50%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+      </div>
     </div>
   );
 }
