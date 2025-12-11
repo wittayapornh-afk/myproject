@@ -1,83 +1,77 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from rest_framework.pagination import PageNumberPagination
-from .models import Product, Order, OrderItem
 from django.db.models import Sum
+from django.db import transaction  # ✅ 1. ใส่ตัวนี้แก้ error transaction
 from django.utils import timezone
+from django.contrib.auth.models import User
 from datetime import timedelta
+from .models import Product, Order, OrderItem, UserProfile
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ==========================================
+# 🛒 Public API
+# ==========================================
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def products_api(request):
-    products = Product.objects.all()
-    
-    # Filter Logic
-    category = request.query_params.get('category')
-    search = request.query_params.get('search')
-    min_price = request.query_params.get('min_price')
-    max_price = request.query_params.get('max_price')
-    sort = request.query_params.get('sort')
+    try:
+        products = Product.objects.all().order_by('-id')
+        category = request.query_params.get('category')
+        search = request.query_params.get('search')
+        min_price = request.query_params.get('min_price')
+        max_price = request.query_params.get('max_price')
+        sort = request.query_params.get('sort')
 
-    if category and category != "ทั้งหมด":
-        products = products.filter(category=category)
-    if search:
-        products = products.filter(title__icontains=search)
-    if min_price:
-        products = products.filter(price__gte=min_price)
-    if max_price:
-        products = products.filter(price__lte=max_price)
+        if category and category != "ทั้งหมด":
+            products = products.filter(category=category)
+        if search:
+            products = products.filter(title__icontains=search)
+        if min_price:
+            products = products.filter(price__gte=min_price)
+        if max_price:
+            products = products.filter(price__lte=max_price)
 
-    # Sort
-    if sort == 'price_asc':
-        products = products.order_by('price')
-    elif sort == 'price_desc':
-        products = products.order_by('-price')
-    else:
-        products = products.order_by('-id')
+        if sort == 'price_asc':
+            products = products.order_by('price')
+        elif sort == 'price_desc':
+            products = products.order_by('-price')
 
-    # ✅ Pagination (ตัวสำคัญ)
-    paginator = PageNumberPagination()
-    paginator.page_size = 12
-    result_page = paginator.paginate_queryset(products, request)
+        paginator = PageNumberPagination()
+        paginator.page_size = 12
+        result_page = paginator.paginate_queryset(products, request)
 
-    # เตรียม Data
-    data = []
-    source = result_page if result_page is not None else products
-    
-    for p in source:
-        data.append({
-            "id": p.id,
-            "title": p.title,
-            "category": p.category,
-            "price": p.price,
-            "stock": p.stock,
-            "description": p.description,
-            "rating": p.rating,
-            "thumbnail": request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else "",
-        })
+        data = []
+        source = result_page if result_page is not None else products
         
-    return paginator.get_paginated_response(data)
+        for p in source:
+            data.append({
+                "id": p.id,
+                "title": p.title,
+                "category": p.category,
+                "price": p.price,
+                "stock": p.stock,
+                "description": p.description,
+                "rating": p.rating,
+                "thumbnail": request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else "",
+            })
+            
+        return paginator.get_paginated_response(data)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def product_detail_api(request, product_id):
     try:
         p = Product.objects.get(id=product_id)
-        
-        gallery_images = []
-        for img in p.images.all():
-            try:
-                gallery_images.append(request.build_absolute_uri(img.image.url))
-            except:
-                pass
-        
-        thumbnail_url = ""
-        if p.thumbnail:
-            try:
-                thumbnail_url = request.build_absolute_uri(p.thumbnail.url)
-            except:
-                pass
+        gallery_images = [request.build_absolute_uri(img.image.url) for img in p.images.all()]
+        thumbnail_url = request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else ""
 
         reviews = p.reviews.all().order_by('-created_at')
         reviews_data = [{
@@ -88,18 +82,21 @@ def product_detail_api(request, product_id):
             "date": r.created_at.strftime("%d/%m/%Y")
         } for r in reviews]
 
+        next_p = Product.objects.filter(id__gt=p.id).order_by('id').first()
+        prev_p = Product.objects.filter(id__lt=p.id).order_by('-id').first()
+        related_products = Product.objects.filter(category=p.category).exclude(id=p.id).order_by('?')[:4]
+        
+        related_data = [{
+            "id": rp.id, "title": rp.title, "price": rp.price, "rating": rp.rating,
+            "category": rp.category, "thumbnail": request.build_absolute_uri(rp.thumbnail.url) if rp.thumbnail else ""
+        } for rp in related_products]
+
         data = {
-            "id": p.id,
-            "title": p.title,
-            "description": p.description,
-            "category": p.category,
-            "price": p.price,
-            "stock": p.stock,
-            "brand": getattr(p, 'brand', ''), 
-            "rating": p.rating,
-            "thumbnail": thumbnail_url,
-            "images": gallery_images,
-            "reviews": reviews_data
+            "id": p.id, "title": p.title, "description": p.description, "category": p.category,
+            "price": p.price, "stock": p.stock, "brand": getattr(p, 'brand', ''), "rating": p.rating,
+            "thumbnail": thumbnail_url, "images": gallery_images, "reviews": reviews_data,
+            "next_product": next_p.id if next_p else None, "prev_product": prev_p.id if prev_p else None,
+            "related_products": related_data
         }
         return Response(data)
     except Product.DoesNotExist:
@@ -111,51 +108,148 @@ def categories_api(request):
     categories = Product.objects.values_list('category', flat=True).distinct()
     return Response({"categories": ["ทั้งหมด"] + list(categories)})
 
+# ==========================================
+# 📝 Auth & Profile
+# ==========================================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_api(request):
+    try:
+        data = request.data
+        username = data.get('username')
+        password = data.get('password')
+        email = data.get('email')
+        
+        if not username or not password:
+            return Response({"error": "กรุณากรอกข้อมูลให้ครบ"}, status=400)
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว"}, status=400)
+
+        user = User.objects.create_user(username=username, password=password, email=email)
+        profile = UserProfile.objects.create(user=user, role='user')
+
+        if 'avatar' in request.FILES:
+            profile.avatar = request.FILES['avatar']
+            profile.save()
+
+        return Response({"message": "สมัครสำเร็จ"}, status=201)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def user_profile_api(request):
+    user = request.user
+    if not hasattr(user, 'profile'):
+        UserProfile.objects.create(user=user)
+
+    if request.method == 'GET':
+        avatar_url = request.build_absolute_uri(user.profile.avatar.url) if user.profile.avatar else ""
+        return Response({
+            "id": user.id, "username": user.username, "role": user.profile.get_role_display(),
+            "role_code": user.profile.role, "email": user.email,
+            "phone": user.profile.phone, "address": user.profile.address, "avatar": avatar_url
+        })
+    elif request.method == 'PUT':
+        data = request.data
+        if 'email' in data: user.email = data['email']
+        user.save()
+        if 'phone' in data: user.profile.phone = data['phone']
+        if 'address' in data: user.profile.address = data['address']
+        if 'avatar' in request.FILES: user.profile.avatar = request.FILES['avatar']
+        user.profile.save()
+        return Response({"message": "Profile updated"})
+
+# ==========================================
+# 📦 Order & Admin
+# ==========================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_order(request):
+    try:
+        user = request.user # ✅ 2. ประกาศตัวแปร user (แก้ error user not defined)
+        data = request.data
+        cart_items = data.get('cart_items', [])
+        customer_info = data.get('customer_info', {})
+
+        if not cart_items:
+            return Response({"error": "ตะกร้าว่าง"}, status=HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic(): # ✅ ใช้ transaction
+            total_price = 0
+            for item in cart_items:
+                product = Product.objects.select_for_update().get(id=item['id'])
+                if product.stock < item['quantity']:
+                    raise ValueError(f"สินค้า '{product.title}' มีของไม่พอ")
+                total_price += product.price * item['quantity']
+
+            order = Order.objects.create(
+                user=user,
+                customer_name=customer_info.get('name', user.username),
+                customer_tel=customer_info.get('tel', '-'),
+                address=customer_info.get('address', '-'),
+                total_price=total_price,
+                status='Pending'
+            )
+
+            for item in cart_items:
+                product = Product.objects.get(id=item['id'])
+                OrderItem.objects.create(order=order, product=product, quantity=item['quantity'], price=product.price)
+                product.stock -= item['quantity']
+                product.save()
+
+            if hasattr(user, 'profile') and user.profile.role == 'user':
+                user.profile.role = 'customer'
+                user.profile.save()
+
+        return Response({"message": "สั่งซื้อสำเร็จ", "order_id": order.id}, status=HTTP_201_CREATED)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
 @api_view(['GET'])
-@permission_classes([AllowAny]) 
+@permission_classes([IsAuthenticated])
+def my_orders_api(request):
+    orders = Order.objects.filter(user=request.user).order_by('-created_at')
+    data = []
+    for o in orders:
+        items = [{"title": i.product.title, "quantity": i.quantity, "price": i.price, "thumbnail": request.build_absolute_uri(i.product.thumbnail.url) if i.product.thumbnail else ""} for i in o.items.all()]
+        data.append({"id": o.id, "date": o.created_at.strftime("%d/%m/%Y"), "total_price": o.total_price, "status": o.status, "items": items})
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def update_order_status(request, order_id):
+    try:
+        order = Order.objects.get(id=order_id)
+        order.status = request.data.get('status')
+        order.save()
+        return Response({"message": "Status updated"})
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found"}, status=404)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def get_admin_stats(request):
     total_sales = Order.objects.filter(status='Delivered').aggregate(Sum('total_price'))['total_price__sum'] or 0
     total_orders = Order.objects.count()
     total_products = Product.objects.count()
-    low_stock_products = Product.objects.filter(stock__lt=5).values('id', 'title', 'stock')
-
-    today = timezone.now()
-    last_7_days = today.date() - timedelta(days=6)
-
-    sales_data = Order.objects.filter(
-        status='Delivered',
-        created_at__date__gte=last_7_days
-    ).values('created_at__date').annotate(total=Sum('total_price')).order_by('created_at__date')
-
-    sales_dict = {item['created_at__date']: item['total'] for item in sales_data}
-
-    graph_sales = []
-    for i in range(6, -1, -1):
-        date_cursor = today.date() - timedelta(days=i)
-        day_name = date_cursor.strftime('%d/%m')
-        total = sales_dict.get(date_cursor, 0)
-        graph_sales.append({'name': day_name, 'total': total})
-
-    category_data = OrderItem.objects.filter(order__status='Delivered')\
-        .values('product__category')\
-        .annotate(total_qty=Sum('quantity'))\
-        .order_by('-total_qty')[:5]
+    total_users = UserProfile.objects.filter(role__in=['user', 'customer']).count()
     
-    graph_category = [
-        {'name': item['product__category'], 'value': item['total_qty']} 
-        for item in category_data
-    ]
-
-    recent_orders = Order.objects.all().order_by('-created_at')[:5].values(
-        'id', 'customer_name', 'total_price', 'status', 'created_at'
-    )
-
+    recent_orders = Order.objects.all().order_by('-created_at')[:5].values('id', 'customer_name', 'total_price', 'status', 'created_at')
+    
     return Response({
-        "total_sales": total_sales,
-        "total_orders": total_orders,
-        "total_products": total_products,
-        "low_stock_products": low_stock_products,
-        "graph_sales": graph_sales,
-        "graph_category": graph_category,
-        "recent_orders": recent_orders
+        "total_sales": total_sales, "total_orders": total_orders, "total_products": total_products,
+        "total_users": total_users, "recent_orders": recent_orders,
+        "graph_sales": [], "graph_category": [], "low_stock_products": []
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_users(request):
+    if request.user.profile.role != 'super_admin':
+        return Response({"error": "Unauthorized"}, status=403)
+    users = UserProfile.objects.all().select_related('user')
+    data = [{"id": u.user.id, "username": u.user.username, "email": u.user.email, "role": u.get_role_display(), "role_code": u.role, "date_joined": u.created_at.strftime("%d/%m/%Y")} for u in users]
+    return Response(data)
