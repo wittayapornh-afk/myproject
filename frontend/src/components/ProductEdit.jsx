@@ -1,168 +1,192 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 import Swal from 'sweetalert2';
-import { useAuth } from '../context/AuthContext'; // 1. นำเข้า AuthContext
+import { useAuth } from '../context/AuthContext';
 
 function ProductEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth(); // 2. ดึง user มาเช็คสิทธิ์
-  
+  const { token } = useAuth(); // ดึง Token มาใช้ยืนยันตัวตน
+
   const [formData, setFormData] = useState({
-    title: "", price: "", brand: "", stock: "", category: "", description: "", thumbnail: ""
+    title: '',
+    description: '',
+    price: '',
+    category: '',
+    stock: '',
+    brand: ''
   });
-  const [previewImage, setPreviewImage] = useState(null);
-  const [thumbnailFile, setThumbnailFile] = useState(null); // เพิ่ม state สำหรับไฟล์รูปใหม่
-  
-  const fileInputRef = useRef(null);
+  const [currentImage, setCurrentImage] = useState(''); // รูปเดิมที่มาจาก Server
+  const [newImage, setNewImage] = useState(null);       // รูปใหม่ที่ผู้ใช้เลือก (ถ้ามี)
+  const [loading, setLoading] = useState(true);
 
-  // 3. เช็คสิทธิ์ (Admin/Super Admin เท่านั้น)
+  // 1. โหลดข้อมูลสินค้าเดิมมาแสดง
   useEffect(() => {
-    if (user && user.role_code !== 'admin' && user.role_code !== 'super_admin') {
-         Swal.fire('Access Denied', 'สำหรับ Admin เท่านั้น!', 'error').then(() => navigate('/'));
-    }
-  }, [user, navigate]);
+    const fetchProduct = async () => {
+      try {
+        const res = await axios.get(`http://localhost:8000/api/products/${id}/`);
+        const p = res.data;
+        setFormData({
+          title: p.title,
+          description: p.description,
+          price: p.price,
+          category: p.category,
+          stock: p.stock,
+          brand: p.brand || ''
+        });
+        setCurrentImage(p.thumbnail); // เก็บ URL รูปเดิมไว้โชว์
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching product:", error);
+        Swal.fire('Error', 'ไม่พบข้อมูลสินค้า', 'error');
+        navigate('/shop');
+      }
+    };
+    fetchProduct();
+  }, [id, navigate]);
 
-  useEffect(() => {
-    fetch(`http://localhost:8000/api/products/${id}/`)
-      .then(res => res.json())
-      .then(data => {
-        setFormData(data);
-        setPreviewImage(data.thumbnail);
-      })
-      .catch(err => console.error(err));
-  }, [id]);
-
+  // 2. ฟังก์ชันจัดการเมื่อพิมพ์ข้อมูล
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        setThumbnailFile(file);
-        setPreviewImage(URL.createObjectURL(file));
+  // 3. ฟังก์ชันจัดการเมื่อเลือกรูปใหม่
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setNewImage(e.target.files[0]); // เก็บไฟล์รูปใหม่
+      // สร้าง URL ชั่วคราวเพื่อพรีวิวทันที
+      setCurrentImage(URL.createObjectURL(e.target.files[0])); 
     }
   };
 
+  // 4. บันทึกข้อมูล (Submit)
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // เตรียมข้อมูลส่งแบบ FormData (เพราะมีรูปภาพ)
+    const dataToSend = new FormData();
+    dataToSend.append('title', formData.title);
+    dataToSend.append('description', formData.description);
+    dataToSend.append('price', formData.price);
+    dataToSend.append('category', formData.category);
+    dataToSend.append('stock', formData.stock);
+    dataToSend.append('brand', formData.brand);
+
+    // ถ้ามีการเลือกรูปใหม่ ให้ส่งไปด้วย
+    if (newImage) {
+      dataToSend.append('thumbnail', newImage);
+    }
+
     try {
-      const token = localStorage.getItem('token'); // 4. ดึง Token
-
-      // 5. ใช้ FormData เพื่อความชัวร์ (รองรับทั้งข้อความและรูปภาพ)
-      const submitData = new FormData();
-      submitData.append('title', formData.title);
-      submitData.append('price', formData.price);
-      submitData.append('stock', formData.stock);
-      submitData.append('brand', formData.brand || '');
-      submitData.append('category', formData.category);
-      submitData.append('description', formData.description);
-      
-      // ถ้ามีการเปลี่ยนรูป ให้ส่งรูปไปด้วย
-      if (thumbnailFile) {
-          submitData.append('thumbnail', thumbnailFile);
-      }
-
-      // 6. ยิงไปที่ URL ที่ถูกต้อง (/edit/)
-      const response = await fetch(`http://localhost:8000/api/products/${id}/edit/`, {
-        method: 'PUT',
-        headers: { 
-            'Authorization': `Token ${token}` // 🔑 สำคัญมาก! ต้องมี Token
-            // ❌ ห้ามใส่ Content-Type: application/json เมื่อใช้ FormData
-        },
-        body: submitData
+      // ยิง API PUT ไปที่ Backend
+      await axios.put(`http://localhost:8000/api/products/${id}/edit/`, dataToSend, {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
-      if (response.ok) {
-        Swal.fire({
-            title: 'บันทึกสำเร็จ!',
-            text: 'แก้ไขข้อมูลสินค้าเรียบร้อยแล้ว',
-            icon: 'success',
-            confirmButtonText: 'ตกลง',
-            confirmButtonColor: '#305949'
-        }).then(() => {
-            navigate(`/product/${id}`);
-        });
-      } else {
-        const errData = await response.json();
-        console.error("Server Error:", errData);
-        Swal.fire('บันทึกไม่สำเร็จ', 'กรุณาลองใหม่อีกครั้ง หรือเช็ค Console', 'error');
-      }
+      // แจ้งเตือนสำเร็จ
+      Swal.fire({
+        icon: 'success',
+        title: 'บันทึกเรียบร้อย',
+        text: 'แก้ไขข้อมูลสินค้าสำเร็จแล้ว',
+        timer: 1500,
+        showConfirmButton: false
+      }).then(() => {
+        navigate(`/product/${id}`); // เด้งกลับไปหน้าดูสินค้า
+      });
+
     } catch (error) {
-      console.error("Network Error:", error);
-      Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
+      console.error("Error updating:", error);
+      Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถแก้ไขข้อมูลได้', 'error');
     }
   };
 
-  const styles = {
-    label: "block text-sm font-bold text-gray-600 mb-2 ml-1",
-    input: "w-full bg-white text-gray-800 font-medium px-6 py-4 rounded-2xl outline-none border border-gray-300 focus:border-[#305949] focus:ring-2 focus:ring-[#305949]/20 transition-all placeholder-gray-400 shadow-sm"
-  };
+  if (loading) return <div className="p-10 text-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-[#F2F0E4] flex flex-col items-center justify-center py-16 px-4">
-        <h1 className="text-3xl font-bold text-[#305949] mb-8 text-center">
-            แก้ไขข้อมูลสินค้า
-        </h1>
+    <div className="min-h-screen bg-[#F9F9F7] py-12 px-4">
+      <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+        <h1 className="text-2xl font-bold text-[#263A33] mb-6">✏️ แก้ไขสินค้า</h1>
+        
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* ชื่อสินค้า */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อสินค้า</label>
+            <input 
+              type="text" 
+              name="title" 
+              value={formData.title} 
+              onChange={handleChange}
+              className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#305949] outline-none"
+              required 
+            />
+          </div>
 
-        <div className="bg-white p-8 md:p-12 rounded-[2rem] shadow-lg w-full max-w-4xl border border-white">
-            <form onSubmit={handleSubmit} className="space-y-6">
-                
-                <div>
-                    <label className={styles.label}>รูปภาพปก (Main Image)</label>
-                    <div onClick={() => fileInputRef.current.click()} className="relative border-2 border-dashed border-gray-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-gray-50 cursor-pointer hover:bg-gray-100 transition">
-                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-                        {previewImage ? (
-                            <img src={previewImage} alt="Preview" className="h-full object-contain p-2" />
-                        ) : (
-                            <p className="font-bold text-gray-400">คลิกเพื่อเปลี่ยนรูปภาพ</p>
-                        )}
-                    </div>
-                </div>
+          {/* รายละเอียด */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label>
+            <textarea 
+              name="description" 
+              rows="4"
+              value={formData.description} 
+              onChange={handleChange}
+              className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#305949] outline-none"
+            />
+          </div>
 
-                <div>
-                    <label className={styles.label}>ชื่อสินค้า</label>
-                    <input type="text" name="title" value={formData.title} onChange={handleChange} className={styles.input} required />
-                </div>
+          {/* แถว ราคา - หมวดหมู่ - สต็อก */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ราคา (บาท)</label>
+              <input type="number" name="price" value={formData.price} onChange={handleChange} className="w-full p-3 border rounded-xl" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่</label>
+              <select name="category" value={formData.category} onChange={handleChange} className="w-full p-3 border rounded-xl">
+                <option value="smartphones">Smartphones</option>
+                <option value="laptops">Laptops</option>
+                <option value="fragrances">Fragrances</option>
+                <option value="skincare">Skincare</option>
+                <option value="groceries">Groceries</option>
+                <option value="home-decoration">Home Decoration</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">สต็อก</label>
+              <input type="number" name="stock" value={formData.stock} onChange={handleChange} className="w-full p-3 border rounded-xl" required />
+            </div>
+          </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className={styles.label}>ราคา (บาท)</label>
-                        <input type="number" name="price" value={formData.price} onChange={handleChange} className={styles.input} required />
-                    </div>
-                    <div>
-                        <label className={styles.label}>จำนวนสินค้า (Stock)</label>
-                        <input type="number" name="stock" value={formData.stock} onChange={handleChange} className={styles.input} />
-                    </div>
-                </div>
+          {/* จัดการรูปภาพ */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">รูปภาพสินค้า</label>
+            <div className="flex items-center gap-4">
+              {currentImage && (
+                <img src={currentImage} alt="Preview" className="w-24 h-24 object-cover rounded-xl border" />
+              )}
+              <input 
+                type="file" 
+                onChange={handleImageChange}
+                accept="image/*"
+                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#305949]/10 file:text-[#305949] hover:file:bg-[#305949]/20"
+              />
+            </div>
+          </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className={styles.label}>แบรนด์</label>
-                        <input type="text" name="brand" value={formData.brand} onChange={handleChange} className={styles.input} />
-                    </div>
-                    <div>
-                        <label className={styles.label}>หมวดหมู่</label>
-                        <input type="text" name="category" value={formData.category} onChange={handleChange} className={styles.input} />
-                    </div>
-                </div>
-
-                <div>
-                    <label className={styles.label}>รายละเอียดสินค้า</label>
-                    <textarea name="description" rows="5" value={formData.description} onChange={handleChange} className={`${styles.input} resize-none`}></textarea>
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                    <button type="button" onClick={() => navigate(-1)} className="flex-1 py-4 border-2 border-gray-200 text-gray-500 rounded-2xl font-bold hover:bg-gray-50 hover:text-gray-700 transition">
-                        ยกเลิก
-                    </button>
-                    <button type="submit" className="flex-[2] bg-[#305949] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[#234236] transition-all shadow-lg active:scale-95">
-                        บันทึกการเปลี่ยนแปลง
-                    </button>
-                </div>
-            </form>
-        </div>
+          {/* ปุ่ม Action */}
+          <div className="flex gap-3 pt-6">
+            <button type="submit" className="flex-1 py-3 bg-[#305949] text-white rounded-xl font-bold hover:bg-[#234236] transition shadow-lg">
+              บันทึกการแก้ไข
+            </button>
+            <Link to={`/product/${id}`} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold text-center hover:bg-gray-200 transition">
+              ยกเลิก
+            </Link>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

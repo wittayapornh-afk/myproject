@@ -8,8 +8,8 @@ from . import views  # ✅ ต้องมีบรรทัดนี้เพ�
 urlpatterns = [
     # สินค้า
     path('products/', views.products_api, name='products_api'),
+    path('products/add/', views.add_product_api, name='add_product'),
     path('products/<int:product_id>/', views.product_detail_api, name='product_detail_api'),
-    path('categories/', views.categories_api, name='categories_api'),
     
     # ออเดอร์
     path('orders/create/', views.create_order, name='create_order'),
@@ -26,11 +26,9 @@ urlpatterns = [
     # Admin Stats
     path('admin-stats/', views.get_admin_stats, name='admin_stats_api'),
     path('admin-logs/', views.get_admin_logs, name='get_admin_logs'),
+    path('products/<int:product_id>/edit/', views.edit_product_api, name='edit_product'),
+    path('products/<int:product_id>/delete/', views.delete_product_api, name='delete_product'),
 
-    # ❌ ลบบรรทัดเหล่านี้ออก เพราะซ้ำซ้อนและทำให้เกิด Loop
-    # path('admin/', admin.site.urls),
-    # path('api/', include('myapp.urls')), 
-    # path('api/login/', token_views.obtain_auth_token),
 ]
 
 if settings.DEBUG:

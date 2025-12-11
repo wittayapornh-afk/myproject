@@ -4,51 +4,66 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  // ใช้ localStorage อย่างระมัดระวัง
+  const [token, setToken] = useState(() => localStorage.getItem('token')); 
   const [loading, setLoading] = useState(true);
 
-  // ฟังก์ชันดึงข้อมูล User จาก Token
   const fetchUser = async (authToken) => {
     try {
         const res = await fetch('http://localhost:8000/api/profile/', {
-            headers: { 'Authorization': `Token ${authToken}` }
+            headers: { 
+                'Authorization': `Token ${authToken}`,
+                'Content-Type': 'application/json'
+            }
         });
+        
         if (res.ok) {
             const data = await res.json();
             setUser(data); 
         } else {
-            // Token หมดอายุหรือผิด
+            // Token หมดอายุหรือ Invalid -> เคลียร์ทิ้ง
+            console.error("Token invalid, logging out...");
             logout();
         }
     } catch (error) {
+        console.error("Failed to fetch user:", error);
+        // กรณี Network Error อาจจะไม่ Logout ทันที แต่แจ้งเตือน
+        // แต่เพื่อความปลอดภัยในเคสนี้ ให้ Logout ไปก่อน
         logout();
     } finally {
-        setLoading(false);
+        setLoading(false); // ✅ จบการโหลดเสมอ ไม่ว่าจะสำเร็จหรือไม่
     }
   };
 
   useEffect(() => {
     if (token) {
-        localStorage.setItem('token', token);
         fetchUser(token);
     } else {
-        localStorage.removeItem('token');
-        setUser(null);
-        setLoading(false);
+        setLoading(false); // ถ้าไม่มี Token ก็ไม่ต้องโหลดอะไร
     }
   }, [token]);
 
-  const login = (newToken) => setToken(newToken);
+  const login = (newToken) => {
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+      // fetchUser จะทำงานเองผ่าน useEffect เมื่อ token เปลี่ยน
+  };
   
   const logout = () => {
+      // เรียก API Logout ฝั่ง Server ด้วย (Optional แต่แนะนำ)
+      fetch('http://localhost:8000/api/logout/', {
+          method: 'POST',
+          headers: { 'Authorization': `Token ${token}` }
+      }).catch(err => console.warn("Logout server error", err));
+
+      localStorage.removeItem('token');
       setToken(null);
       setUser(null);
-      localStorage.removeItem('token');
   };
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, loading }}>
-      {children}
+      {!loading && children} {/* ✅ ป้องกันการ render App ก่อนเช็ค User เสร็จ */}
     </AuthContext.Provider>
   );
 };

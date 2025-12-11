@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom'; // เพิ่ม Navigate
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import HeroSection from './components/HeroSection';
@@ -18,11 +18,17 @@ import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import UserProfile from './components/UserProfile';
 
-// Context & Guard
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { SearchProvider } from './context/SearchContext';
-import ProtectedRoute from './components/ProtectedRoute'; // 👈 นำเข้าตัวคุมประตู
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Component สำหรับป้องกัน Login ซ้ำ
+const RedirectIfAuthenticated = ({ children }) => {
+    const { user } = useAuth();
+    if (user) return <Navigate to="/" replace />;
+    return children;
+};
 
 function App() {
   return (
@@ -34,7 +40,7 @@ function App() {
             <div className="flex-grow pt-24">
               <Routes>
                 
-                {/* 🌍 1. Public Routes (ใครก็เข้าได้: User/Customer/Guest) */}
+                {/* Public Routes */}
                 <Route path="/" element={
                   <>
                     <HeroSection />
@@ -48,10 +54,20 @@ function App() {
                 <Route path="/shop" element={<ProductList />} />
                 <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/cart" element={<CartPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
+                
+                {/* Auth Routes (ห้ามเข้าถ้า Login แล้ว) */}
+                <Route path="/login" element={
+                    <RedirectIfAuthenticated>
+                        <LoginPage />
+                    </RedirectIfAuthenticated>
+                } />
+                <Route path="/register" element={
+                    <RedirectIfAuthenticated>
+                        <RegisterPage />
+                    </RedirectIfAuthenticated>
+                } />
 
-                {/* 🔒 2. Customer Routes (ต้องล็อกอิน: User/Customer) */}
+                {/* Customer Routes */}
                 <Route path="/checkout" element={
                     <ProtectedRoute allowedRoles={['user', 'customer', 'admin', 'super_admin']}>
                         <CheckoutPage />
@@ -74,7 +90,7 @@ function App() {
                     </ProtectedRoute>
                 } />
 
-                {/* 🛡️ 3. Admin & Super Admin Routes */}
+                {/* Admin Routes */}
                 <Route path="/admin" element={
                     <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
                         <AdminDashboard />
@@ -90,6 +106,9 @@ function App() {
                         <ProductEdit />
                     </ProtectedRoute>
                 } />
+
+                {/* 404 Route */}
+                <Route path="*" element={<div className="text-center mt-20 text-xl">ไม่พบหน้าที่ต้องการ (404)</div>} />
 
               </Routes>
             </div>

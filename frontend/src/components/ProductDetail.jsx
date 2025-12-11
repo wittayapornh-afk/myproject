@@ -2,10 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import Swal from 'sweetalert2';
+import { useAuth } from '../context/AuthContext';
 
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth(); // ✅ ดึง user มาใช้ถูกต้อง
   const [product, setProduct] = useState(null);
   const [mainImage, setMainImage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,6 @@ function ProductDetail() {
     toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, timerProgressBar: true
   });
 
-  // ฟังก์ชันโหลดข้อมูล (แยกออกมาเพื่อให้เรียกซ้ำได้ตอนเปลี่ยนหน้า)
   const fetchProductData = (productId) => {
     setLoading(true);
     fetch(`http://localhost:8000/api/products/${productId}/`)
@@ -27,11 +28,11 @@ function ProductDetail() {
         setProduct(data);
         setMainImage(data.thumbnail);
         setLoading(false);
-        window.scrollTo(0,0); // เลื่อนขึ้นบนสุดเสมอ
+        window.scrollTo(0,0);
       })
       .catch((err) => {
           console.error(err);
-          navigate('/shop'); // ถ้าหาไม่เจอให้เด้งกลับหน้ารวม
+          navigate('/shop');
       });
   };
 
@@ -51,7 +52,7 @@ function ProductDetail() {
     <div className="min-h-screen bg-[#F9F9F7] py-10 px-6 font-sans">
       <div className="max-w-6xl mx-auto">
         
-        {/* ⭐ 1. Breadcrumb Links (กดได้จริง) */}
+        {/* Breadcrumb & Nav */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <nav className="text-sm font-medium text-gray-500">
                 <Link to="/" className="hover:text-[#305949] transition">หน้าหลัก</Link> 
@@ -61,7 +62,6 @@ function ProductDetail() {
                 <span className="text-[#305949] font-bold">{product.title}</span>
             </nav>
 
-            {/* ⭐ 2. ปุ่ม Previous / Next */}
             <div className="flex gap-2">
                 <button 
                     disabled={!product.prev_product}
@@ -80,7 +80,7 @@ function ProductDetail() {
             </div>
         </div>
 
-        {/* Product Main Content (Card Design) */}
+        {/* Product Card */}
         <div className="bg-white rounded-[3rem] p-6 md:p-10 shadow-sm border border-gray-100 flex flex-col lg:flex-row gap-12 mb-16">
             {/* Left: Gallery */}
             <div className="lg:w-1/2 space-y-6">
@@ -88,7 +88,7 @@ function ProductDetail() {
                     <img src={mainImage} alt={product.title} className="max-w-full max-h-full object-contain mix-blend-multiply transition-all duration-500 hover:scale-110" />
                     {product.stock < 5 && product.stock > 0 && <span className="absolute top-6 left-6 bg-red-500 text-white text-xs px-3 py-1 rounded-full font-bold shadow-sm animate-pulse">🔥 เหลือ {product.stock} ชิ้น</span>}
                 </div>
-                {/* Thumbnails */}
+                
                 {product.images && product.images.length > 0 && (
                     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
                         <div onClick={() => setMainImage(product.thumbnail)} className={`w-20 h-20 rounded-2xl flex-shrink-0 cursor-pointer border-2 p-2 ${mainImage === product.thumbnail ? 'border-[#305949] bg-gray-50' : 'border-transparent bg-[#F9F9F7]'}`}>
@@ -115,37 +115,32 @@ function ProductDetail() {
                 </div>
                 <p className="text-gray-500 leading-relaxed mb-8 text-lg font-light">{product.description}</p>
                 
+                {/* 🔧 ส่วนที่ปรับแก้: ลบ div ที่ซ้อนกันออก ให้เหลือชุดเดียว */}
                 <div className="mt-auto pt-8 border-t border-gray-100 flex items-center justify-between">
                     <div>
                         <p className="text-sm text-gray-400 mb-1">ราคาปัจจุบัน</p>
                         <span className="text-4xl font-extrabold text-[#305949]">฿{product.price?.toLocaleString()}</span>
                     </div>
-                    <div className="mt-auto pt-8 border-t border-gray-100 flex items-center justify-between">
-    <div>
-        <p className="text-sm text-gray-400 mb-1">ราคาปัจจุบัน</p>
-        <span className="text-4xl font-extrabold text-[#305949]">฿{product.price?.toLocaleString()}</span>
-    </div>
 
-    {/* ✅ ตรวจสอบ Role */}
-    {user?.role_code === 'super_admin' ? (
-        <div className="px-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold border-2 border-dashed border-gray-300 select-none">
-            🚫 Admin Mode (View Only)
-        </div>
-    ) : (
-        <button 
-            onClick={handleAddToCart} 
-            disabled={product.stock === 0} 
-            className={`px-10 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center gap-3 ${product.stock === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#305949] text-white hover:bg-[#234236] hover:shadow-xl'}`}
-        >
-            {product.stock === 0 ? 'สินค้าหมด' : <><span>🛒</span> ใส่ตะกร้าเลย</>}
-        </button>
-    )}
-</div>
+                    {/* ✅ ปุ่ม Action (เช็ค Role) */}
+                    {user?.role_code === 'super_admin' ? (
+                        <div className="px-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold border-2 border-dashed border-gray-300 select-none">
+                            🚫 Admin Mode (View Only)
+                        </div>
+                    ) : (
+                        <button 
+                            onClick={handleAddToCart} 
+                            disabled={product.stock === 0} 
+                            className={`px-10 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center gap-3 ${product.stock === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#305949] text-white hover:bg-[#234236] hover:shadow-xl'}`}
+                        >
+                            {product.stock === 0 ? 'สินค้าหมด' : <><span>🛒</span> ใส่ตะกร้าเลย</>}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
 
-        {/* ⭐ 3. Recommended Products (สินค้าแนะนำ) */}
+        {/* Recommended Products */}
         {product.related_products && product.related_products.length > 0 && (
             <div className="mb-16 animate-fade-in-up">
                 <h2 className="text-2xl font-bold text-[#263A33] mb-8 flex items-center gap-2">
