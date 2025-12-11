@@ -8,7 +8,7 @@ from django.db import transaction  # ✅ 1. ใส่ตัวนี้แก้
 from django.utils import timezone
 from django.contrib.auth.models import User
 from datetime import timedelta
-from .models import Product, Order, OrderItem, UserProfile
+from .models import Product, Order, OrderItem, UserProfile, AdminLog
 import logging
 
 logger = logging.getLogger(__name__)
@@ -252,4 +252,121 @@ def get_all_users(request):
         return Response({"error": "Unauthorized"}, status=403)
     users = UserProfile.objects.all().select_related('user')
     data = [{"id": u.user.id, "username": u.user.username, "email": u.user.email, "role": u.get_role_display(), "role_code": u.role, "date_joined": u.created_at.strftime("%d/%m/%Y")} for u in users]
+    return Response(data)
+
+# ==========================================
+# 🔧 Admin Product Management (จัดการสินค้า)
+# ==========================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_product_api(request):
+    # เช็คสิทธิ์: ต้องเป็น admin หรือ super_admin เท่านั้น
+    if request.user.profile.role not in ['admin', 'super_admin']:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    try:
+        data = request.data
+        product = Product.objects.create(
+            title=data.get('title'),
+            description=data.get('description', ''),
+            category=data.get('category'),
+            price=data.get('price'),
+            stock=data.get('stock', 0),
+            brand=data.get('brand', ''),
+        )
+        
+        if 'thumbnail' in request.FILES:
+            product.thumbnail = request.FILES['thumbnail']
+            product.save()
+
+        # ✅ บันทึก Log
+        AdminLog.objects.create(
+            admin=request.user,
+            action=f"เพิ่มสินค้า: {product.title} (ID: {product.id})"
+        )
+
+        return Response({"message": "เพิ่มสินค้าสำเร็จ", "id": product.id}, status=201)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def edit_product_api(request, product_id):
+    if request.user.profile.role not in ['admin', 'super_admin']:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    try:
+        product = Product.objects.get(id=product_id)
+        data = request.data
+
+        # อัปเดตข้อมูล (ถ้าส่งมา)
+        if 'title' in data: product.title = data['title']
+        if 'description' in data: product.description = data['description']
+        if 'category' in data: product.category = data['category']
+        if 'price' in data: product.price = data['price']
+        if 'stock' in data: product.stock = data['stock']
+        if 'brand' in data: product.brand = data['brand']
+        if 'is_active' in data: product.is_active = (data['is_active'] == 'true' or data['is_active'] == True)
+        
+        if 'thumbnail' in request.FILES:
+            product.thumbnail = request.FILES['thumbnail']
+        
+        product.save()
+
+        # ✅ บันทึก Log
+        AdminLog.objects.create(
+            admin=request.user,
+            action=f"แก้ไขสินค้า: {product.title} (ID: {product.id})"
+        )
+
+        return Response({"message": "แก้ไขสินค้าสำเร็จ"})
+    except Product.DoesNotExist:
+        return Response({"error": "ไม่พบสินค้า"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_product_api(request, product_id):
+    if request.user.profile.role not in ['admin', 'super_admin']:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    try:
+        product = Product.objects.get(id=product_id)
+        product_title = product.title
+        product_id_log = product.id
+        
+        product.delete() # หรือใช้ product.is_active = False ถ้าไม่อยากลบจริง
+
+        # ✅ บันทึก Log
+        AdminLog.objects.create(
+            admin=request.user,
+            action=f"ลบสินค้า: {product_title} (ID: {product_id_log})"
+        )
+
+        return Response({"message": "ลบสินค้าสำเร็จ"})
+    except Product.DoesNotExist:
+        return Response({"error": "ไม่พบสินค้า"}, status=404)
+
+# ==========================================
+# 🛡️ Super Admin Logs (ดูประวัติการทำงาน)
+# ==========================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_admin_logs(request):
+    # เฉพาะ Super Admin เท่านั้นที่ดู Log ได้
+    if request.user.profile.role != 'super_admin':
+        return Response({"error": "Unauthorized: Super Admin only"}, status=403)
+
+    logs = AdminLog.objects.all().order_by('-timestamp')
+    data = [{
+        "id": log.id,
+        "admin": log.admin.username,
+        "role": log.admin.profile.get_role_display(),
+        "action": log.action,
+        "date": log.timestamp.strftime("%d/%m/%Y %H:%M")
+    } for log in logs]
+
     return Response(data)

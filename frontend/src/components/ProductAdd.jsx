@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import { useAuth } from '../context/AuthContext'; // ✅ 1. นำเข้า AuthContext
 
 function ProductAdd() {
   const navigate = useNavigate();
+  const { user } = useAuth(); // ✅ 2. ดึง user จาก Context แทน localStorage
   const [formData, setFormData] = useState({});
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [galleryFiles, setGalleryFiles] = useState([]); 
@@ -13,12 +15,12 @@ function ProductAdd() {
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
+  // ✅ 3. เช็คสิทธิ์ด้วย role_code ให้ตรงกับระบบ login
   useEffect(() => {
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (!user || !user.is_superuser) {
-          Swal.fire('Access Denied', 'Admins only!', 'error').then(() => navigate('/'));
+      if (user && user.role_code !== 'admin' && user.role_code !== 'super_admin') {
+          Swal.fire('Access Denied', 'สำหรับ Admin เท่านั้น!', 'error').then(() => navigate('/'));
       }
-  }, []);
+  }, [user, navigate]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -53,13 +55,27 @@ function ProductAdd() {
         if (thumbnailFile) data.append('thumbnail', thumbnailFile);
         galleryFiles.forEach((file) => data.append('images', file));
 
-        const response = await fetch('http://localhost:8000/api/products/', { method: 'POST', body: data });
+        const token = localStorage.getItem('token'); // ✅ 4. ดึง Token
+
+        // ✅ 5. แก้ URL เป็น /api/products/add/ และเพิ่ม Headers Authorization
+        const response = await fetch('http://localhost:8000/api/products/add/', { 
+            method: 'POST', 
+            headers: {
+                'Authorization': `Token ${token}` // 🔑 สำคัญมาก!
+                // *ไม่ต้องใส่ Content-Type เมื่อส่ง FormData Browser จะจัดการให้เอง
+            },
+            body: data 
+        });
+
         if (response.ok) {
-            Swal.fire('Success', 'Product added!', 'success').then(() => navigate('/'));
+            Swal.fire('Success', 'เพิ่มสินค้าเรียบร้อย!', 'success').then(() => navigate('/shop'));
         } else {
-            Swal.fire('Error', 'Failed to add product', 'error');
+            const errData = await response.json();
+            Swal.fire('Error', errData.error || 'Failed to add product', 'error');
         }
-    } catch (error) { Swal.fire('Error', 'Server Error', 'error'); }
+    } catch (error) { 
+        Swal.fire('Error', 'Server Connection Error', 'error'); 
+    }
   };
 
   const styles = { label: "block text-sm font-bold text-gray-600 mb-2 ml-1", input: "w-full bg-white text-gray-800 font-medium px-6 py-4 rounded-2xl outline-none border border-gray-300 focus:border-[#305949] shadow-sm" };
@@ -69,6 +85,7 @@ function ProductAdd() {
         <h1 className="text-3xl font-bold text-[#305949] mb-10 text-center">เพิ่มสินค้าใหม่</h1>
         <div className="bg-white p-8 md:p-12 rounded-[2rem] shadow-lg w-full max-w-4xl border border-white">
             <form onSubmit={handleSubmit} className="space-y-8">
+                {/* ... (ส่วน Form เหมือนเดิม ไม่ต้องแก้) ... */}
                 <div>
                     <label className={styles.label}>รูปภาพปก</label>
                     <div onClick={() => fileInputRef.current.click()} className="border-2 border-dashed rounded-3xl h-64 flex flex-col items-center justify-center cursor-pointer bg-gray-50 hover:bg-white">

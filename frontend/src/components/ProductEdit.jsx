@@ -1,20 +1,27 @@
-// frontend/src/components/ProductEdit.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Swal from 'sweetalert2'; // ✅ 1. นำเข้า SweetAlert2
+import Swal from 'sweetalert2';
+import { useAuth } from '../context/AuthContext'; // 1. นำเข้า AuthContext
 
 function ProductEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth(); // 2. ดึง user มาเช็คสิทธิ์
   
   const [formData, setFormData] = useState({
     title: "", price: "", brand: "", stock: "", category: "", description: "", thumbnail: ""
   });
   const [previewImage, setPreviewImage] = useState(null);
+  const [thumbnailFile, setThumbnailFile] = useState(null); // เพิ่ม state สำหรับไฟล์รูปใหม่
   
-  // ( ... ส่วน useRef และ useEffect เหมือนเดิม ... )
   const fileInputRef = useRef(null);
-  const galleryInputRef = useRef(null);
+
+  // 3. เช็คสิทธิ์ (Admin/Super Admin เท่านั้น)
+  useEffect(() => {
+    if (user && user.role_code !== 'admin' && user.role_code !== 'super_admin') {
+         Swal.fire('Access Denied', 'สำหรับ Admin เท่านั้น!', 'error').then(() => navigate('/'));
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     fetch(`http://localhost:8000/api/products/${id}/`)
@@ -30,17 +37,44 @@ function ProductEdit() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        setThumbnailFile(file);
+        setPreviewImage(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`http://localhost:8000/api/products/${id}/`, {
+      const token = localStorage.getItem('token'); // 4. ดึง Token
+
+      // 5. ใช้ FormData เพื่อความชัวร์ (รองรับทั้งข้อความและรูปภาพ)
+      const submitData = new FormData();
+      submitData.append('title', formData.title);
+      submitData.append('price', formData.price);
+      submitData.append('stock', formData.stock);
+      submitData.append('brand', formData.brand || '');
+      submitData.append('category', formData.category);
+      submitData.append('description', formData.description);
+      
+      // ถ้ามีการเปลี่ยนรูป ให้ส่งรูปไปด้วย
+      if (thumbnailFile) {
+          submitData.append('thumbnail', thumbnailFile);
+      }
+
+      // 6. ยิงไปที่ URL ที่ถูกต้อง (/edit/)
+      const response = await fetch(`http://localhost:8000/api/products/${id}/edit/`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: { 
+            'Authorization': `Token ${token}` // 🔑 สำคัญมาก! ต้องมี Token
+            // ❌ ห้ามใส่ Content-Type: application/json เมื่อใช้ FormData
+        },
+        body: submitData
       });
 
       if (response.ok) {
-        // ✅ 2. ใช้ Swal แจ้งเตือนความสำเร็จ
         Swal.fire({
             title: 'บันทึกสำเร็จ!',
             text: 'แก้ไขข้อมูลสินค้าเรียบร้อยแล้ว',
@@ -51,15 +85,16 @@ function ProductEdit() {
             navigate(`/product/${id}`);
         });
       } else {
-        // ❌ 3. แจ้งเตือนเมื่อพัง
-        Swal.fire('บันทึกไม่สำเร็จ', 'กรุณาลองใหม่อีกครั้ง', 'error');
+        const errData = await response.json();
+        console.error("Server Error:", errData);
+        Swal.fire('บันทึกไม่สำเร็จ', 'กรุณาลองใหม่อีกครั้ง หรือเช็ค Console', 'error');
       }
     } catch (error) {
+      console.error("Network Error:", error);
       Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
     }
   };
 
-  // ( ... ส่วน styles และ return JSX เหมือนเดิม ... )
   const styles = {
     label: "block text-sm font-bold text-gray-600 mb-2 ml-1",
     input: "w-full bg-white text-gray-800 font-medium px-6 py-4 rounded-2xl outline-none border border-gray-300 focus:border-[#305949] focus:ring-2 focus:ring-[#305949]/20 transition-all placeholder-gray-400 shadow-sm"
@@ -74,20 +109,18 @@ function ProductEdit() {
         <div className="bg-white p-8 md:p-12 rounded-[2rem] shadow-lg w-full max-w-4xl border border-white">
             <form onSubmit={handleSubmit} className="space-y-6">
                 
-                {/* ... (ส่วนแสดงรูปภาพเหมือนเดิม) ... */}
                 <div>
                     <label className={styles.label}>รูปภาพปก (Main Image)</label>
-                    <div className="relative border-2 border-dashed border-gray-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-gray-50">
+                    <div onClick={() => fileInputRef.current.click()} className="relative border-2 border-dashed border-gray-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-gray-50 cursor-pointer hover:bg-gray-100 transition">
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
                         {previewImage ? (
                             <img src={previewImage} alt="Preview" className="h-full object-contain p-2" />
                         ) : (
-                            <p className="font-bold text-gray-400">ไม่มีรูปภาพ</p>
+                            <p className="font-bold text-gray-400">คลิกเพื่อเปลี่ยนรูปภาพ</p>
                         )}
-                        <p className="text-xs text-gray-400 mt-2 absolute bottom-2">*การแก้ไขรูปภาพยังไม่รองรับในโหมดนี้</p>
                     </div>
                 </div>
 
-                {/* ... (Inputs ต่างๆ เหมือนเดิม) ... */}
                 <div>
                     <label className={styles.label}>ชื่อสินค้า</label>
                     <input type="text" name="title" value={formData.title} onChange={handleChange} className={styles.input} required />

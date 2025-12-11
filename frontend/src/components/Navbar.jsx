@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
-import { useAuth } from '../context/AuthContext'; // นำเข้า Auth
+import { useAuth } from '../context/AuthContext';
 
 function Navbar() {
   const { cartItems } = useCart();
   const { searchQuery, setSearchQuery } = useSearch();
-  const { user, logout } = useAuth(); // ดึง User
+  const { user, logout } = useAuth(); 
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
 
+  // คำนวณจำนวนสินค้าในตะกร้า
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
@@ -20,7 +21,8 @@ function Navbar() {
   }, []);
 
   const showSearchBar = location.pathname !== '/shop';
-  // เช็ค Role ง่ายๆ
+  
+  // ✅ ตรวจสอบสิทธิ์ (ถ้าไม่มี user ให้เป็น false)
   const isAdmin = user && (user.role_code === 'admin' || user.role_code === 'super_admin');
 
   return (
@@ -35,7 +37,13 @@ function Navbar() {
         {showSearchBar && (
             <div className="hidden md:flex flex-1 max-w-md mx-8">
                 <div className="relative w-full">
-                    <input type="text" placeholder="ค้นหาสินค้า..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white/50 border-2 border-transparent focus:bg-white focus:border-[#305949]/30 pl-12 pr-4 py-2.5 rounded-full outline-none transition-all" />
+                    <input 
+                      type="text" 
+                      placeholder="ค้นหาสินค้า..." 
+                      value={searchQuery} 
+                      onChange={(e) => setSearchQuery(e.target.value)} 
+                      className="w-full bg-white/50 border-2 border-transparent focus:bg-white focus:border-[#305949]/30 pl-12 pr-4 py-2.5 rounded-full outline-none transition-all" 
+                    />
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                 </div>
             </div>
@@ -44,14 +52,14 @@ function Navbar() {
         <div className="flex items-center gap-2 sm:gap-4">
           <Link to="/shop" className="hidden sm:block px-4 py-2 text-sm font-bold text-gray-600 hover:text-[#305949]">สินค้าทั้งหมด</Link>
           
-          {/* 🛡️ ปุ่ม Dashboard (เฉพาะ Admin) */}
+          {/* 🛡️ ปุ่ม Dashboard (เฉพาะ Admin/Super Admin) */}
           {isAdmin && (
              <Link to="/admin" className="px-4 py-2 bg-yellow-400 text-yellow-900 rounded-full text-sm font-bold shadow-sm hover:bg-yellow-300 transition">
                 👑 แดชบอร์ด
              </Link>
           )}
 
-          {/* 🛒 ตะกร้าสินค้า (User/Customer เห็นได้ตลอด) */}
+          {/* 🛒 ตะกร้าสินค้า (ซ่อนถ้าเป็น Admin/Super Admin) */}
           {!isAdmin && (
               <Link to="/cart" className="relative p-2.5 rounded-full hover:bg-[#305949]/10 text-[#305949] transition group">
                 <span className="text-2xl">🛒</span>
@@ -68,7 +76,7 @@ function Navbar() {
             <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
                 <Link to="/profile" className="flex items-center gap-2">
                     <div className="w-9 h-9 rounded-full bg-[#305949] text-white flex items-center justify-center font-bold text-sm border-2 border-white shadow-sm">
-                        {user.username.charAt(0).toUpperCase()}
+                        {user.username?.charAt(0).toUpperCase()}
                     </div>
                     <div className="hidden lg:block text-left">
                         <p className="text-xs font-bold text-[#263A33]">{user.username}</p>

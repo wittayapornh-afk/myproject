@@ -120,9 +120,27 @@ function ProductDetail() {
                         <p className="text-sm text-gray-400 mb-1">ราคาปัจจุบัน</p>
                         <span className="text-4xl font-extrabold text-[#305949]">฿{product.price?.toLocaleString()}</span>
                     </div>
-                    <button onClick={handleAddToCart} disabled={product.stock === 0} className={`px-10 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center gap-3 ${product.stock === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#305949] text-white hover:bg-[#234236] hover:shadow-xl'}`}>
-                        {product.stock === 0 ? 'สินค้าหมด' : <><span>🛒</span> ใส่ตะกร้าเลย</>}
-                    </button>
+                    <div className="mt-auto pt-8 border-t border-gray-100 flex items-center justify-between">
+    <div>
+        <p className="text-sm text-gray-400 mb-1">ราคาปัจจุบัน</p>
+        <span className="text-4xl font-extrabold text-[#305949]">฿{product.price?.toLocaleString()}</span>
+    </div>
+
+    {/* ✅ ตรวจสอบ Role */}
+    {user?.role_code === 'super_admin' ? (
+        <div className="px-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold border-2 border-dashed border-gray-300 select-none">
+            🚫 Admin Mode (View Only)
+        </div>
+    ) : (
+        <button 
+            onClick={handleAddToCart} 
+            disabled={product.stock === 0} 
+            className={`px-10 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center gap-3 ${product.stock === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#305949] text-white hover:bg-[#234236] hover:shadow-xl'}`}
+        >
+            {product.stock === 0 ? 'สินค้าหมด' : <><span>🛒</span> ใส่ตะกร้าเลย</>}
+        </button>
+    )}
+</div>
                 </div>
             </div>
         </div>
