@@ -34,6 +34,7 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
+        
         <SearchProvider>
           <div className="flex flex-col min-h-screen bg-[#F2F0E4] font-sans text-[#263A33]">
             <Navbar />
