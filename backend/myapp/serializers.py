@@ -1,17 +1,28 @@
+# backend/myapp/serializers.py
 from rest_framework import serializers
-from .models import Product, ProductImage, Category
+from .models import Product, ProductImage, Order, OrderItem, User
 
-# ✅ 1. เพิ่ม Class นี้ไว้ด้านบน (ถ้ายังไม่มี)
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
         fields = ['id', 'image']
 
 class ProductSerializer(serializers.ModelSerializer):
-    # ✅ 2. เพิ่มบรรทัดนี้ เพื่อดึงรูป Gallery ออกมาด้วย
+    # เพิ่มบรรทัดนี้เพื่อดึงรูปภาพย่อยทั้งหมดมาแสดง
     images = ProductImageSerializer(many=True, read_only=True) 
-    
+
     class Meta:
         model = Product
-        # ✅ 3. อย่าลืมเติม 'images' เข้าไปใน fields
-        fields = ['id', 'title', 'description', 'price', 'thumbnail', 'stock', 'category', 'brand', 'rating', 'images']
+        fields = '__all__' # หรือระบุ fields รวมถึง 'images' ด้วย
+
+# Serializer สำหรับ Order
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+# Serializer สำหรับ User management
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'is_staff', 'is_superuser']

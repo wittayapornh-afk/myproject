@@ -1,247 +1,299 @@
 import React, { useEffect, useState } from 'react';
-import { Line, Doughnut } from 'react-chartjs-2';
-import { Link } from 'react-router-dom'; // ✅ เพิ่ม Link
-import { useAuth } from '../context/AuthContext';
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement, Filler
-} from 'chart.js';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement, Filler);
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext'; // ต้องมั่นใจว่า path ถูก
+import { LayoutDashboard, Package, ShoppingCart, Users, FileText, Plus, Trash2, Edit, CheckCircle, XCircle } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const navigate = useNavigate();
+  
+  // State สำหรับจัดการ Tab และ Data
+  const [activeTab, setActiveTab] = useState('overview'); // overview, products, orders, users, logs
+  const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [usersList, setUsersList] = useState([]);
-  const [logs, setLogs] = useState([]); // ✅ 1. เพิ่ม State สำหรับ Logs
-  const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState([]);
 
-  // 1. Fetch Stats
-  useEffect(() => {
-    fetch('http://localhost:8000/api/admin-stats/')
-      .then(res => res.json())
-      .then(data => {
-        setStats(data);
-        setLoading(false);
-      })
-      .catch(err => setLoading(false));
-  }, []);
+  // ตั้งค่า Axios instance เพื่อความสะดวก
+  const api = axios.create({
+      baseURL: 'http://localhost:8000/api', // ต้องตรงกับ Port Backend
+      headers: { Authorization: `Token ${token}` }
+  });
 
-  // 2. Fetch Users & Logs (Super Admin Only)
-  useEffect(() => {
-      const token = localStorage.getItem('token');
-      if (user && (user.role_code === 'super_admin' || user.role_code === 'admin')) { // ให้ Admin เห็น Users ได้บ้าง หรือจะจำกัดแค่ Super Admin ก็ได้
-          // ... (Fetch Users code if needed) ...
+  // ฟังก์ชันโหลดข้อมูลตาม Tab ที่เลือก
+  const fetchData = async () => {
+      if (!token) return;
+      setLoading(true);
+      try {
+          if (activeTab === 'overview') {
+              const res = await api.get('/admin-stats/');
+              setStats(res.data);
+          } else if (activeTab === 'products') {
+              const res = await api.get('/admin/products/');
+              setProducts(res.data);
+          } else if (activeTab === 'orders') {
+              const res = await api.get('/admin/orders/');
+              setOrders(res.data);
+          } else if (activeTab === 'users' && user.role_code === 'super_admin') {
+              const res = await api.get('/admin/users/');
+              setUsersList(res.data);
+          } else if (activeTab === 'logs' && user.role_code === 'super_admin') {
+              const res = await api.get('/admin-logs/');
+              setLogs(res.data);
+          }
+      } catch (err) {
+          console.error("Error loading data:", err);
+          // ถ้า Server ดับ จะแจ้งเตือนตรงนี้
+          if (err.message === "Network Error") {
+              Swal.fire("เชื่อมต่อ Server ไม่ได้", "กรุณาเปิด Backend (python manage.py runserver)", "error");
+          }
+      } finally {
+          setLoading(false);
       }
-
-      if (user && user.role_code === 'super_admin') {
-          // Fetch Users
-          fetch('http://localhost:8000/api/admin/users/', {
-              headers: { 'Authorization': `Token ${token}` }
-          })
-          .then(res => res.json())
-          .then(data => setUsersList(data));
-
-          // ✅ 2. Fetch Logs
-          fetch('http://localhost:8000/api/admin-logs/', {
-              headers: { 'Authorization': `Token ${token}` }
-          })
-          .then(res => res.json())
-          .then(data => setLogs(data));
-      }
-  }, [user]);
-
-  const updateStatus = async (orderId, newStatus) => {
-    // ... (Code เดิม) ...
-    try {
-        await fetch(`http://localhost:8000/api/orders/${orderId}/update/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus })
-        });
-        window.location.reload(); 
-    } catch (err) {
-        alert('Update failed');
-    }
   };
 
-  if (loading) return <div className="text-center py-20 text-gray-400">กำลังโหลดข้อมูล...</div>;
-  if (!stats) return <div className="text-center py-20 text-red-500">Error Loading Data</div>;
+  useEffect(() => {
+      fetchData();
+  }, [activeTab, token]);
 
-  // ... (Chart Data เดิม) ...
-  const salesChartData = {
-    labels: stats.graph_sales?.map(d => d.name) || [],
-    datasets: [{
-      label: 'ยอดขาย',
-      data: stats.graph_sales?.map(d => d.total) || [],
-      borderColor: '#305949',
-      backgroundColor: 'rgba(48, 89, 73, 0.1)',
-      tension: 0.4,
-      fill: true
-    }]
+  // --- ฟังก์ชันจัดการ ---
+
+  const handleRoleChange = async (userId, action) => {
+      const title = action === 'promote' ? "ตั้งเป็น Admin" : "ปลดเป็น User";
+      const result = await Swal.fire({
+          title: `ยืนยัน${title}?`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#305949',
+          confirmButtonText: 'ยืนยัน'
+      });
+
+      if (result.isConfirmed) {
+          try {
+              // ยิง API ไปเปลี่ยน Role
+              await api.post('/admin/users/role/', { user_id: userId, action });
+              Swal.fire('สำเร็จ', `${title} เรียบร้อยแล้ว`, 'success');
+              fetchData(); // โหลดข้อมูลใหม่
+          } catch (error) {
+              Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถแก้ไขสิทธิ์ได้', 'error');
+          }
+      }
   };
 
-  const categoryChartData = {
-    labels: stats.graph_category?.map(d => d.name) || [],
-    datasets: [{
-      data: stats.graph_category?.map(d => d.value) || [],
-      backgroundColor: ['#305949', '#Eab308', '#EF4444', '#3B82F6', '#9CA3AF'],
-      borderWidth: 0
-    }]
+  const handleDeleteProduct = async (id) => {
+      if ((await Swal.fire({ title: 'ยืนยันลบ?', icon: 'warning', showCancelButton: true })).isConfirmed) {
+          await api.delete(`/products/${id}/delete/`);
+          fetchData();
+      }
+  };
+
+  const updateOrderStatus = async (id, status) => {
+      await api.post(`/orders/${id}/update/`, { status });
+      fetchData();
+  };
+
+  // --- ส่วนแสดงผล (UI) ---
+
+  const renderContent = () => {
+      if (loading) return <div className="p-10 text-center animate-pulse">กำลังโหลดข้อมูล...</div>;
+
+      // 1. หน้าภาพรวม
+      if (activeTab === 'overview' && stats) {
+          return (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white p-6 rounded-2xl shadow border">
+                      <p className="text-gray-500 text-sm">ยอดขายรวม</p>
+                      <h3 className="text-3xl font-bold text-[#305949]">฿{stats.total_sales?.toLocaleString()}</h3>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl shadow border">
+                      <p className="text-gray-500 text-sm">คำสั่งซื้อ</p>
+                      <h3 className="text-3xl font-bold">{stats.total_orders}</h3>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl shadow border">
+                      <p className="text-gray-500 text-sm">สินค้า</p>
+                      <h3 className="text-3xl font-bold">{stats.total_products}</h3>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl shadow border">
+                      <p className="text-gray-500 text-sm">ผู้ใช้งาน</p>
+                      <h3 className="text-3xl font-bold text-blue-600">{stats.total_users}</h3>
+                  </div>
+              </div>
+          );
+      }
+
+      // 2. หน้าจัดการสินค้า
+      if (activeTab === 'products') {
+          return (
+              <div className="bg-white rounded-2xl shadow overflow-hidden">
+                  <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                      <h3 className="font-bold text-lg">สินค้าทั้งหมด ({products.length})</h3>
+                      <Link to="/product/add" className="bg-[#305949] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#234236]">
+                          <Plus size={18}/> เพิ่มสินค้า
+                      </Link>
+                  </div>
+                  <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                          <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+                              <tr>
+                                  <th className="p-4">รูป</th>
+                                  <th className="p-4">ชื่อสินค้า</th>
+                                  <th className="p-4">ราคา</th>
+                                  <th className="p-4">คงเหลือ</th>
+                                  <th className="p-4">สถานะ</th>
+                                  <th className="p-4">จัดการ</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {products.map(p => (
+                                  <tr key={p.id} className="hover:bg-gray-50">
+                                      <td className="p-4"><img src={p.thumbnail} className="w-12 h-12 object-cover rounded border"/></td>
+                                      <td className="p-4 font-medium">{p.title}</td>
+                                      <td className="p-4">฿{p.price.toLocaleString()}</td>
+                                      <td className="p-4">{p.stock}</td>
+                                      <td className="p-4">
+                                          {p.is_active ? 
+                                            <span className="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">ขายอยู่</span> : 
+                                            <span className="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">ปิดการขาย</span>
+                                          }
+                                      </td>
+                                      <td className="p-4 flex gap-2">
+                                          <Link to={`/product/${p.id}/edit`} className="text-yellow-600 bg-yellow-100 p-2 rounded hover:bg-yellow-200"><Edit size={16}/></Link>
+                                          <button onClick={() => handleDeleteProduct(p.id)} className="text-red-600 bg-red-100 p-2 rounded hover:bg-red-200"><Trash2 size={16}/></button>
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+      }
+
+      // 3. หน้าจัดการ Users (เฉพาะ Super Admin)
+      if (activeTab === 'users') {
+          return (
+              <div className="bg-white rounded-2xl shadow overflow-hidden">
+                  <div className="p-4 border-b bg-indigo-50"><h3 className="font-bold text-indigo-900">จัดการสิทธิ์ผู้ใช้งาน</h3></div>
+                  <table className="w-full text-left">
+                      <thead className="bg-indigo-100 text-indigo-900 uppercase text-xs">
+                          <tr>
+                              <th className="p-4">Username</th>
+                              <th className="p-4">Email</th>
+                              <th className="p-4">Role ปัจจุบัน</th>
+                              <th className="p-4">เปลี่ยนสิทธิ์</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-indigo-50">
+                          {usersList.map(u => (
+                              <tr key={u.id} className="hover:bg-indigo-50/30">
+                                  <td className="p-4 font-bold">{u.username}</td>
+                                  <td className="p-4">{u.email}</td>
+                                  <td className="p-4">
+                                      <span className={`px-2 py-1 rounded text-xs ${u.role_code==='admin'?'bg-purple-100 text-purple-700': u.role_code==='super_admin'?'bg-red-100 text-red-700':'bg-gray-100'}`}>
+                                          {u.role}
+                                      </span>
+                                  </td>
+                                  <td className="p-4">
+                                      {u.role_code !== 'super_admin' && (
+                                          <div className="flex gap-2">
+                                              {u.role_code === 'user' && (
+                                                  <button onClick={() => handleRoleChange(u.id, 'promote')} className="bg-[#305949] text-white px-3 py-1 rounded text-xs hover:bg-[#234236]">
+                                                      ตั้งเป็น Admin
+                                                  </button>
+                                              )}
+                                              {u.role_code === 'admin' && (
+                                                  <button onClick={() => handleRoleChange(u.id, 'demote')} className="bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs hover:bg-gray-400">
+                                                      ปลดเป็น User
+                                                  </button>
+                                              )}
+                                          </div>
+                                      )}
+                                  </td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+          );
+      }
+
+      // 4. Logs และ Orders (ใส่แบบย่อๆ เพื่อความกระชับ)
+      if (activeTab === 'orders') return (
+        <div className="bg-white rounded-2xl shadow p-4">
+            <h3 className="font-bold mb-4">รายการสั่งซื้อ</h3>
+            {/* Table Code เหมือนเดิม */}
+            <table className="w-full text-sm">
+                <thead><tr className="text-left text-gray-500"><th>ID</th><th>ลูกค้า</th><th>สถานะ</th><th>เปลี่ยนสถานะ</th></tr></thead>
+                <tbody>
+                    {orders.map(o => (
+                        <tr key={o.id} className="border-t">
+                            <td className="p-3">#{o.id}</td>
+                            <td className="p-3">{o.customer}</td>
+                            <td className="p-3"><span className="bg-gray-100 px-2 rounded">{o.status}</span></td>
+                            <td className="p-3">
+                                <select value={o.status} onChange={(e)=>updateOrderStatus(o.id, e.target.value)} className="border rounded p-1">
+                                    <option value="Pending">รอจ่าย</option>
+                                    <option value="Paid">จ่ายแล้ว</option>
+                                    <option value="Shipped">ส่งแล้ว</option>
+                                </select>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+      );
+
+      return null;
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F0E4] p-6 md:p-10 font-sans">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-extrabold text-[#263A33] flex items-center gap-3">
-                📊 แดชบอร์ด <span className="text-sm font-normal text-gray-500 bg-white px-3 py-1 rounded-full shadow-sm">{user?.role || 'Admin'} View</span>
-            </h1>
-            {/* ✅ 3. ปุ่มเพิ่มสินค้า */}
-            <Link to="/product/add" className="bg-[#305949] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-[#234236] transition flex items-center gap-2">
-                + เพิ่มสินค้าใหม่
-            </Link>
-        </div>
-
-        {/* ... (Stat Cards เดิม) ... */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-                <p className="text-gray-400 text-xs font-bold uppercase mb-1">ยอดขายรวม</p>
-                <h3 className="text-3xl font-black text-[#305949]">฿{stats.total_sales?.toLocaleString()}</h3>
-            </div>
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-                <p className="text-gray-400 text-xs font-bold uppercase mb-1">ออเดอร์</p>
-                <h3 className="text-3xl font-black text-[#263A33]">{stats.total_orders}</h3>
-            </div>
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-                <p className="text-gray-400 text-xs font-bold uppercase mb-1">สินค้า</p>
-                <h3 className="text-3xl font-black text-[#263A33]">{stats.total_products}</h3>
-            </div>
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-                <p className="text-gray-400 text-xs font-bold uppercase mb-1">ผู้ใช้งาน</p>
-                <h3 className="text-3xl font-black text-blue-600">{stats.total_users || 0}</h3>
-            </div>
-        </div>
-
-        {/* ... (Charts เดิม) ... */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-            <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-                <h3 className="font-bold text-xl text-[#263A33] mb-6">📈 ยอดขาย 7 วันล่าสุด</h3>
-                <div className="h-64"><Line data={salesChartData} options={{maintainAspectRatio: false, plugins: {legend: {display: false}}}} /></div>
-            </div>
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-                <h3 className="font-bold text-xl text-[#263A33] mb-6 text-center">🏆 หมวดหมู่ยอดฮิต</h3>
-                <div className="h-64 flex justify-center"><Doughnut data={categoryChartData} options={{maintainAspectRatio: false}} /></div>
-            </div>
-        </div>
-
-        {/* ... (Orders Table เดิม) ... */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden mb-8">
-            <div className="p-8 border-b border-gray-50 bg-gray-50/50">
-                <h3 className="font-bold text-xl text-[#263A33]">🛒 จัดการออเดอร์</h3>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead className="bg-gray-100/50 text-gray-500 text-sm uppercase">
-                        <tr>
-                            <th className="p-6">Order ID</th>
-                            <th className="p-6">ลูกค้า</th>
-                            <th className="p-6">ยอดรวม</th>
-                            <th className="p-6">สถานะ</th>
-                            <th className="p-6">จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {stats.recent_orders?.map(order => (
-                            <tr key={order.id} className="hover:bg-gray-50 transition">
-                                <td className="p-6 font-bold text-[#305949]">#{order.id}</td>
-                                <td className="p-6">{order.customer_name}</td>
-                                <td className="p-6 font-bold">฿{order.total_price.toLocaleString()}</td>
-                                <td className="p-6"><span className="bg-gray-100 px-3 py-1 rounded-full text-xs font-bold">{order.status}</span></td>
-                                <td className="p-6">
-                                    <select 
-                                        value={order.status} 
-                                        onChange={(e) => updateStatus(order.id, e.target.value)}
-                                        className="bg-white border border-gray-200 rounded-lg text-xs font-bold px-3 py-2 cursor-pointer hover:border-[#305949]"
-                                    >
-                                        <option value="Pending">รอโอน</option>
-                                        <option value="Paid">จ่ายแล้ว</option>
-                                        <option value="Shipped">ส่งแล้ว</option>
-                                        <option value="Completed">สำเร็จ</option>
-                                    </select>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        {/* ✅ 4. Admin Logs Table (เฉพาะ Super Admin) */}
-        {user?.role_code === 'super_admin' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-10">
-                {/* ตาราง Users */}
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-indigo-100 overflow-hidden">
-                    <div className="p-8 border-b border-indigo-50 bg-indigo-50/30">
-                        <h3 className="font-bold text-xl text-indigo-900">👥 รายชื่อผู้ใช้งาน</h3>
-                    </div>
-                    <div className="overflow-x-auto h-96 scrollbar-thin">
-                        <table className="w-full text-left">
-                            <thead className="bg-indigo-50/50 text-indigo-900 text-sm uppercase sticky top-0 bg-white">
-                                <tr>
-                                    <th className="p-6">User</th>
-                                    <th className="p-6">Role</th>
-                                    <th className="p-6">Joined</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-indigo-50">
-                                {usersList.map(u => (
-                                    <tr key={u.id} className="hover:bg-indigo-50/20 transition">
-                                        <td className="p-6 font-bold text-gray-700">{u.username}</td>
-                                        <td className="p-6"><span className="bg-gray-100 px-2 py-1 rounded text-xs">{u.role}</span></td>
-                                        <td className="p-6 text-gray-400 text-xs">{u.date_joined}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+    <div className="min-h-screen bg-[#F2F0E4] p-6 font-sans">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-6">
+            
+            {/* Sidebar เมนู */}
+            <div className="w-full md:w-64 bg-white rounded-2xl shadow p-4 h-fit">
+                <div className="mb-6 text-center">
+                    <h2 className="text-xl font-black text-[#263A33]">Admin Panel</h2>
+                    <p className="text-xs text-gray-400">สวัสดี, {user?.username}</p>
                 </div>
-
-                {/* ตาราง Audit Logs */}
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-orange-100 overflow-hidden">
-                    <div className="p-8 border-b border-orange-50 bg-orange-50/30">
-                        <h3 className="font-bold text-xl text-orange-900">📜 ประวัติการทำงาน (Audit Logs)</h3>
-                    </div>
-                    <div className="overflow-x-auto h-96 scrollbar-thin">
-                        <table className="w-full text-left">
-                            <thead className="bg-orange-50/50 text-orange-900 text-sm uppercase sticky top-0 bg-white">
-                                <tr>
-                                    <th className="p-6">Admin</th>
-                                    <th className="p-6">Action</th>
-                                    <th className="p-6">Time</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-orange-50">
-                                {logs.map(log => (
-                                    <tr key={log.id} className="hover:bg-orange-50/20 transition">
-                                        <td className="p-6 font-bold text-gray-700">
-                                            {log.admin} <br/>
-                                            <span className="text-[10px] text-gray-400 font-normal">{log.role}</span>
-                                        </td>
-                                        <td className="p-6 text-sm text-gray-600">{log.action}</td>
-                                        <td className="p-6 text-gray-400 text-xs">{log.date}</td>
-                                    </tr>
-                                ))}
-                                {logs.length === 0 && (
-                                    <tr><td colSpan="3" className="p-6 text-center text-gray-400">ยังไม่มีประวัติการทำงาน</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                
+                <nav className="space-y-2">
+                    <button onClick={() => setActiveTab('overview')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition ${activeTab==='overview' ? 'bg-[#305949] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <LayoutDashboard size={20}/> ภาพรวม
+                    </button>
+                    <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition ${activeTab==='products' ? 'bg-[#305949] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <Package size={20}/> สินค้า
+                    </button>
+                    <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition ${activeTab==='orders' ? 'bg-[#305949] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <ShoppingCart size={20}/> ออเดอร์
+                    </button>
+                    
+                    {/* เมนูเฉพาะ Super Admin */}
+                    {user?.role_code === 'super_admin' && (
+                        <>
+                            <div className="border-t my-2"></div>
+                            <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition ${activeTab==='users' ? 'bg-indigo-600 text-white' : 'text-indigo-600 hover:bg-indigo-50'}`}>
+                                <Users size={20}/> ผู้ใช้งาน (Admin)
+                            </button>
+                            <button onClick={() => setActiveTab('logs')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition ${activeTab==='logs' ? 'bg-orange-500 text-white' : 'text-orange-500 hover:bg-orange-50'}`}>
+                                <FileText size={20}/> ประวัติระบบ
+                            </button>
+                        </>
+                    )}
+                </nav>
             </div>
-        )}
 
-      </div>
+            {/* Main Content */}
+            <div className="flex-1">
+                <h1 className="text-3xl font-bold text-[#263A33] mb-6 capitalize">{activeTab} Dashboard</h1>
+                {renderContent()}
+            </div>
+        </div>
     </div>
   );
 }

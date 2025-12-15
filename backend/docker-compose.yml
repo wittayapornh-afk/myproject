@@ -36,6 +36,10 @@ services:
       - MYSQL_USER=django_user
       - MYSQL_PASSWORD=django_password
       - MYSQL_ROOT_PASSWORD=root_secret
+      - MYSQL_CHARSET=utf8mb4
+      - MYSQL_COLLATION=utf8mb4_general_ci
+      - MYSQL_PORT_3306_TCP_ADDR=db
+      - MYSQL_PORT_3306_TCP_PORT=3306
     ports:
       - "3306:3306"
     networks:

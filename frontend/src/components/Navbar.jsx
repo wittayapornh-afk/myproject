@@ -3,8 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { useAuth } from '../context/AuthContext';
-// นำเข้าไอคอน
-import { Search, ShoppingCart, User, LayoutGrid, LayoutDashboard, LogIn, Package } from 'lucide-react';
+import { Search, ShoppingCart, User, LayoutGrid, LayoutDashboard, LogIn, Package, History } from 'lucide-react';
 
 function Navbar() {
   const { cartItems } = useCart();
@@ -22,7 +21,6 @@ function Navbar() {
   }, []);
 
   const showSearchBar = location.pathname !== '/';
-  
   const isAdmin = user && (user.role_code === 'admin' || user.role_code === 'super_admin');
 
   return (
@@ -39,13 +37,7 @@ function Navbar() {
         {showSearchBar && (
             <div className="hidden md:flex flex-1 max-w-lg mx-8 animate-fade-in">
                 <div className="relative w-full group">
-                    <input 
-                      type="text" 
-                      placeholder="ค้นหาสินค้า..." 
-                      value={searchQuery} 
-                      onChange={(e) => setSearchQuery(e.target.value)} 
-                      className="w-full bg-white border border-gray-200 focus:border-[#305949] pl-12 pr-4 py-2.5 rounded-full outline-none transition-all shadow-sm group-hover:shadow-md text-sm" 
-                    />
+                    <input type="text" placeholder="ค้นหาสินค้า..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border border-gray-200 focus:border-[#305949] pl-12 pr-4 py-2.5 rounded-full outline-none transition-all shadow-sm group-hover:shadow-md text-sm" />
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#305949] transition-colors" size={18} />
                 </div>
             </div>
@@ -65,28 +57,27 @@ function Navbar() {
           {!isAdmin && (
               <Link to="/cart" className="relative p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-[#305949] transition group">
                 <ShoppingCart size={24} />
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#ff4d4f] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm">
-                    {totalItems}
-                  </span>
-                )}
+                {totalItems > 0 && <span className="absolute -top-1 -right-1 bg-[#ff4d4f] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm">{totalItems}</span>}
               </Link>
           )}
 
           {user ? (
-            <Link to="/profile" className="flex items-center gap-3 pl-4 border-l border-gray-200 hover:opacity-80 transition">
-                <div className="text-right hidden lg:block">
-                    <p className="text-xs font-bold text-[#263A33] truncate max-w-[100px]">{user.username}</p>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide">{user.role || 'Member'}</p>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#305949] to-[#1a332a] text-white flex items-center justify-center shadow-md ring-2 ring-white overflow-hidden">
-                    {user.avatar ? (
-                        <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
-                    ) : (
-                        <User size={18} />
-                    )}
-                </div>
-            </Link>
+            <div className="flex items-center gap-3">
+                {/* ✅ ปุ่มดูประวัติการสั่งซื้อ */}
+                <Link to="/my-orders" className="text-gray-500 hover:text-[#305949] p-2 rounded-full hover:bg-gray-100 transition" title="ประวัติการสั่งซื้อ">
+                    <History size={22} />
+                </Link>
+
+                <Link to="/profile" className="flex items-center gap-3 pl-2 border-l border-gray-200 hover:opacity-80 transition">
+                    <div className="text-right hidden lg:block">
+                        <p className="text-xs font-bold text-[#263A33] truncate max-w-[100px]">{user.username}</p>
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wide">{user.role || 'Member'}</p>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#305949] to-[#1a332a] text-white flex items-center justify-center shadow-md ring-2 ring-white overflow-hidden">
+                        {user.avatar ? <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" /> : <User size={18} />}
+                    </div>
+                </Link>
+            </div>
           ) : (
             <Link to="/login" className="px-6 py-2.5 bg-[#263A33] text-white rounded-full text-sm font-bold shadow-md hover:shadow-lg hover:bg-[#1d2d27] transition hover:-translate-y-0.5 flex items-center gap-2">
               <LogIn size={16} /> เข้าสู่ระบบ
