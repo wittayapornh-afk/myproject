@@ -1,40 +1,46 @@
+from django.contrib import admin
 from django.urls import path
+from rest_framework.authtoken import views as token_views
 from django.conf import settings
 from django.conf.urls.static import static
-from rest_framework.authtoken import views as token_views
-from . import views
+from myapp import views
 
 urlpatterns = [
-    # Public
-    path('products/', views.products_api),
-    path('products/<int:product_id>/', views.product_detail_api),
-    path('categories/', views.categories_api),
+    # --- Auth ---
+    path('api/login/', token_views.obtain_auth_token, name='api_token_auth'),
+    path('api/register/', views.register_api, name='register_api'),
+    path('api/logout/', views.logout_api, name='logout_api'),
+    path('api/profile/', views.user_profile_api, name='user_profile'),
+
+    # --- Admin Users & Role (Super Admin) ---
+    path('api/admin/users/', views.get_all_users, name='get_all_users'),
+    path('api/admin/users/role/', views.manage_user_role, name='manage_user_role'), # ✅ เพิ่มบรรทัดนี้ เพื่อให้เปลี่ยนสิทธิ์ user ได้
+
+    # --- Admin Dashboard Lists (ส่วนที่หายไป ทำให้กราฟไม่ขึ้น) ---
+    path('api/admin/products/', views.admin_products_list, name='admin_products_list'), # ✅ แก้ปัญหา สินค้าไม่ขึ้น
+    path('api/admin/orders/', views.admin_orders_list, name='admin_orders_list'),     # ✅ แก้ปัญหา ออเดอร์ไม่ขึ้น
+
+    # --- Products ---
+    path('api/products/', views.products_api, name='products_api'),
+    path('api/products/add/', views.add_product_api, name='add_product'),
+    path('api/products/<int:product_id>/', views.product_detail_api, name='product_detail_api'),
+    path('api/products/<int:product_id>/edit/', views.edit_product_api, name='edit_product'),
+    path('api/products/<int:product_id>/delete/', views.delete_product_api, name='delete_product'),
     
-    # Auth
-    path('login/', token_views.obtain_auth_token),
-    path('logout/', views.logout_api),
-    path('register/', views.register_api),
-    path('profile/', views.user_profile_api),
+    path('api/categories/', views.categories_api, name='categories_api'),
+
+    # --- Orders ---
+    path('api/orders/create/', views.create_order, name='create_order'),
+    path('api/orders/<int:order_id>/update/', views.update_order_status, name='update_order'),
+    path('api/my-orders/', views.my_orders_api, name='my_orders'),
+
+    # --- Admin Stats & Logs ---
+    path('api/admin-stats/', views.get_admin_stats, name='admin_stats_api'),
+    path('api/admin-logs/', views.get_admin_logs, name='get_admin_logs'), # URL นี้มีแล้ว แต่ต้องเช็คสิทธิ์ Super Admin
     
-    # User Orders
-    path('orders/create/', views.create_order),
-    path('my-orders/', views.my_orders_api),
-    
-    # Admin Dashboard
-    path('admin-stats/', views.get_admin_stats),
-    path('admin/products/', views.admin_products_list),
-    path('products/add/', views.add_product_api),
-    path('products/<int:product_id>/edit/', views.edit_product_api),
-    path('products/<int:product_id>/delete/', views.delete_product_api),
-    
-    path('admin/orders/', views.admin_orders_list),
-    path('orders/<int:order_id>/update/', views.update_order_status),
-    
-    # Super Admin
-    path('admin/users/', views.get_all_users),
-    path('admin/users/role/', views.manage_user_role), # ✅ เส้นนี้สำคัญสำหรับแก้ Role
-    path('admin-logs/', views.get_admin_logs),
+    path('admin/', admin.site.urls),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
