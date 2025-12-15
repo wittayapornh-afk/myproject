@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
+// นำเข้าไอคอน
+import { User, Lock, LogIn } from 'lucide-react';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -39,11 +41,10 @@ function LoginPage() {
             navigate(from, { replace: true });
         });
       } else {
-        // แจ้งเตือนเมื่อ User/Pass ผิด (Error 400)
         Swal.fire({
             icon: 'error',
             title: 'เข้าสู่ระบบไม่สำเร็จ',
-            text: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (หากเพิ่งเริ่มระบบใหม่ กรุณาสมัครสมาชิกก่อน)',
+            text: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง',
             confirmButtonColor: '#305949'
         });
       }
@@ -67,28 +68,34 @@ function LoginPage() {
           <div className="space-y-4">
               <div>
                   <label className="text-xs font-bold text-gray-500 uppercase ml-2 mb-1 block">ชื่อผู้ใช้</label>
-                  <input 
-                    type="text" 
-                    placeholder="Username" 
-                    autoComplete="username" // ✅ แก้ Warning
-                    className="w-full px-5 py-3 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" 
-                    onChange={e => setUsername(e.target.value)} 
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Username" 
+                      autoComplete="username" 
+                      className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" 
+                      onChange={e => setUsername(e.target.value)} 
+                    />
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  </div>
               </div>
               <div>
                   <label className="text-xs font-bold text-gray-500 uppercase ml-2 mb-1 block">รหัสผ่าน</label>
-                  <input 
-                    type="password" 
-                    placeholder="••••••••" 
-                    autoComplete="current-password" // ✅ แก้ Warning
-                    className="w-full px-5 py-3 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" 
-                    onChange={e => setPassword(e.target.value)} 
-                  />
+                  <div className="relative">
+                    <input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      autoComplete="current-password" 
+                      className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" 
+                      onChange={e => setPassword(e.target.value)} 
+                    />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  </div>
               </div>
           </div>
 
-          <button type="submit" className="w-full py-4 bg-[#305949] text-white font-bold rounded-2xl shadow-lg shadow-[#305949]/30 hover:bg-[#234236] hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-              เข้าสู่ระบบ
+          <button type="submit" className="w-full py-4 bg-[#305949] text-white font-bold rounded-2xl shadow-lg shadow-[#305949]/30 hover:bg-[#234236] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex justify-center items-center gap-2">
+              <LogIn size={20} /> เข้าสู่ระบบ
           </button>
 
           <div className="text-center mt-6 pt-6 border-t border-gray-100">

@@ -1,5 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+// นำเข้าไอคอน
+import { Facebook, Instagram, Twitter, Send, MapPin, Phone, Mail, ChevronRight, ShoppingBag, MessageCircle } from 'lucide-react';
 
 function Footer() {
   return (
@@ -10,18 +12,19 @@ function Footer() {
           {/* Brand & Concept */}
           <div className="space-y-6">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-2xl backdrop-blur-sm">🛍️</div>
+              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm group-hover:bg-white/20 transition">
+                <ShoppingBag size={20} className="text-white" />
+              </div>
               <span className="text-2xl font-black tracking-tight text-white">SHOP.</span>
             </Link>
             <p className="text-sm leading-7 text-gray-400 font-light">
               เราคัดสรรสินค้าคุณภาพดีที่สุด เพื่อไลฟ์สไตล์ที่ลงตัวของคุณ ส่งตรงถึงหน้าบ้านด้วยความใส่ใจในทุกขั้นตอน
             </p>
             <div className="flex gap-4 pt-2">
-                {['facebook', 'instagram', 'twitter', 'line'].map(social => (
-                    <a key={social} href="#" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#305949] hover:text-white transition-all text-gray-400">
-                        <i className={`bi bi-${social}`}></i>
-                    </a>
-                ))}
+                <a href="#" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#1877F2] hover:text-white transition-all text-gray-400"><Facebook size={16} /></a>
+                <a href="#" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#E4405F] hover:text-white transition-all text-gray-400"><Instagram size={16} /></a>
+                <a href="#" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#1DA1F2] hover:text-white transition-all text-gray-400"><Twitter size={16} /></a>
+                <a href="#" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#06C755] hover:text-white transition-all text-gray-400"><MessageCircle size={16} /></a>
             </div>
           </div>
 
@@ -29,10 +32,10 @@ function Footer() {
           <div>
             <h3 className="text-white font-bold mb-6 uppercase tracking-widest text-xs">เมนูแนะนำ</h3>
             <ul className="space-y-3 text-sm text-gray-400 font-medium">
-              <li><Link to="/" className="hover:text-[#4ADE80] transition flex items-center gap-2"><i className="bi bi-chevron-right text-xs"></i> หน้าแรก</Link></li>
-              <li><Link to="/shop" className="hover:text-[#4ADE80] transition flex items-center gap-2"><i className="bi bi-chevron-right text-xs"></i> สินค้าทั้งหมด</Link></li>
-              <li><Link to="/cart" className="hover:text-[#4ADE80] transition flex items-center gap-2"><i className="bi bi-chevron-right text-xs"></i> ตะกร้าสินค้า</Link></li>
-              <li><Link to="/profile" className="hover:text-[#4ADE80] transition flex items-center gap-2"><i className="bi bi-chevron-right text-xs"></i> บัญชีของฉัน</Link></li>
+              <li><Link to="/" className="hover:text-[#4ADE80] transition flex items-center gap-2"><ChevronRight size={14} /> หน้าแรก</Link></li>
+              <li><Link to="/shop" className="hover:text-[#4ADE80] transition flex items-center gap-2"><ChevronRight size={14} /> สินค้าทั้งหมด</Link></li>
+              <li><Link to="/cart" className="hover:text-[#4ADE80] transition flex items-center gap-2"><ChevronRight size={14} /> ตะกร้าสินค้า</Link></li>
+              <li><Link to="/profile" className="hover:text-[#4ADE80] transition flex items-center gap-2"><ChevronRight size={14} /> บัญชีของฉัน</Link></li>
             </ul>
           </div>
 
@@ -41,15 +44,15 @@ function Footer() {
             <h3 className="text-white font-bold mb-6 uppercase tracking-widest text-xs">ติดต่อเรา</h3>
             <ul className="space-y-4 text-sm text-gray-400 font-medium">
               <li className="flex items-start gap-3">
-                <i className="bi bi-geo-alt-fill text-[#305949] mt-1"></i>
+                <MapPin size={18} className="text-[#305949] mt-0.5 text-green-400" />
                 <span>123 อาคารสยามทาวเวอร์ ชั้น 15,<br/>ถนนสุขุมวิท, กรุงเทพฯ 10330</span>
               </li>
               <li className="flex items-center gap-3">
-                <i className="bi bi-telephone-fill text-[#305949]"></i>
+                <Phone size={18} className="text-green-400" />
                 <span>02-123-4567</span>
               </li>
               <li className="flex items-center gap-3">
-                <i className="bi bi-envelope-fill text-[#305949]"></i>
+                <Mail size={18} className="text-green-400" />
                 <span>hello@myshop.com</span>
               </li>
             </ul>
@@ -66,7 +69,7 @@ function Footer() {
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#305949] focus:bg-white/10 transition" 
                 />
                 <button className="absolute right-1.5 top-1.5 bg-[#305949] hover:bg-[#234236] text-white p-2 rounded-lg transition shadow-lg">
-                    <i className="bi bi-send-fill text-xs"></i>
+                    <Send size={14} />
                 </button>
             </div>
           </div>
