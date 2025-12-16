@@ -14,11 +14,11 @@ urlpatterns = [
 
     # --- Admin Users & Role (Super Admin) ---
     path('api/admin/users/', views.get_all_users, name='get_all_users'),
-    path('api/admin/users/role/', views.manage_user_role, name='manage_user_role'), # ✅ เพิ่มบรรทัดนี้ เพื่อให้เปลี่ยนสิทธิ์ user ได้
+    path('api/admin/users/role/', views.manage_user_role, name='manage_user_role'),
 
-    # --- Admin Dashboard Lists (ส่วนที่หายไป ทำให้กราฟไม่ขึ้น) ---
-    path('api/admin/products/', views.admin_products_list, name='admin_products_list'), # ✅ แก้ปัญหา สินค้าไม่ขึ้น
-    path('api/admin/orders/', views.admin_orders_list, name='admin_orders_list'),     # ✅ แก้ปัญหา ออเดอร์ไม่ขึ้น
+    # --- Admin Dashboard Lists ---
+    path('api/admin/products/', views.admin_products_list, name='admin_products_list'),
+    path('api/admin/orders/', views.admin_orders_list, name='admin_orders_list'),
 
     # --- Products ---
     path('api/products/', views.products_api, name='products_api'),
@@ -36,7 +36,7 @@ urlpatterns = [
 
     # --- Admin Stats & Logs ---
     path('api/admin-stats/', views.get_admin_stats, name='admin_stats_api'),
-    path('api/admin-logs/', views.get_admin_logs, name='get_admin_logs'), # URL นี้มีแล้ว แต่ต้องเช็คสิทธิ์ Super Admin
+    path('api/admin-logs/', views.get_admin_logs, name='get_admin_logs'),
     
     path('admin/', admin.site.urls),
 ]

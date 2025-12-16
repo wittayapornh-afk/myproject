@@ -1,7 +1,6 @@
 from django.contrib import admin
 from .models import Product, ProductImage, Order, OrderItem, Review, UserProfile, AdminLog
 
-# แสดงรายการ OrderItem ซ้อนในหน้า Order
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0

@@ -1,6 +1,5 @@
-# backend/myapp/serializers.py
 from rest_framework import serializers
-from .models import Product, ProductImage, Order, OrderItem, User
+from .models import Product, ProductImage, Order, OrderItem
 
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -8,21 +7,22 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image']
 
 class ProductSerializer(serializers.ModelSerializer):
-    # เพิ่มบรรทัดนี้เพื่อดึงรูปภาพย่อยทั้งหมดมาแสดง
-    images = ProductImageSerializer(many=True, read_only=True) 
+    # เพิ่ม field images เพื่อดึงรูปจากตาราง ProductImage ที่เชื่อมกัน
+    images = ProductImageSerializer(many=True, read_only=True, source='productimage_set') 
 
     class Meta:
         model = Product
-        fields = '__all__' # หรือระบุ fields รวมถึง 'images' ด้วย
+        # เพิ่ม 'images' เข้าไปใน fields
+        fields = ['id', 'name', 'price', 'description', 'stock', 'image', 'brand', 'rating', 'images']
 
-# Serializer สำหรับ Order
+class OrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.ReadOnlyField(source='product.name')
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'product', 'product_name', 'quantity', 'price']
+
 class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True, source='orderitem_set')
     class Meta:
         model = Order
-        fields = '__all__'
-
-# Serializer สำหรับ User management
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'email', 'is_staff', 'is_superuser']
+        fields = ['id', 'user', 'total_price', 'status', 'created_at', 'items']

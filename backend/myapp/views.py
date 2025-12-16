@@ -7,7 +7,7 @@ from django.db.models import Sum
 from django.db import transaction
 from django.contrib.auth.models import User
 from .models import Product, Order, OrderItem, UserProfile, AdminLog, ProductImage
-import logging  # ✅ ต้องมีบรรทัดนี้ครับ ไม่งั้นจะเกิด Error แบบที่เจอ
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +18,9 @@ logger = logging.getLogger(__name__)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def admin_products_list(request):
-    # ✅ ฟังก์ชันนี้ดึงสินค้าทั้งหมด (รวมที่ปิดการขาย) ให้ Admin เห็น
     if request.user.profile.role not in ['admin', 'super_admin']:
         return Response({"error": "Unauthorized"}, status=403)
     
-    # ใช้ .all() เพื่อดึงทั้งหมด ไม่สนใจ is_active
     products = Product.objects.all().order_by('-id')
     
     data = [{
@@ -31,7 +29,7 @@ def admin_products_list(request):
         "price": p.price,
         "stock": p.stock,
         "category": p.category,
-        "is_active": p.is_active, # ส่งสถานะไปด้วย
+        "is_active": p.is_active,
         "thumbnail": request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else ""
     } for p in products]
     return Response(data)
@@ -39,7 +37,6 @@ def admin_products_list(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def manage_user_role(request):
-    # ✅ ฟังก์ชันแต่งตั้ง Admin (สำหรับ Super Admin)
     if request.user.profile.role != 'super_admin':
         return Response({"error": "Unauthorized: Super Admin only"}, status=403)
     
@@ -55,11 +52,11 @@ def manage_user_role(request):
 
         if action == 'promote':
             profile.role = 'admin'
-            target_user.is_staff = True # ✅ เปิดสิทธิ์ Staff ให้เข้าถึงส่วน Admin ได้
+            target_user.is_staff = True
             msg = "แต่งตั้งเป็น Admin"
         elif action == 'demote':
             profile.role = 'user'
-            target_user.is_staff = False # ❌ ปิดสิทธิ์
+            target_user.is_staff = False
             msg = "ปลดเป็น User"
         else:
             return Response({"error": "Invalid action"}, status=400)
@@ -67,7 +64,6 @@ def manage_user_role(request):
         target_user.save()
         profile.save()
         
-        # บันทึก Log
         AdminLog.objects.create(admin=request.user, action=f"{msg}: {target_user.username}")
         
         return Response({"message": f"ดำเนินการ {msg} สำเร็จ"})
@@ -83,7 +79,6 @@ def manage_user_role(request):
 @permission_classes([AllowAny])
 def products_api(request):
     try:
-        # User ทั่วไปเห็นแค่สินค้าที่ is_active=True
         products = Product.objects.filter(is_active=True).order_by('-id')
         category = request.query_params.get('category')
         search = request.query_params.get('search')
@@ -185,7 +180,6 @@ def create_order(request):
         with transaction.atomic():
             total_price = 0
             for item in cart_items:
-                # ตรวจสอบ Stock
                 p = Product.objects.select_for_update().get(id=item['id'])
                 if p.stock < item['quantity']: raise ValueError(f"{p.title} out of stock")
                 total_price += p.price * item['quantity']
@@ -278,19 +272,37 @@ def get_admin_logs(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def add_product_api(request):
-    if request.user.profile.role not in ['admin', 'super_admin']: return Response(status=403)
+    if request.user.profile.role not in ['admin', 'super_admin']: 
+        return Response(status=403)
     
     data = request.data
-    p = Product.objects.create(
-        title=data['title'], description=data.get('description',''), 
-        price=data['price'], stock=data['stock'], category=data['category'], brand=data.get('brand','')
-    )
-    if 'thumbnail' in request.FILES:
-        p.thumbnail = request.FILES['thumbnail']
-        p.save()
-        
-    AdminLog.objects.create(admin=request.user, action=f"เพิ่มสินค้า: {p.title}")
-    return Response({"message": "Added", "id": p.id}, status=201)
+    try:
+        with transaction.atomic(): # ใช้ transaction เพื่อความปลอดภัย (ถ้าพังให้ rollback)
+            # 1. สร้างตัวสินค้า
+            p = Product.objects.create(
+                title=data['title'], 
+                description=data.get('description',''), 
+                price=data['price'], 
+                stock=data['stock'], 
+                category=data['category'], 
+                brand=data.get('brand','')
+            )
+            
+            # 2. บันทึกรูปหลัก (Thumbnail)
+            if 'thumbnail' in request.FILES:
+                p.thumbnail = request.FILES['thumbnail']
+                p.save()
+            
+            # 3. บันทึกรูปแกลเลอรี่ (New Gallery Images) ✅ เพิ่มส่วนนี้
+            new_images = request.FILES.getlist('new_gallery_images')
+            for img in new_images:
+                ProductImage.objects.create(product=p, image=img)
+                
+            AdminLog.objects.create(admin=request.user, action=f"เพิ่มสินค้า: {p.title}")
+            return Response({"message": "Added", "id": p.id}, status=201)
+            
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
@@ -310,7 +322,6 @@ def edit_product_api(request, product_id):
         p.thumbnail = request.FILES['thumbnail']
     p.save()
     
-    # Handle Gallery (เพิ่ม/ลบรูป)
     new_images = request.FILES.getlist('new_gallery_images')
     for img in new_images:
         ProductImage.objects.create(product=p, image=img)
@@ -328,7 +339,7 @@ def delete_product_api(request, product_id):
     if request.user.profile.role not in ['admin', 'super_admin']: return Response(status=403)
     
     p = Product.objects.get(id=product_id)
-    p.is_active = False # Soft delete
+    p.is_active = False 
     p.save()
     
     AdminLog.objects.create(admin=request.user, action=f"ลบสินค้า: {p.title}")

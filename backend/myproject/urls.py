@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
 from rest_framework.authtoken import views as token_views
 from django.conf import settings
 from django.conf.urls.static import static
@@ -11,14 +11,17 @@ urlpatterns = [
     path('api/register/', views.register_api, name='register_api'),
     path('api/logout/', views.logout_api, name='logout_api'),
     path('api/profile/', views.user_profile_api, name='user_profile'),
+    
+    # --- Admin Dashboard Lists (เพิ่มส่วนนี้) ---
     path('api/admin/users/', views.get_all_users, name='get_all_users'),
+    path('api/admin/users/role/', views.manage_user_role, name='manage_user_role'),
+    path('api/admin/products/', views.admin_products_list, name='admin_products_list'), # ✅ API สำหรับดึงสินค้าทั้งหมด
+    path('api/admin/orders/', views.admin_orders_list, name='admin_orders_list'),     # ✅ API สำหรับดึงออเดอร์ทั้งหมด
 
     # --- Products ---
     path('api/products/', views.products_api, name='products_api'),
     path('api/products/add/', views.add_product_api, name='add_product'),
     path('api/products/<int:product_id>/', views.product_detail_api, name='product_detail_api'),
-    
-    # ✅ แก้ไขตรงนี้: ย้าย <int:product_id> มาไว้ก่อน edit และ delete เพื่อให้ตรงกับ Frontend
     path('api/products/<int:product_id>/edit/', views.edit_product_api, name='edit_product'),
     path('api/products/<int:product_id>/delete/', views.delete_product_api, name='delete_product'),
     
