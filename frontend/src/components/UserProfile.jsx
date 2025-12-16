@@ -127,14 +127,16 @@ function UserProfile() {
                     <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><User size={14} /> ชื่อผู้ใช้</label>
                     <input type="text" disabled={!isEditing} value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
                 </div>
-                <div>
-                    <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><Mail size={14} /> อีเมล</label>
-                    <input type="text" disabled={!isEditing} value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
-                </div>
-                <div>
-                    <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><Phone size={14} /> เบอร์โทรศัพท์</label>
-                    <input type="text" disabled={!isEditing} value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
-                </div>
+                <div className="grid grid-cols-1 gap-4 mt-6">
+        <div className="p-4 bg-white rounded shadow-sm border">
+            <label className="text-gray-500 text-sm">อีเมล</label>
+            <p className="font-medium">{user.email || "-"}</p> {/* ✅ แสดง email */}
+        </div>
+        <div className="p-4 bg-white rounded shadow-sm border">
+            <label className="text-gray-500 text-sm">เบอร์โทรศัพท์</label>
+            <p className="font-medium">{user.phone || "-"}</p> {/* ✅ แสดง phone */}
+        </div>
+    </div>
                 <div>
                     <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><MapPin size={14} /> ที่อยู่จัดส่ง</label>
                     <textarea rows="3" disabled={!isEditing} value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition"></textarea>

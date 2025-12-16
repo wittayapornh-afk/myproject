@@ -1,33 +1,58 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
-// นำเข้าไอคอน
-import { User, Lock, Mail, Phone, UserPlus } from 'lucide-react';
+// นำเข้าไอคอนเพิ่ม Camera
+import { User, Lock, Mail, Phone, UserPlus, Camera } from 'lucide-react';
 
 function RegisterPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState(''); // ✅ เพิ่ม state เบอร์โทร
-  
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+    email: '',
+    phone: ''
+  });
+  const [avatar, setAvatar] = useState(null); // ✅ State สำหรับเก็บไฟล์รูป
+  const [preview, setPreview] = useState(null); // ✅ State สำหรับแสดงตัวอย่างรูป
+
   const navigate = useNavigate();
+
+  // ฟังก์ชันจัดการ Text Input
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // ฟังก์ชันจัดการ File Input
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAvatar(file);
+      setPreview(URL.createObjectURL(file)); // สร้าง URL จำลองเพื่อแสดงรูป preview
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // ✅ 1. เตรียมข้อมูลแบบ FormData (จำเป็นสำหรับการส่งไฟล์)
+    const data = new FormData();
+    data.append('username', formData.username);
+    data.append('password', formData.password);
+    data.append('email', formData.email);
+    data.append('phone', formData.phone);
+    if (avatar) {
+      data.append('avatar', avatar); // ส่งไฟล์รูป
+    }
+
     try {
       Swal.showLoading();
+      
+      // ✅ 2. ส่งข้อมูลด้วย fetch (ไม่ต้องกำหนด Content-Type, Browser จะจัดการเอง)
       const res = await fetch('http://localhost:8000/api/register/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            username, 
-            password, 
-            email, 
-            phone // ✅ ส่งเบอร์โทรไปด้วย
-        })
+        body: data 
       });
       
-      const data = await res.json();
+      const responseData = await res.json();
       
       if (res.ok) {
         Swal.fire({
@@ -42,12 +67,13 @@ function RegisterPage() {
         Swal.fire({
             icon: 'error',
             title: 'สมัครสมาชิกไม่สำเร็จ',
-            text: data.error || 'ชื่อผู้ใช้นี้อาจมีคนใช้แล้ว',
+            text: responseData.error || 'ตรวจสอบข้อมูลอีกครั้ง',
             confirmButtonColor: '#d33'
         });
       }
     } catch (err) {
-      Swal.fire('Error', 'ไม่สามารถเชื่อมต่อ Server ได้', 'error');
+      console.error(err);
+      Swal.fire('Error', 'ไม่สามารถเชื่อมต่อ Server ได้ (ตรวจสอบ Backend ว่า Run อยู่หรือไม่)', 'error');
     }
   };
 
@@ -64,11 +90,35 @@ function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4 relative z-10">
             
+            {/* ✅ ส่วนอัปโหลดรูปภาพ */}
+            <div className="flex flex-col items-center mb-6">
+                <div className="relative w-24 h-24 mb-2">
+                    <img 
+                        src={preview || "https://via.placeholder.com/150?text=Avatar"} 
+                        alt="Profile Preview" 
+                        className="w-full h-full rounded-full object-cover border-4 border-[#F2F0E4] shadow-md"
+                    />
+                    <label className="absolute bottom-0 right-0 bg-[#305949] text-white p-1.5 rounded-full cursor-pointer hover:bg-[#234236] transition shadow-sm">
+                        <Camera size={14} />
+                        <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                    </label>
+                </div>
+                <p className="text-xs text-gray-400">อัปโหลดรูปโปรไฟล์ (ถ้ามี)</p>
+            </div>
+
             {/* Username */}
             <div>
                 <label className="text-xs font-bold text-gray-500 uppercase ml-2 mb-1 block">ชื่อผู้ใช้</label>
                 <div className="relative">
-                    <input type="text" placeholder="Username" className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" onChange={e => setUsername(e.target.value)} required />
+                    <input 
+                        type="text" 
+                        name="username"
+                        placeholder="Username" 
+                        autoComplete="username" 
+                        className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" 
+                        onChange={handleChange} 
+                        required 
+                    />
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 </div>
             </div>
@@ -77,25 +127,49 @@ function RegisterPage() {
             <div>
                 <label className="text-xs font-bold text-gray-500 uppercase ml-2 mb-1 block">อีเมล</label>
                 <div className="relative">
-                    <input type="email" placeholder="hello@example.com" className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" onChange={e => setEmail(e.target.value)} required />
+                    <input 
+                        type="email" 
+                        name="email"
+                        placeholder="hello@example.com" 
+                        autoComplete="email" 
+                        className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" 
+                        onChange={handleChange} 
+                        required 
+                    />
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 </div>
             </div>
 
-            {/* Phone Number (เพิ่มใหม่) */}
+            {/* Phone Number */}
             <div>
                 <label className="text-xs font-bold text-gray-500 uppercase ml-2 mb-1 block">เบอร์โทรศัพท์</label>
                 <div className="relative">
-                    <input type="tel" placeholder="081-234-5678" className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" onChange={e => setPhone(e.target.value)} required />
+                    <input 
+                        type="tel" 
+                        name="phone"
+                        placeholder="081-234-5678" 
+                        autoComplete="tel"
+                        className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" 
+                        onChange={handleChange} 
+                        required 
+                    />
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 </div>
             </div>
 
-            {/* Password */}
+            {/* Password (✅ เพิ่ม autocomplete="new-password" แก้ Warning) */}
             <div>
                 <label className="text-xs font-bold text-gray-500 uppercase ml-2 mb-1 block">รหัสผ่าน</label>
                 <div className="relative">
-                    <input type="password" placeholder="••••••••" className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" onChange={e => setPassword(e.target.value)} required />
+                    <input 
+                        type="password" 
+                        name="password"
+                        placeholder="••••••••" 
+                        autoComplete="new-password" 
+                        className="w-full px-5 py-3 pl-12 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#305949]/30 border border-transparent focus:bg-white transition-all" 
+                        onChange={handleChange} 
+                        required 
+                    />
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 </div>
             </div>

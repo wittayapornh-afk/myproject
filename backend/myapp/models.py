@@ -8,12 +8,14 @@ from django.contrib.auth.models import User
 # ==========================================
 
 class UserProfile(models.Model):
-    ROLE_CHOICES = [
-        ('user', 'User (ผู้เยี่ยมชม/สมาชิกใหม่)'),
-        ('customer', 'Customer (ลูกค้าที่เคยซื้อ)'),
-        ('admin', 'Admin (เจ้าของร้าน/คนขาย)'),
-        ('super_admin', 'Super Admin (ผู้ดูแลระบบสูงสุด)'),
-    ]
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    role = models.CharField(max_length=20, default='user')
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    # เพิ่มบรรทัดนี้สำหรับเบอร์โทร
+    phone = models.CharField(max_length=15, blank=True, default='') 
+
+    def __str__(self):
+        return self.user.username
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')

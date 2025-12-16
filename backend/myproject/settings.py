@@ -63,8 +63,8 @@ DATABASES = {
         'NAME': os.environ.get('DATABASE_NAME', 'django_db'),
         'USER': os.environ.get('DATABASE_USER', 'django_user'),
         'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'django_password'),
-        'HOST': os.environ.get('DATABASE_HOST', 'db'),
-        'PORT':os.environ.get ( 'DATABASE_PORT', '3306'),
+        'HOST': '127.0.0.1',
+        'PORT': os.environ.get('DATABASE_PORT', '3306'),
     }
 }
 

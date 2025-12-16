@@ -137,16 +137,32 @@ def categories_api(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_api(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
-    email = request.data.get('email')
+    # รับข้อมูลทั้งหมด
+    data = request.data 
+    
+    username = data.get('username')
+    password = data.get('password')
+    email = data.get('email')
+    phone = data.get('phone', '') # รับเบอร์โทร
     
     if User.objects.filter(username=username).exists():
         return Response({"error": "Username already exists"}, status=400)
 
-    user = User.objects.create_user(username=username, password=password, email=email)
-    UserProfile.objects.create(user=user, role='user')
-    return Response({"message": "Registered successfully"})
+    try:
+        # สร้าง User หลัก
+        user = User.objects.create_user(username=username, password=password, email=email)
+        
+        # สร้าง UserProfile พร้อมรูปภาพและเบอร์โทร
+        profile = UserProfile.objects.create(user=user, role='user', phone=phone)
+        
+        # ถ้ารูปถูกส่งมาด้วย ให้บันทึกลง profile
+        if 'avatar' in request.FILES:
+            profile.avatar = request.FILES['avatar']
+            profile.save()
+            
+        return Response({"message": "Registered successfully"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -161,6 +177,8 @@ def user_profile_api(request):
     return Response({
         "id": request.user.id,
         "username": request.user.username,
+        "email": request.user.email,      # ✅ เพิ่ม email
+        "phone": profile.phone,           # ✅ เพิ่ม phone
         "role": profile.get_role_display(),
         "role_code": profile.role,
         "avatar": request.build_absolute_uri(profile.avatar.url) if profile.avatar else ""

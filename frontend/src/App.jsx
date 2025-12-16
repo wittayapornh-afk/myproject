@@ -86,7 +86,7 @@ function App() {
                     </ProtectedRoute>
                 } />
                 <Route path="/order-history" element={
-                    <ProtectedRoute allowedRoles={['customer', 'admin', 'super_admin']}>
+                    <ProtectedRoute allowedRoles={[, 'user', 'customer', 'admin', 'super_admin']}>
                         <OrderHistory />
                     </ProtectedRoute>
                 } />
