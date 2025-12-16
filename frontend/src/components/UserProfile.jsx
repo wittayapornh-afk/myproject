@@ -11,17 +11,20 @@ function UserProfile() {
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
+  // ดึงข้อมูลโปรไฟล์
   useEffect(() => {
-    fetch('http://localhost:8000/api/profile/', {
+    fetch('/api/profile/', {
       headers: { 'Authorization': `Token ${token}` }
     })
     .then(res => res.json())
     .then(data => {
         setProfile(data);
         setFormData(data);
-    });
+    })
+    .catch(() => Swal.fire('Error', 'โหลดข้อมูลไม่สำเร็จ', 'error'));
   }, [token]);
 
+  // จัดการเมื่อเลือกไฟล์รูป
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -30,25 +33,26 @@ function UserProfile() {
     }
   };
 
+  // บันทึกข้อมูล
   const handleSave = async () => {
     const data = new FormData();
-    // ✅ ส่ง username ไปด้วย (ถ้า API รองรับการแก้ชื่อ)
     data.append('username', formData.username); 
     data.append('email', formData.email);
-    data.append('phone', formData.phone);
-    data.append('address', formData.address);
+    data.append('phone', formData.phone || '');
+    data.append('address', formData.address || ''); // ✅ ส่งที่อยู่ไปด้วย
     if (selectedFile) data.append('avatar', selectedFile);
 
     try {
-        const res = await fetch('http://localhost:8000/api/profile/', {
-            method: 'PUT',
+        Swal.showLoading();
+        const res = await fetch('/api/profile/', {
+            method: 'PUT', // ✅ ใช้ PUT สำหรับแก้ไข
             headers: { 'Authorization': `Token ${token}` },
             body: data
         });
+        
         if (res.ok) {
-            Swal.fire('สำเร็จ', 'อัปเดตข้อมูลเรียบร้อย', 'success');
-            setIsEditing(false);
-            window.location.reload(); 
+            await Swal.fire('สำเร็จ', 'อัปเดตข้อมูลเรียบร้อย', 'success');
+            window.location.reload(); // รีโหลดหน้าเพื่อแสดงข้อมูลใหม่
         } else {
             throw new Error("Update failed");
         }
@@ -79,7 +83,7 @@ function UserProfile() {
                     </label>
                 )}
             </div>
-            {/* แสดงชื่อแบบ Text หรือ Input ถ้ากำลังแก้ */}
+            
             {isEditing ? (
                  <input 
                     type="text" 
@@ -122,21 +126,18 @@ function UserProfile() {
             </div>
 
             <div className="space-y-4">
-                {/* ✅ เพิ่มช่องชื่อผู้ใช้ให้เห็นชัดเจนตอนแก้ */}
                 <div>
                     <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><User size={14} /> ชื่อผู้ใช้</label>
                     <input type="text" disabled={!isEditing} value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
                 </div>
-                <div className="grid grid-cols-1 gap-4 mt-6">
-        <div className="p-4 bg-white rounded shadow-sm border">
-            <label className="text-gray-500 text-sm">อีเมล</label>
-            <p className="font-medium">{user.email || "-"}</p> {/* ✅ แสดง email */}
-        </div>
-        <div className="p-4 bg-white rounded shadow-sm border">
-            <label className="text-gray-500 text-sm">เบอร์โทรศัพท์</label>
-            <p className="font-medium">{user.phone || "-"}</p> {/* ✅ แสดง phone */}
-        </div>
-    </div>
+                <div>
+                    <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><Mail size={14} /> อีเมล</label>
+                    <input type="text" disabled={!isEditing} value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
+                </div>
+                <div>
+                    <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><Phone size={14} /> เบอร์โทรศัพท์</label>
+                    <input type="text" disabled={!isEditing} value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
+                </div>
                 <div>
                     <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><MapPin size={14} /> ที่อยู่จัดส่ง</label>
                     <textarea rows="3" disabled={!isEditing} value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition"></textarea>

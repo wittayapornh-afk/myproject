@@ -25,19 +25,19 @@ function ProductDetail() {
   const getImageUrl = (path) => {
       if (!path) return "https://via.placeholder.com/500";
       if (path.startsWith("http")) return path;
-      return `http://localhost:8000${path}`;
+      return `${path}`;
   };
 
   useEffect(() => {
     window.scrollTo(0, 0);
     setLoading(true);
-    fetch(`http://localhost:8000/api/products/${id}/`)
+    fetch(`/api/products/${id}/`)
       .then((res) => res.json())
       .then((data) => {
         setProduct(data);
         setMainImage(data.thumbnail); // เริ่มต้นใช้รูป Thumbnail
         
-        fetch(`http://localhost:8000/api/products/?category=${data.category}`)
+        fetch(`/api/products/?category=${data.category}`)
             .then(res => res.json())
             .then(relatedData => {
                 const related = (relatedData.results || relatedData.products || [])

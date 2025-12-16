@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 SECRET_KEY = 'django-insecure-change-me-please'
 DEBUG = True
-ALLOWED_HOSTS = ['*'] # ✅ อนุญาตทุก Host เพื่อไม่ให้ติดปัญหาใน Docker
+ALLOWED_HOSTS = ['*', 'shop_backend', 'localhost', '127.0.0.1'] # ✅ อนุญาตทุก Host เพื่อไม่ให้ติดปัญหาใน Docker
 
 # Application definition
 INSTALLED_APPS = [
@@ -63,7 +63,7 @@ DATABASES = {
         'NAME': os.environ.get('DATABASE_NAME', 'django_db'),
         'USER': os.environ.get('DATABASE_USER', 'django_user'),
         'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'django_password'),
-        'HOST': '127.0.0.1',
+        'HOST': os.environ.get('DATABASE_HOST', '127.0.0.1'),
         'PORT': os.environ.get('DATABASE_PORT', '3306'),
     }
 }

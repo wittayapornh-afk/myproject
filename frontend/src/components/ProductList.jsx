@@ -32,7 +32,7 @@ function ProductList() {
   });
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/categories/")
+    fetch("/api/categories/")
       .then((res) => res.json())
       .then((data) => { if (data.categories) setCategories(data.categories); })
       .catch((err) => console.error(err));
@@ -40,7 +40,7 @@ function ProductList() {
 
   const fetchProducts = (urlOverride) => {
     setLoading(true);
-    let url = urlOverride || `http://localhost:8000/api/products/?sort=${sortOption}`;
+    let url = urlOverride || `/api/products/?sort=${sortOption}`;
     if (!urlOverride) {
       if (minPrice) url += `&min_price=${minPrice}`;
       if (maxPrice) url += `&max_price=${maxPrice}`;
@@ -73,7 +73,7 @@ function ProductList() {
     if (result.isConfirmed) {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch(`http://localhost:8000/api/products/${productId}/delete/`, {
+        const response = await fetch(`/api/products/${productId}/delete/`, {
             method: "DELETE", headers: { Authorization: `Token ${token}` },
         });
         if (response.ok) {

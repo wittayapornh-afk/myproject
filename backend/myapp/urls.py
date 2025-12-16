@@ -6,21 +6,23 @@ from django.conf.urls.static import static
 from myapp import views
 
 urlpatterns = [
-    # --- Auth ---
+    # --- Auth (ระบบสมาชิก) ---
     path('api/login/', token_views.obtain_auth_token, name='api_token_auth'),
     path('api/register/', views.register_api, name='register_api'),
     path('api/logout/', views.logout_api, name='logout_api'),
     path('api/profile/', views.user_profile_api, name='user_profile'),
 
-    # --- Admin Users & Role (Super Admin) ---
+    # --- Admin Users & Role ---
     path('api/admin/users/', views.get_all_users, name='get_all_users'),
     path('api/admin/users/role/', views.manage_user_role, name='manage_user_role'),
 
     # --- Admin Dashboard Lists ---
     path('api/admin/products/', views.admin_products_list, name='admin_products_list'),
-    path('api/admin/orders/', views.admin_orders_list, name='admin_orders_list'),
+    
+    # ✅ แก้ไข 1: เพิ่ม api/ ให้ลิงก์นี้
+    path('api/admin/orders/', views.admin_orders_api, name='admin_orders'), 
 
-    # --- Products ---
+    # --- Products (สินค้า) ---
     path('api/products/', views.products_api, name='products_api'),
     path('api/products/add/', views.add_product_api, name='add_product'),
     path('api/products/<int:product_id>/', views.product_detail_api, name='product_detail_api'),
@@ -29,15 +31,21 @@ urlpatterns = [
     
     path('api/categories/', views.categories_api, name='categories_api'),
 
-    # --- Orders ---
+    # --- Orders & Checkout (สั่งซื้อ) ---
+    # ✅ แก้ไข 2: เพิ่ม api/ ให้ลิงก์ checkout (สำคัญมาก!)
+    path('api/checkout/', views.checkout_api, name='checkout'), 
+    
     path('api/orders/create/', views.create_order, name='create_order'),
     path('api/orders/<int:order_id>/update/', views.update_order_status, name='update_order'),
+    
+    # ✅ แก้ไข 3: ใช้ path นี้อันเดียวสำหรับประวัติการสั่งซื้อ
     path('api/my-orders/', views.my_orders_api, name='my_orders'),
 
     # --- Admin Stats & Logs ---
     path('api/admin-stats/', views.get_admin_stats, name='admin_stats_api'),
     path('api/admin-logs/', views.get_admin_logs, name='get_admin_logs'),
     
+    # --- Django Admin ---
     path('admin/', admin.site.urls),
 ]
 

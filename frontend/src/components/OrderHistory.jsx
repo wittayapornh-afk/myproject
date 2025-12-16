@@ -9,7 +9,7 @@ function OrderHistory() {
 
     useEffect(() => {
         if (token) {
-            axios.get('http://localhost:8000/api/my-orders/', {
+            axios.get('/api/my-orders/', {
                 headers: { Authorization: `Token ${token}` }
             }).then(res => setOrders(res.data));
         }
@@ -18,7 +18,7 @@ function OrderHistory() {
     const getImageUrl = (path) => {
         if (!path) return "https://via.placeholder.com/150";
         if (path.startsWith("http")) return path;
-        return `http://localhost:8000${path}`;
+        return `${path}`;
     };
 
     return (

@@ -15,7 +15,7 @@ function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
     useEffect(() => {
         setLoading(true);
         // ดึงข้อมูลสินค้าตามหมวดหมู่
-        fetch(`http://localhost:8000/api/products/?category=${categorySlug}`)
+        fetch(`/api/products/?category=${categorySlug}`)
             .then(res => {
                 if (!res.ok) throw new Error("Failed");
                 return res.json();

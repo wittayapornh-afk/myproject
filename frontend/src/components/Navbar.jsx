@@ -64,7 +64,7 @@ function Navbar() {
           {user ? (
             <div className="flex items-center gap-3">
                 {/* ✅ ปุ่มดูประวัติการสั่งซื้อ */}
-                <Link to="/my-orders" className="text-gray-500 hover:text-[#305949] p-2 rounded-full hover:bg-gray-100 transition" title="ประวัติการสั่งซื้อ">
+                <Link to="/order-history" className="text-gray-500 hover:text-[#305949] p-2 rounded-full hover:bg-gray-100 transition" title="ประวัติการสั่งซื้อ">
                     <History size={22} />
                 </Link>
 

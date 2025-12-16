@@ -47,7 +47,7 @@ function RegisterPage() {
       Swal.showLoading();
       
       // ✅ 2. ส่งข้อมูลด้วย fetch (ไม่ต้องกำหนด Content-Type, Browser จะจัดการเอง)
-      const res = await fetch('http://localhost:8000/api/register/', {
+      const res = await fetch('/api/register/', {
         method: 'POST',
         body: data 
       });

@@ -18,5 +18,5 @@ services:
 
 networks:
   shop-net:
-    external: true      # สำคัญ! บอกว่า Network นี้มีอยู่แล้ว (Backend สร้างไว้)
-    name: shop-network 
+    external: true
+    name: shop-network

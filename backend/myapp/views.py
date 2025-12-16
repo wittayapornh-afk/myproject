@@ -170,20 +170,41 @@ def logout_api(request):
     request.user.auth_token.delete()
     return Response({"message": "Logged out"})
 
-@api_view(['GET'])
+@api_view(['GET', 'PUT']) # ✅ เพิ่ม 'PUT' ตรงนี้
 @permission_classes([IsAuthenticated])
 def user_profile_api(request):
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
-    return Response({
-        "id": request.user.id,
-        "username": request.user.username,
-        "email": request.user.email,      # ✅ เพิ่ม email
-        "phone": profile.phone,           # ✅ เพิ่ม phone
-        "role": profile.get_role_display(),
-        "role_code": profile.role,
-        "avatar": request.build_absolute_uri(profile.avatar.url) if profile.avatar else ""
-    })
 
+    # 🟢 กรณีดึงข้อมูล (GET)
+    if request.method == 'GET':
+        return Response({
+            "id": request.user.id,
+            "username": request.user.username,
+            "email": request.user.email,
+            "phone": profile.phone,
+            "address": profile.address, # ✅ เพิ่ม address ให้ frontend ดึงไปแสดง
+            "role": profile.get_role_display(),
+            "role_code": profile.role,
+            "avatar": request.build_absolute_uri(profile.avatar.url) if profile.avatar else ""
+        })
+    
+    # 🟠 กรณีบันทึกแก้ไข (PUT)
+    elif request.method == 'PUT':
+        user = request.user
+        data = request.data
+
+        # 1. อัปเดตข้อมูล User หลัก (username, email)
+        if 'username' in data: user.username = data['username']
+        if 'email' in data: user.email = data['email']
+        user.save()
+
+        # 2. อัปเดตข้อมูล Profile (phone, address, avatar)
+        if 'phone' in data: profile.phone = data['phone']
+        if 'address' in data: profile.address = data['address']
+        if 'avatar' in request.FILES: profile.avatar = request.FILES['avatar']
+        profile.save()
+
+        return Response({"message": "Profile updated successfully"})
 # ==========================================
 # 📦 Order & Stats
 # ==========================================
@@ -362,3 +383,73 @@ def delete_product_api(request, product_id):
     
     AdminLog.objects.create(admin=request.user, action=f"ลบสินค้า: {p.title}")
     return Response({"message": "Deleted"})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def checkout_api(request):
+    try:
+        # ใช้ transaction เพื่อถ้าตัดของไม่ได้ ให้ยกเลิกออเดอร์ทั้งหมด (กันข้อมูลพัง)
+        with transaction.atomic():
+            user = request.user
+            data = request.data
+            cart_items = data.get('items', [])
+            customer_info = data.get('customer', {})
+
+            if not cart_items:
+                return Response({"error": "ตะกร้าสินค้าว่างเปล่า"}, status=400)
+
+            # 1. ตรวจสอบสต็อกสินค้าก่อน (ว่ามีของพอไหม)
+            total_price = 0
+            for item in cart_items:
+                product = Product.objects.select_for_update().get(id=item['id'])
+                if product.stock < item['quantity']:
+                    # ❌ ถ้าของหมด ให้แจ้ง Error กลับไปทันที
+                    raise Exception(f"สินค้า '{product.title}' มีไม่เพียงพอ (เหลือ {product.stock})")
+                total_price += product.price * item['quantity']
+
+            # 2. สร้าง Order (บันทึกว่าใครซื้อ)
+            order = Order.objects.create(
+                user=user,  # ✅ ผูกกับ User ที่ Login
+                customer_name=customer_info.get('name', user.username),
+                customer_tel=customer_info.get('tel', ''),
+                customer_email=customer_info.get('email', user.email),
+                address=customer_info.get('address', ''),
+                total_price=total_price, # ใช้ราคาที่คำนวณใหม่จาก Backend เพื่อความชัวร์
+                payment_method=data.get('paymentMethod', 'Transfer'),
+                status='Pending'
+            )
+
+            # 3. สร้าง OrderItem และ ✅ ตัดสต็อกสินค้า
+            for item in cart_items:
+                product = Product.objects.get(id=item['id'])
+                
+                # บันทึกรายการลงออเดอร์
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=item['quantity'],
+                    price=product.price
+                )
+                
+                # ✂️ ตัดสต็อกตรงนี้
+                product.stock -= item['quantity']
+                product.save()
+
+            return Response({"message": "สั่งซื้อสำเร็จ!", "order_id": order.id})
+
+    except Product.DoesNotExist:
+        return Response({"error": "ไม่พบสินค้าในระบบ"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
+
+# ==============================
+# 📦 ดูประวัติการสั่งซื้อ (My Orders)
+# ==============================
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_orders_api(request):
+    # ดึงออเดอร์ของ User คนนี้เท่านั้น
+    orders = Order.objects.filter(user=request.user).order_by('-created_at')
+    serializer = OrderSerializer(orders, many=True)
+    return Response(serializer.data)

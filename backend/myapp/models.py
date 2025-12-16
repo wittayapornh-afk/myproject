@@ -1,25 +1,26 @@
 from django.db import models
 from django.contrib.auth.models import User
 
-# ❌ ลบบรรทัดนี้ทิ้งครับ: from .models import ...
-
 # ==========================================
 # 👤 ส่วนจัดการผู้ใช้งาน (User & Roles)
 # ==========================================
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    role = models.CharField(max_length=20, default='user')
-    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
-    # เพิ่มบรรทัดนี้สำหรับเบอร์โทร
-    phone = models.CharField(max_length=15, blank=True, default='') 
+    # ✅ 1. ต้องประกาศ ROLE_CHOICES ตรงนี้ (ก่อนบรรทัด role)
+    ROLE_CHOICES = [
+        ('user', 'User (ผู้เยี่ยมชม/สมาชิกใหม่)'),
+        ('customer', 'Customer (ลูกค้าที่เคยซื้อ)'),
+        ('admin', 'Admin (เจ้าของร้าน/คนขาย)'),
+        ('super_admin', 'Super Admin (ผู้ดูแลระบบสูงสุด)'),
+    ]
 
-    def __str__(self):
-        return self.user.username
-
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    
+    # ✅ 2. เรียกใช้ choices=ROLE_CHOICES ได้อย่างถูกต้อง
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
-    phone = models.CharField(max_length=15, blank=True, null=True)
+    
+    # ✅ 3. ฟิลด์อื่นๆ ครบถ้วน
+    phone = models.CharField(max_length=15, blank=True, null=True, default='')
     address = models.TextField(blank=True, null=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

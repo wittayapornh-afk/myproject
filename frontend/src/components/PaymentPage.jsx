@@ -43,7 +43,7 @@ function PaymentPage() {
     setIsProcessing(true);
 
     try {
-        const response = await fetch('http://localhost:8000/api/orders/create/', {
+        const response = await fetch('/api/orders/create/', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',

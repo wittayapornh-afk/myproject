@@ -25,7 +25,7 @@ function ProductEdit() {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const res = await axios.get(`http://localhost:8000/api/products/${id}/`);
+        const res = await axios.get(`/api/products/${id}/`);
         const p = res.data;
         setFormData({
           title: p.title, description: p.description, price: p.price,
@@ -88,7 +88,7 @@ function ProductEdit() {
     }
 
     try {
-      await axios.put(`http://localhost:8000/api/products/${id}/edit/`, dataToSend, {
+      await axios.put(`/api/products/${id}/edit/`, dataToSend, {
         headers: {
           'Authorization': `Token ${token}`,
           'Content-Type': 'multipart/form-data'

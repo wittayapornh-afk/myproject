@@ -59,9 +59,9 @@ const AdminDashboard = () => {
       const config = { headers: { Authorization: `Token ${token}` } };
 
       const [productsRes, ordersRes, catRes] = await Promise.all([
-        axios.get('http://localhost:8000/api/admin/products/', config).catch(() => ({ data: [] })),
-        axios.get('http://localhost:8000/api/admin/orders/', config).catch(() => ({ data: [] })),
-        axios.get('http://localhost:8000/api/categories/').catch(() => ({ data: { categories: [] } }))
+        axios.get('/api/admin/products/', config).catch(() => ({ data: [] })),
+        axios.get('/api/admin/orders/', config).catch(() => ({ data: [] })),
+        axios.get('/api/categories/').catch(() => ({ data: { categories: [] } }))
       ]);
 
       setProducts(productsRes.data);
@@ -70,7 +70,7 @@ const AdminDashboard = () => {
       setCategories(catRes.data.categories.filter(c => c !== "ทั้งหมด"));
 
       try {
-        const usersRes = await axios.get('http://localhost:8000/api/admin/users/', config);
+        const usersRes = await axios.get('/api/admin/users/', config);
         setUsers(usersRes.data);
         setIsAdmin(true);
       } catch (err) {}
@@ -105,7 +105,7 @@ const AdminDashboard = () => {
         });
         if (product.thumbnail) setThumbnailPreview(product.thumbnail);
         try {
-            const res = await axios.get(`http://localhost:8000/api/products/${product.id}/`);
+            const res = await axios.get(`/api/products/${product.id}/`);
             setExistingGallery(res.data.images || []);
         } catch (err) { console.error("Error loading gallery"); }
     } else {
@@ -157,10 +157,10 @@ const AdminDashboard = () => {
 
     try {
         if (currentProduct) {
-            await axios.put(`http://localhost:8000/api/products/${currentProduct.id}/edit/`, data, config);
+            await axios.put(`/api/products/${currentProduct.id}/edit/`, data, config);
             Swal.fire('สำเร็จ', 'แก้ไขข้อมูลสินค้าเรียบร้อย', 'success');
         } else {
-            await axios.post(`http://localhost:8000/api/products/add/`, data, config);
+            await axios.post(`/api/products/add/`, data, config);
             Swal.fire('สำเร็จ', 'เพิ่มสินค้าใหม่เรียบร้อย', 'success');
         }
         setIsModalOpen(false);
@@ -175,7 +175,7 @@ const AdminDashboard = () => {
     if (res.isConfirmed) {
         const token = localStorage.getItem('token');
         try {
-            await axios.delete(`http://localhost:8000/api/products/${id}/delete/`, { headers: { Authorization: `Token ${token}` } });
+            await axios.delete(`/api/products/${id}/delete/`, { headers: { Authorization: `Token ${token}` } });
             setProducts(products.filter(p => p.id !== id));
             Swal.fire('Deleted!', 'ลบสินค้าแล้ว', 'success');
         } catch (err) { Swal.fire('Error', 'ลบไม่ได้', 'error'); }
@@ -185,7 +185,7 @@ const AdminDashboard = () => {
   const handleOrderStatusUpdate = async (id, status) => {
       const token = localStorage.getItem('token');
       try {
-        await axios.post(`http://localhost:8000/api/orders/${id}/update/`, { status }, { headers: { Authorization: `Token ${token}` } });
+        await axios.post(`/api/orders/${id}/update/`, { status }, { headers: { Authorization: `Token ${token}` } });
         setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
         const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, timerProgressBar: true });
         Toast.fire({ icon: 'success', title: `สถานะออเดอร์ #${id} เปลี่ยนเป็น ${status}` });
@@ -298,7 +298,7 @@ const AdminDashboard = () => {
                     <tbody className="divide-y">
                         {filteredProducts.map(p => (
                         <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="p-4"><img src={p.thumbnail || `http://localhost:8000${p.image}`} className="w-12 h-12 rounded-lg object-cover bg-gray-100 border shadow-sm"/></td>
+                            <td className="p-4"><img src={p.thumbnail || `${p.image}`} className="w-12 h-12 rounded-lg object-cover bg-gray-100 border shadow-sm"/></td>
                             <td className="p-4 font-medium text-gray-800">{p.title}</td>
                             <td className="p-4"><span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-full font-medium inline-flex items-center"><Tag size={10} className="mr-1"/>{p.category}</span></td>
                             <td className="p-4 font-medium text-gray-700">{formatCurrency(p.price)}</td>

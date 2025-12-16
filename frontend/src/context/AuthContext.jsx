@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async (authToken) => {
     try {
-        const res = await fetch('http://localhost:8000/api/profile/', {
+        const res = await fetch('/api/profile/', {
             headers: { 
                 'Authorization': `Token ${authToken}`,
                 'Content-Type': 'application/json'
@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
   
   const logout = () => {
       // เรียก API Logout ฝั่ง Server ด้วย (Optional แต่แนะนำ)
-      fetch('http://localhost:8000/api/logout/', {
+      fetch('/api/logout/', {
           method: 'POST',
           headers: { 'Authorization': `Token ${token}` }
       }).catch(err => console.warn("Logout server error", err));

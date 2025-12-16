@@ -58,7 +58,7 @@ function ProductAdd() {
         const token = localStorage.getItem('token'); // ✅ 4. ดึง Token
 
         // ✅ 5. แก้ URL เป็น /api/products/add/ และเพิ่ม Headers Authorization
-        const response = await fetch('http://localhost:8000/api/products/add/', { 
+        const response = await fetch('/api/products/add/', { 
             method: 'POST', 
             headers: {
                 'Authorization': `Token ${token}` // 🔑 สำคัญมาก!
