@@ -17,7 +17,10 @@ function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
         // ดึงข้อมูลสินค้าตามหมวดหมู่
         fetch(`/api/products/?category=${categorySlug}`)
             .then(res => {
-                if (!res.ok) throw new Error("Failed");
+                if (!res.ok) {
+                    res.text().then(text => console.error("API Error:", text));
+                    throw new Error("Failed");
+                }
                 return res.json();
             })
             .then(data => {
@@ -43,7 +46,7 @@ function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
     return (
         <div className="py-12 px-6 border-b border-gray-50" style={{ backgroundColor: bgColor }}>
             <div className="max-w-7xl mx-auto">
-                
+
                 {/* หัวข้อหมวดหมู่ */}
                 <div className="flex justify-between items-end mb-8">
                     <div>
@@ -66,7 +69,7 @@ function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
                         products.map((product) => (
                             // ✨ การ์ดสินค้า (ดีไซน์เดียวกับ ProductList เป๊ะๆ)
                             <div key={product.id} className="min-w-[280px] md:min-w-[320px] snap-center group bg-white rounded-[2.5rem] p-5 shadow-soft hover:shadow-xl transition-all duration-500 relative overflow-hidden flex flex-col border border-white hover:-translate-y-2">
-                                
+
                                 {/* Status Badges */}
                                 <div className="absolute top-6 left-6 z-20 flex flex-col gap-2 items-start">
                                     <span className="bg-white/95 backdrop-blur text-gray-800 text-[10px] px-3 py-1.5 rounded-full font-bold uppercase tracking-wider shadow-sm border border-gray-100 flex items-center gap-1">
@@ -98,9 +101,9 @@ function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
 
                                     <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-50">
                                         <span className="text-2xl font-bold text-primary">฿{product.price?.toLocaleString()}</span>
-                                        <button 
-                                            onClick={() => handleAddToCart(product)} 
-                                            disabled={product.stock === 0} 
+                                        <button
+                                            onClick={() => handleAddToCart(product)}
+                                            disabled={product.stock === 0}
                                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md active:scale-90 ${product.stock === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-[#234236] hover:rotate-90'}`}
                                         >
                                             {product.stock === 0 ? '✕' : '+'}

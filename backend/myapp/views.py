@@ -8,12 +8,65 @@ from django.db import transaction
 from django.contrib.auth.models import User
 from .models import Product, Order, OrderItem, UserProfile, AdminLog, ProductImage
 import logging
+import traceback
 
 logger = logging.getLogger(__name__)
+
+# ... (existing imports)
 
 # ==========================================
 # 🔧 Admin & Super Admin Core Logic
 # ==========================================
+
+# ... (skip to products_api)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def products_api(request):
+    try:
+        # ... (logic)
+        products = Product.objects.filter(is_active=True).order_by('-id')
+        category = request.query_params.get('category')
+        search = request.query_params.get('search')
+        
+        if category and category != "ทั้งหมด":
+            products = products.filter(category=category)
+        if search:
+            products = products.filter(title__icontains=search)
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 12
+        result_page = paginator.paginate_queryset(products, request)
+        
+        data = []
+        for p in result_page:
+            try:
+                thumbnail_url = ""
+                if p.thumbnail:
+                    thumbnail_url = request.build_absolute_uri(p.thumbnail.url)
+                
+                data.append({
+                    "id": p.id,
+                    "title": p.title,
+                    "category": p.category,
+                    "price": p.price,
+                    "stock": p.stock,
+                    "rating": p.rating,
+                    "thumbnail": thumbnail_url,
+                })
+            except Exception:
+                continue
+            
+    except Exception as e:
+        err_msg = f"Cannot fetch products: {str(e)}\n{traceback.format_exc()}"
+        logger.error(err_msg)
+        print(f"DEBUG TRACEBACK: {err_msg}", flush=True)
+        try:
+            with open("error.log", "a", encoding="utf-8") as f:
+                f.write(err_msg + "\n" + "-"*50 + "\n")
+        except:
+            pass
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -30,7 +83,7 @@ def admin_products_list(request):
         "stock": p.stock,
         "category": p.category,
         "is_active": p.is_active,
-        "thumbnail": request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else ""
+        "thumbnail": p.thumbnail.url if p.thumbnail else ""
     } for p in products]
     return Response(data)
 
@@ -92,17 +145,28 @@ def products_api(request):
         paginator.page_size = 12
         result_page = paginator.paginate_queryset(products, request)
         
-        data = [{
-            "id": p.id,
-            "title": p.title,
-            "category": p.category,
-            "price": p.price,
-            "stock": p.stock,
-            "rating": p.rating,
-            "thumbnail": request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else "",
-        } for p in result_page]
+        data = []
+        for p in result_page:
+            try:
+                thumbnail_url = ""
+                if p.thumbnail:
+                    thumbnail_url = p.thumbnail.url
+                
+                data.append({
+                    "id": p.id,
+                    "title": p.title,
+                    "category": p.category,
+                    "price": p.price,
+                    "stock": p.stock,
+                    "rating": p.rating,
+                    "thumbnail": thumbnail_url,
+                })
+            except Exception:
+                # Skip items with data issues (e.g. missing file)
+                continue
             
         return paginator.get_paginated_response(data)
+
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
@@ -111,13 +175,13 @@ def products_api(request):
 def product_detail_api(request, product_id):
     try:
         p = Product.objects.get(id=product_id)
-        gallery = [{"id": img.id, "image": request.build_absolute_uri(img.image.url)} for img in p.images.all()]
+        gallery = [{"id": img.id, "image": img.image.url} for img in p.images.all()]
         
         data = {
             "id": p.id, "title": p.title, "description": p.description, 
             "category": p.category, "price": p.price, "stock": p.stock, 
             "brand": getattr(p, 'brand', ''), "rating": p.rating,
-            "thumbnail": request.build_absolute_uri(p.thumbnail.url) if p.thumbnail else "",
+            "thumbnail": p.thumbnail.url if p.thumbnail else "",
             "images": gallery
         }
         return Response(data)
@@ -185,7 +249,7 @@ def user_profile_api(request):
             "address": profile.address, # ✅ เพิ่ม address ให้ frontend ดึงไปแสดง
             "role": profile.get_role_display(),
             "role_code": profile.role,
-            "avatar": request.build_absolute_uri(profile.avatar.url) if profile.avatar else ""
+            "avatar": profile.avatar.url if profile.avatar else ""
         })
     
     # 🟠 กรณีบันทึกแก้ไข (PUT)
@@ -245,7 +309,7 @@ def my_orders_api(request):
     orders = Order.objects.filter(user=request.user).order_by('-created_at')
     data = []
     for o in orders:
-        items = [{"title": i.product.title, "quantity": i.quantity, "price": i.price, "thumbnail": request.build_absolute_uri(i.product.thumbnail.url) if i.product.thumbnail else ""} for i in o.items.all()]
+        items = [{"title": i.product.title, "quantity": i.quantity, "price": i.price, "thumbnail": i.product.thumbnail.url if i.product.thumbnail else ""} for i in o.items.all()]
         data.append({
             "id": o.id, "date": o.created_at.strftime("%d/%m/%Y"), 
             "total_price": o.total_price, "status": o.status, "items": items
