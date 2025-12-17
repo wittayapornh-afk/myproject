@@ -11,7 +11,7 @@ services:
     ports:
       - "3000:5173"
     volumes:
-      - .:/app       # ตรวจสอบว่าบรรทัดนี้มีอยู่ (เพื่อให้แก้โค้ดแล้วเปลี่ยนทันที)
+      - .:/app
       - /app/node_modules
     networks:
       - shop-net
