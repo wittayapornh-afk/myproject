@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: shop_backend
+    container_name: shop-backend
     volumes:
       - .:/usr/src/app
     ports:
