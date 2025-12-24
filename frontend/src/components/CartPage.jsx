@@ -1,116 +1,141 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
-import Swal from 'sweetalert2';
-import { ShoppingCart, Minus, Plus, Trash2, ArrowRight, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, ChevronLeft, ShieldCheck, Info } from 'lucide-react';
+// ✅ Rule 59: เรียกใช้ Utility สำหรับจัดการราคาและรูปภาพ
+import { formatPrice, getImageUrl } from '../utils/formatUtils';
 
 function CartPage() {
-  const { cartItems, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { cartItems, removeFromCart, updateQuantity, getTotalPrice } = useCart();
   const navigate = useNavigate();
 
-  const subtotal = cartItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
-  const shipping = subtotal > 5000 ? 0 : 100;
-  const total = subtotal + shipping;
-
-  const handleCheckout = () => {
-    if (cartItems.length === 0) {
-      Swal.fire('ตะกร้าว่างเปล่า', 'กรุณาเลือกสินค้าก่อนชำระเงิน', 'warning');
-      return;
-    }
-    navigate('/checkout');
-  };
-
-  const confirmRemove = (id) => {
-    Swal.fire({
-      title: 'ลบสินค้านี้?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'ลบเลย',
-      cancelButtonText: 'ยกเลิก'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        removeFromCart(id);
-      }
-    });
-  };
-
+  // ✅ Rule 10, 44, 64: ปรับปรุงหน้า Empty State ให้ดูเป็นมืออาชีพ
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center bg-[#F9F9F7] font-sans p-4">
-        <div className="bg-white p-12 rounded-[2.5rem] shadow-sm text-center max-w-lg border border-gray-100 animate-fade-in">
-          <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner text-gray-400">
-            <ShoppingCart size={48} />
-          </div>
-          <h2 className="text-3xl font-black text-[#263A33] mb-3">ตะกร้าของคุณว่างเปล่า</h2>
-          <Link to="/shop" className="inline-flex items-center justify-center gap-2 bg-[#305949] text-white px-8 py-3.5 rounded-xl font-bold hover:bg-[#234236] transition-all shadow-lg">
-            <ArrowLeft size={18} /> กลับไปเลือกสินค้า
-          </Link>
+      <div className="min-h-screen bg-[#F9F9F7] flex flex-col items-center justify-center p-6 pt-24">
+        <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mb-8 shadow-xl shadow-gray-200/50 border border-gray-50">
+          <ShoppingBag size={56} className="text-gray-200" />
         </div>
+        <h2 className="text-3xl font-black text-[#263A33] mb-3">ตะกร้าของคุณยังว่างเปล่า</h2>
+        <p className="text-gray-400 font-bold mb-10 text-center max-w-sm">
+            ดูเหมือนว่าคุณยังไม่ได้เลือกสินค้าที่ถูกใจใส่ลงในตะกร้าเลย ลองไปเลือกดูสินค้าใหม่ๆ ของเราไหม?
+        </p>
+        <Link to="/shop" className="px-12 py-4 bg-[#1a4d2e] text-white rounded-2xl font-black hover:bg-[#143d24] transition-all shadow-xl hover:shadow-green-100 flex items-center gap-3 transform hover:-translate-y-1">
+          ไปหน้าร้านค้า <ArrowRight size={20} />
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F9F9F7] py-12 px-4 font-sans">
+    <div className="min-h-screen bg-[#F9F9F7] py-12 px-4 md:px-8 pt-28 font-sans">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-extrabold text-[#263A33] mb-8 flex items-center gap-3">
-          <span className="bg-[#305949] text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-md"><ShoppingCart size={20} /></span>
-          ตะกร้าสินค้าของคุณ <span className="text-sm font-normal text-gray-500 bg-white px-3 py-1 rounded-full shadow-sm">({cartItems.length} รายการ)</span>
+        <h1 className="text-4xl font-black text-[#263A33] mb-10 flex items-center gap-4">
+          <div className="p-3 bg-[#1a4d2e] rounded-2xl text-white shadow-lg">
+            <ShoppingBag size={28} /> 
+          </div>
+          My Shopping Cart
         </h1>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="flex-1 space-y-4">
+        <div className="flex flex-col lg:flex-row gap-10">
+          {/* Cart Items List */}
+          <div className="flex-1 space-y-6">
             {cartItems.map((item) => (
-              <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col sm:flex-row items-center gap-6 group hover:shadow-md transition-all">
-                <div className="w-24 h-24 sm:w-32 sm:h-32 bg-[#F9F9F7] rounded-xl flex-shrink-0 flex items-center justify-center overflow-hidden p-2">
-                   {/* ใช้ logic ง่ายๆ ถ้าไม่มีรูปใช้ placeholder */}
-                   <img src={item.thumbnail} alt={item.title} className="w-full h-full object-contain mix-blend-multiply" />
+              <div key={item.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-6 items-center transition-all hover:shadow-md group">
+                {/* ✅ Rule 31: จัดการรูปภาพผ่าน Utility */}
+                <div className="w-32 h-32 bg-gray-50 rounded-[2rem] overflow-hidden flex-shrink-0 border border-gray-50">
+                  <img 
+                    src={getImageUrl(item.thumbnail || item.image)} 
+                    alt={item.title} 
+                    className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500" 
+                  />
                 </div>
-                <div className="flex-1 w-full text-center sm:text-left">
-                  <h3 className="font-bold text-[#263A33] text-lg mb-1">{item.title}</h3>
-                  <p className="text-xs text-gray-400 mb-3 uppercase tracking-wider">{item.category}</p>
-                  <div className="font-extrabold text-[#305949] text-xl">฿{Number(item.price).toLocaleString()}</div>
+                
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">{item.category}</p>
+                  <h3 className="font-black text-[#263A33] text-xl mb-1 line-clamp-1">{item.title}</h3>
+                  <div className="flex items-center justify-center sm:justify-start gap-4">
+                    <span className="font-black text-[#1a4d2e] text-2xl">{formatPrice(item.price)}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center gap-3">
-                  
-                  {/* ✅ ปุ่มเพิ่มลดจำนวนที่แก้ไขแล้ว */}
-                  <div className="flex items-center gap-1 bg-[#F5F5F0] rounded-full p-1 border border-gray-200">
-                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-600 hover:bg-[#305949] hover:text-white transition-all shadow-sm">
-                      <Minus size={14} />
-                    </button>
-                    <span className="w-8 text-center font-bold text-[#263A33]">{item.quantity}</span>
+
+                <div className="flex flex-row sm:flex-col items-center sm:items-end gap-6 w-full sm:w-auto">
+                  <div className="flex items-center bg-gray-50 rounded-2xl p-1.5 border border-gray-100">
+                    {/* ✅ Rule 42: ปุ่มลดจำนวน */}
                     <button 
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-600 hover:bg-[#305949] hover:text-white transition-all shadow-sm"
+                        onClick={() => updateQuantity(item.id, item.quantity - 1)} 
+                        className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90 text-gray-500 hover:text-red-500"
+                        disabled={item.quantity <= 1}
                     >
-                      <Plus size={14} />
+                        <Minus size={18} />
+                    </button>
+                    
+                    <span className="w-10 text-center font-black text-lg text-gray-800">{item.quantity}</span>
+                    
+                    {/* ✅ Rule 42: ปุ่มเพิ่มจำนวน (ดักสต็อกไม่ให้เกินจริง) */}
+                    <button 
+                        onClick={() => updateQuantity(item.id, item.quantity + 1)} 
+                        disabled={item.quantity >= (item.stock || 99)}
+                        className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90 text-gray-500 hover:text-[#1a4d2e] disabled:opacity-20 disabled:cursor-not-allowed"
+                    >
+                        <Plus size={18} />
                     </button>
                   </div>
-                  
-                  <button onClick={() => confirmRemove(item.id)} className="text-gray-400 text-xs hover:text-red-500 transition-colors flex items-center gap-1 py-1 px-2 rounded-md hover:bg-red-50">
-                    <Trash2 size={14} /> ลบรายการ
+
+                  <button 
+                    onClick={() => removeFromCart(item.id)} 
+                    className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all ml-auto sm:ml-0"
+                    title="ลบสินค้า"
+                  >
+                    <Trash2 size={24} />
                   </button>
                 </div>
               </div>
             ))}
-            <div className="flex justify-end pt-2">
-                <button onClick={() => Swal.fire({ title: 'ล้างตะกร้า?', showCancelButton:true, confirmButtonColor:'#d33' }).then(r => r.isConfirmed && clearCart())} className="text-red-500 text-sm font-bold hover:underline">ล้างตะกร้าทั้งหมด</button>
-            </div>
+
+            <Link to="/shop" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#1a4d2e] font-bold mt-4 transition-all group">
+                <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> เลือกซื้อสินค้าเพิ่มเติม
+            </Link>
           </div>
 
-          <div className="lg:w-1/3">
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 sticky top-28">
-              <h3 className="text-xl font-black text-[#263A33] mb-6">สรุปคำสั่งซื้อ</h3>
-              <div className="space-y-3 mb-6 text-sm text-gray-600">
-                <div className="flex justify-between"><span>ยอดรวมสินค้า</span><span className="font-bold">฿{subtotal.toLocaleString()}</span></div>
-                <div className="flex justify-between items-center"><span>ค่าจัดส่ง</span>{shipping === 0 ? <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold">ส่งฟรี</span> : <span className="font-bold">฿{shipping.toLocaleString()}</span>}</div>
+          {/* ✅ Rule 43: สรุปยอดเงิน (Order Summary Sidebar) */}
+          <div className="lg:w-96 flex-shrink-0">
+            <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100 sticky top-28">
+              <h2 className="text-2xl font-black text-[#263A33] mb-8">Summary</h2>
+              
+              <div className="space-y-4 mb-8 pb-8 border-b border-gray-100">
+                <div className="flex justify-between font-bold text-gray-400 uppercase text-xs tracking-widest">
+                  <span>Subtotal</span>
+                  <span className="text-gray-600">{formatPrice(getTotalPrice())}</span>
+                </div>
+                <div className="flex justify-between font-bold text-gray-400 uppercase text-xs tracking-widest">
+                  <span>Shipping</span>
+                  <span className="text-green-600">Free</span>
+                </div>
               </div>
-              <div className="border-t-2 border-dashed border-gray-100 my-6"></div>
-              <div className="flex justify-between items-end mb-8"><span className="font-bold text-gray-500">ยอดสุทธิ</span><span className="text-3xl font-black text-[#305949]">฿{total.toLocaleString()}</span></div>
-              <button onClick={handleCheckout} className="w-full bg-[#305949] text-white py-4 rounded-xl font-bold text-lg shadow-xl hover:bg-[#234236] transition-all flex items-center justify-center gap-2">ดำเนินการชำระเงิน <ArrowRight size={20} /></button>
-              <p className="text-center text-xs text-gray-400 mt-4 flex justify-center items-center gap-1"><ShieldCheck size={14} /> ข้อมูลของคุณปลอดภัย 100%</p>
+
+              <div className="flex justify-between items-end mb-10">
+                <span className="font-black text-gray-400 text-xs uppercase tracking-widest mb-1">Total Amount</span>
+                <span className="text-4xl font-black text-[#1a4d2e]">{formatPrice(getTotalPrice())}</span>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-2xl mb-8 flex items-start gap-3">
+                <Info size={16} className="text-gray-400 mt-0.5" />
+                <p className="text-[10px] font-bold text-gray-400 leading-relaxed uppercase">
+                    ราคาสินค้าทั้งหมดรวมภาษีมูลค่าเพิ่ม (VAT) เรียบร้อยแล้ว บริษัทฯ สงวนสิทธิ์ในการเปลี่ยนแปลงสต็อกโดยไม่ต้องแจ้งให้ทราบล่วงหน้า
+                </p>
+              </div>
+
+              <button 
+                onClick={() => navigate('/checkout')}
+                className="w-full py-5 bg-[#1a4d2e] text-white font-black text-xl rounded-2xl shadow-xl hover:shadow-green-100 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-1 active:scale-95"
+              >
+                PROCEED TO CHECKOUT <ArrowRight size={22} />
+              </button>
+
+              <div className="mt-6 flex items-center justify-center gap-2 text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                <ShieldCheck size={16} className="text-[#1a4d2e] opacity-50" /> Secure Payments Powered by Bank
+              </div>
             </div>
           </div>
         </div>

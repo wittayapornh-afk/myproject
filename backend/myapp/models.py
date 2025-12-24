@@ -1,115 +1,91 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver 
 
 # ==========================================
-# 👤 ส่วนจัดการผู้ใช้งาน (User & Roles)
+# 👤 Model โปรไฟล์ผู้ใช้
 # ==========================================
-
 class UserProfile(models.Model):
-    # ✅ 1. ต้องประกาศ ROLE_CHOICES ตรงนี้ (ก่อนบรรทัด role)
-    ROLE_CHOICES = [
-        ('user', 'User (ผู้เยี่ยมชม/สมาชิกใหม่)'),
-        ('customer', 'Customer (ลูกค้าที่เคยซื้อ)'),
-        ('admin', 'Admin (เจ้าของร้าน/คนขาย)'),
-        ('super_admin', 'Super Admin (ผู้ดูแลระบบสูงสุด)'),
-    ]
-
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    
-    # ✅ 2. เรียกใช้ choices=ROLE_CHOICES ได้อย่างถูกต้อง
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
-    
-    # ✅ 3. ฟิลด์อื่นๆ ครบถ้วน
-    phone = models.CharField(max_length=15, blank=True, null=True, default='')
-    address = models.TextField(blank=True, null=True)
-    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    role = models.CharField(max_length=20, default='user')
+    phone = models.CharField(max_length=20, blank=True)
+    address = models.TextField(blank=True)
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.get_role_display()}"
+        return self.user.username
 
 # ==========================================
-# 🛒 ส่วนสินค้าและร้านค้า
+# 🛒 Model สินค้า (Products) - ✅ เพิ่ม created_at
 # ==========================================
-
 class Product(models.Model):
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    category = models.CharField(max_length=100)
-    price = models.FloatField()
-    thumbnail = models.ImageField(upload_to='products/', null=True, blank=True)
-    rating = models.FloatField(default=0)
+    title = models.CharField(max_length=200)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    description = models.TextField(blank=True, null=True)
     stock = models.IntegerField(default=0)
-    brand = models.CharField(max_length=100, null=True, blank=True)
+    category = models.CharField(max_length=100, default='General')
+    thumbnail = models.ImageField(upload_to='products/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    brand = models.CharField(max_length=100, blank=True, null=True)
+    rating = models.FloatField(default=0.0)
     
-    def __str__(self):
-        return self.title
-
-class ProductImage(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images') 
-    image = models.ImageField(upload_to='products/gallery/')
-
-    def __str__(self):
-        return f"{self.product.title} Image"
-
-# ==========================================
-# 📦 ส่วนคำสั่งซื้อ (Order System)
-# ==========================================
-
-class Order(models.Model):
-    STATUS_CHOICES = [
-        ('Pending', 'รอชำระเงิน'),
-        ('Paid', 'ชำระแล้ว (รอตรวจสอบ)'),
-        ('Processing', 'กำลังเตรียมสินค้า'),
-        ('Shipped', 'จัดส่งแล้ว'),
-        ('Completed', 'ได้รับสินค้าแล้ว'),
-        ('Cancelled', 'ยกเลิก'),
-    ]
-    
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    customer_name = models.CharField(max_length=100)
-    customer_tel = models.CharField(max_length=20)
-    customer_email = models.EmailField(blank=True, null=True)
-    address = models.TextField()
-    
-    total_price = models.FloatField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-    
-    payment_slip = models.ImageField(upload_to='slips/', null=True, blank=True)
-    payment_method = models.CharField(max_length=50, default='Transfer')
-    
+    # ✅ เพิ่ม 2 บรรทัดนี้ เพื่อแก้ Error 1364
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Order #{self.id} - {self.customer_name} ({self.status})"
+        return self.title
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, related_name='images', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='products/gallery/')
+    # เพิ่ม created_at ด้วยเผื่อตารางนี้ก็มี
+    created_at = models.DateTimeField(auto_now_add=True) 
+
+# ==========================================
+# 📦 Model คำสั่งซื้อ (Orders)
+# ==========================================
+class Order(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=50, default='Pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    customer_name = models.CharField(max_length=200, default='')
+    customer_email = models.EmailField(max_length=200, default='', blank=True)
+    customer_tel = models.CharField(max_length=20, default='', blank=True)
+    address = models.TextField(default='', blank=True)
+    payment_method = models.CharField(max_length=50, default='Transfer')
 
 class OrderItem(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
+    order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.IntegerField()
-    price = models.FloatField()
+    quantity = models.IntegerField(default=1)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
 
-    def __str__(self):
-        return f"{self.product.title} (x{self.quantity})"
-
+# ==========================================
+# 💬 Model รีวิว (Reviews)
+# ==========================================
 class Review(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews")
+    product = models.ForeignKey(Product, related_name='reviews', on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     rating = models.IntegerField(default=5)
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='replies', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.user} review {self.product}"
 
 # ==========================================
-# 🛡️ ส่วน Super Admin (Logs)
+# 📝 Model บันทึกกิจกรรม (ActivityLog)
 # ==========================================
-
-class AdminLog(models.Model):
-    admin = models.ForeignKey(User, on_delete=models.CASCADE)
-    action = models.CharField(max_length=255)
+class ActivityLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    action = models.CharField(max_length=50) 
+    target = models.CharField(max_length=255) 
+    details = models.TextField(blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.admin.username}: {self.action}"
+        return f"{self.user} - {self.action}"

@@ -1,519 +1,273 @@
+from django.shortcuts import render
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAdminUser, AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_200_OK
+from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Sum
-from django.db import transaction
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate
+from django.db.models import Sum, Q, Count
+from .models import Product, Order, OrderItem, UserProfile, ActivityLog, ProductImage
 from django.contrib.auth.models import User
-from .models import Product, Order, OrderItem, UserProfile, AdminLog, ProductImage
-import logging
-import traceback
+from django.utils import timezone
+import datetime
 
-logger = logging.getLogger(__name__)
-
-# ... (existing imports)
-
-# ==========================================
-# 🔧 Admin & Super Admin Core Logic
-# ==========================================
-
-# ... (skip to products_api)
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def products_api(request):
-    try:
-        # ... (logic)
-        products = Product.objects.filter(is_active=True).order_by('-id')
-        category = request.query_params.get('category')
-        search = request.query_params.get('search')
-        
-        if category and category != "ทั้งหมด":
-            products = products.filter(category=category)
-        if search:
-            products = products.filter(title__icontains=search)
-
-        paginator = PageNumberPagination()
-        paginator.page_size = 12
-        result_page = paginator.paginate_queryset(products, request)
-        
-        data = []
-        for p in result_page:
-            try:
-                thumbnail_url = ""
-                if p.thumbnail:
-                    thumbnail_url = request.build_absolute_uri(p.thumbnail.url)
-                
-                data.append({
-                    "id": p.id,
-                    "title": p.title,
-                    "category": p.category,
-                    "price": p.price,
-                    "stock": p.stock,
-                    "rating": p.rating,
-                    "thumbnail": thumbnail_url,
-                })
-            except Exception:
-                continue
-            
-    except Exception as e:
-        err_msg = f"Cannot fetch products: {str(e)}\n{traceback.format_exc()}"
-        logger.error(err_msg)
-        print(f"DEBUG TRACEBACK: {err_msg}", flush=True)
-        try:
-            with open("error.log", "a", encoding="utf-8") as f:
-                f.write(err_msg + "\n" + "-"*50 + "\n")
-        except:
-            pass
-        return Response({"error": str(e)}, status=500)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def admin_products_list(request):
-    if request.user.profile.role not in ['admin', 'super_admin']:
-        return Response({"error": "Unauthorized"}, status=403)
-    
-    products = Product.objects.all().order_by('-id')
-    
-    data = [{
-        "id": p.id,
-        "title": p.title,
-        "price": p.price,
-        "stock": p.stock,
-        "category": p.category,
-        "is_active": p.is_active,
-        "thumbnail": p.thumbnail.url if p.thumbnail else ""
-    } for p in products]
-    return Response(data)
+# =========================================
+# 🔐 Authentication APIs
+# =========================================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def manage_user_role(request):
-    if request.user.profile.role != 'super_admin':
-        return Response({"error": "Unauthorized: Super Admin only"}, status=403)
-    
-    user_id = request.data.get('user_id')
-    action = request.data.get('action') 
-
-    try:
-        target_user = User.objects.get(id=user_id)
-        profile = target_user.profile
-        
-        if target_user.id == request.user.id:
-             return Response({"error": "ไม่สามารถเปลี่ยนสถานะตัวเองได้"}, status=400)
-
-        if action == 'promote':
-            profile.role = 'admin'
-            target_user.is_staff = True
-            msg = "แต่งตั้งเป็น Admin"
-        elif action == 'demote':
-            profile.role = 'user'
-            target_user.is_staff = False
-            msg = "ปลดเป็น User"
-        else:
-            return Response({"error": "Invalid action"}, status=400)
-
-        target_user.save()
-        profile.save()
-        
-        AdminLog.objects.create(admin=request.user, action=f"{msg}: {target_user.username}")
-        
-        return Response({"message": f"ดำเนินการ {msg} สำเร็จ"})
-        
-    except User.DoesNotExist:
-        return Response({"error": "User not found"}, status=404)
-
-# ==========================================
-# 🛒 Public API (สินค้าหน้าบ้าน)
-# ==========================================
-
-@api_view(['GET'])
 @permission_classes([AllowAny])
-def products_api(request):
-    try:
-        products = Product.objects.filter(is_active=True).order_by('-id')
-        category = request.query_params.get('category')
-        search = request.query_params.get('search')
-        
-        if category and category != "ทั้งหมด":
-            products = products.filter(category=category)
-        if search:
-            products = products.filter(title__icontains=search)
-
-        paginator = PageNumberPagination()
-        paginator.page_size = 12
-        result_page = paginator.paginate_queryset(products, request)
-        
-        data = []
-        for p in result_page:
-            try:
-                thumbnail_url = ""
-                if p.thumbnail:
-                    thumbnail_url = p.thumbnail.url
-                
-                data.append({
-                    "id": p.id,
-                    "title": p.title,
-                    "category": p.category,
-                    "price": p.price,
-                    "stock": p.stock,
-                    "rating": p.rating,
-                    "thumbnail": thumbnail_url,
-                })
-            except Exception:
-                # Skip items with data issues (e.g. missing file)
-                continue
-            
-        return paginator.get_paginated_response(data)
-
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def product_detail_api(request, product_id):
-    try:
-        p = Product.objects.get(id=product_id)
-        gallery = [{"id": img.id, "image": img.image.url} for img in p.images.all()]
-        
-        data = {
-            "id": p.id, "title": p.title, "description": p.description, 
-            "category": p.category, "price": p.price, "stock": p.stock, 
-            "brand": getattr(p, 'brand', ''), "rating": p.rating,
-            "thumbnail": p.thumbnail.url if p.thumbnail else "",
-            "images": gallery
-        }
-        return Response(data)
-    except Product.DoesNotExist:
-        return Response({"error": "Not found"}, status=404)
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def categories_api(request):
-    categories = Product.objects.filter(is_active=True).values_list('category', flat=True).distinct()
-    return Response({"categories": ["ทั้งหมด"] + list(categories)})
-
-# ==========================================
-# 📝 Auth & Profile
-# ==========================================
+def login_api(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    user = authenticate(username=username, password=password)
+    if user:
+        token, _ = Token.objects.get_or_create(user=user)
+        try: profile = user.profile
+        except UserProfile.DoesNotExist: profile = UserProfile.objects.create(user=user, role='user')
+        return Response({'token': token.key, 'user': {'id': user.id, 'username': user.username, 'role': profile.role}})
+    return Response({'error': 'Invalid credentials'}, status=400)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_api(request):
-    # รับข้อมูลทั้งหมด
-    data = request.data 
-    
-    username = data.get('username')
-    password = data.get('password')
-    email = data.get('email')
-    phone = data.get('phone', '') # รับเบอร์โทร
-    
-    if User.objects.filter(username=username).exists():
-        return Response({"error": "Username already exists"}, status=400)
-
+    username = request.data.get('username')
+    password = request.data.get('password')
+    email = request.data.get('email')
+    if User.objects.filter(username=username).exists(): return Response({'error': 'Existed'}, 400)
     try:
-        # สร้าง User หลัก
-        user = User.objects.create_user(username=username, password=password, email=email)
-        
-        # สร้าง UserProfile พร้อมรูปภาพและเบอร์โทร
-        profile = UserProfile.objects.create(user=user, role='user', phone=phone)
-        
-        # ถ้ารูปถูกส่งมาด้วย ให้บันทึกลง profile
-        if 'avatar' in request.FILES:
-            profile.avatar = request.FILES['avatar']
-            profile.save()
-            
-        return Response({"message": "Registered successfully"})
-    except Exception as e:
-        return Response({"error": str(e)}, status=400)
+        user = User.objects.create_user(username, email, password)
+        UserProfile.objects.create(user=user, role='user')
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({'token': token.key, 'user': {'id': user.id, 'username': user.username, 'role': 'user'}}, 201)
+    except Exception as e: return Response({'error': str(e)}, 400)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_api(request):
     request.user.auth_token.delete()
-    return Response({"message": "Logged out"})
+    return Response({'message': 'Logged out'})
 
-@api_view(['GET', 'PUT']) # ✅ เพิ่ม 'PUT' ตรงนี้
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def user_profile_api(request):
-    profile, _ = UserProfile.objects.get_or_create(user=request.user)
-
-    # 🟢 กรณีดึงข้อมูล (GET)
-    if request.method == 'GET':
-        return Response({
-            "id": request.user.id,
-            "username": request.user.username,
-            "email": request.user.email,
-            "phone": profile.phone,
-            "address": profile.address, # ✅ เพิ่ม address ให้ frontend ดึงไปแสดง
-            "role": profile.get_role_display(),
-            "role_code": profile.role,
-            "avatar": profile.avatar.url if profile.avatar else ""
-        })
-    
-    # 🟠 กรณีบันทึกแก้ไข (PUT)
-    elif request.method == 'PUT':
-        user = request.user
-        data = request.data
-
-        # 1. อัปเดตข้อมูล User หลัก (username, email)
-        if 'username' in data: user.username = data['username']
-        if 'email' in data: user.email = data['email']
-        user.save()
-
-        # 2. อัปเดตข้อมูล Profile (phone, address, avatar)
-        if 'phone' in data: profile.phone = data['phone']
-        if 'address' in data: profile.address = data['address']
-        if 'avatar' in request.FILES: profile.avatar = request.FILES['avatar']
+    user = request.user
+    try: profile = user.profile
+    except: profile = UserProfile.objects.create(user=user)
+    if request.method == 'POST':
+        if 'phone' in request.data: profile.phone = request.data['phone']
+        if 'address' in request.data: profile.address = request.data['address']
         profile.save()
-
-        return Response({"message": "Profile updated successfully"})
-# ==========================================
-# 📦 Order & Stats
-# ==========================================
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_order(request):
-    cart_items = request.data.get('cart_items', [])
-    if not cart_items: return Response({"error": "Empty cart"}, status=400)
-
-    try:
-        with transaction.atomic():
-            total_price = 0
-            for item in cart_items:
-                p = Product.objects.select_for_update().get(id=item['id'])
-                if p.stock < item['quantity']: raise ValueError(f"{p.title} out of stock")
-                total_price += p.price * item['quantity']
-                p.stock -= item['quantity']
-                p.save()
-
-            order = Order.objects.create(
-                user=request.user,
-                customer_name=request.user.username,
-                total_price=total_price,
-                status='Pending'
-            )
-            
-            for item in cart_items:
-                OrderItem.objects.create(order=order, product_id=item['id'], quantity=item['quantity'], price=item['price'])
-
-        return Response({"message": "Order created", "order_id": order.id}, status=201)
-    except Exception as e:
-        return Response({"error": str(e)}, status=400)
+    return Response({'username': user.username, 'email': user.email, 'phone': profile.phone, 'address': profile.address, 'role': profile.role})
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def my_orders_api(request):
-    orders = Order.objects.filter(user=request.user).order_by('-created_at')
-    data = []
-    for o in orders:
-        items = [{"title": i.product.title, "quantity": i.quantity, "price": i.price, "thumbnail": i.product.thumbnail.url if i.product.thumbnail else ""} for i in o.items.all()]
-        data.append({
-            "id": o.id, "date": o.created_at.strftime("%d/%m/%Y"), 
-            "total_price": o.total_price, "status": o.status, "items": items
-        })
-    return Response(data)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_admin_stats(request):
-    if request.user.profile.role not in ['admin', 'super_admin']: return Response(status=403)
-    
-    total_sales = Order.objects.filter(status='Completed').aggregate(Sum('total_price'))['total_price__sum'] or 0
-    return Response({
-        "total_sales": total_sales,
-        "total_orders": Order.objects.count(),
-        "total_products": Product.objects.count(),
-        "total_users": User.objects.count()
-    })
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def admin_orders_list(request):
-    if request.user.profile.role not in ['admin', 'super_admin']: return Response(status=403)
-    orders = Order.objects.all().order_by('-created_at')
-    data = [{
-        "id": o.id, "customer": o.customer_name, "total_price": o.total_price,
-        "status": o.status, "date": o.created_at.strftime("%d/%m/%Y %H:%M")
-    } for o in orders]
-    return Response(data)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def update_order_status(request, order_id):
-    if request.user.profile.role not in ['admin', 'super_admin']: return Response(status=403)
-    order = Order.objects.get(id=order_id)
-    order.status = request.data.get('status')
-    order.save()
-    return Response({"message": "Status updated"})
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def get_all_users(request):
-    if request.user.profile.role != 'super_admin': return Response(status=403)
-    users = UserProfile.objects.all().select_related('user')
-    data = [{
-        "id": u.user.id, "username": u.user.username, "email": u.user.email,
-        "role": u.get_role_display(), "role_code": u.role
-    } for u in users]
+    users = User.objects.all().order_by('-date_joined')
+    data = [{'id': u.id, 'username': u.username, 'email': u.email, 'role': getattr(u, 'profile', None).role if hasattr(u, 'profile') else 'user', 'date_joined': u.date_joined.strftime("%Y-%m-%d")} for u in users]
+    return Response(data)
+
+# =========================================
+# 📊 Dashboard API (แก้ไขจุดที่พัง)
+# =========================================
+class DashboardStatsView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        try:
+            # 1. รับค่าและกรองออเดอร์
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
+            
+            orders = Order.objects.all()
+            if start_date and end_date:
+                # ใช้ string ตรงๆ ถ้า DB รองรับ หรือแปลงเป็น date object
+                orders = orders.filter(created_at__date__range=[start_date, end_date])
+
+            # 2. คำนวณยอดขาย (แปลงเป็น float กันเหนียว)
+            total_sales_dec = orders.aggregate(Sum('total_price'))['total_price__sum'] or 0
+            total_sales = float(total_sales_dec)
+
+            total_orders = orders.count()
+            total_users = User.objects.count()
+            pending_orders = orders.filter(status='Pending').count()
+
+            # 3. Pie Chart (ใส่ Try-Except กันพัง)
+            pie_data = []
+            try:
+                cat_sales = OrderItem.objects.filter(order__in=orders).values('product__category')\
+                    .annotate(value=Sum('price')).order_by('-value')
+                pie_data = [{"name": i['product__category'] or 'Uncategorized', "value": float(i['value'] or 0)} for i in cat_sales]
+            except Exception as e: print(f"Pie Error: {e}")
+
+            # 4. Bar Chart
+            bar_data = []
+            try:
+                top_pd = OrderItem.objects.filter(order__in=orders).values('product__title')\
+                    .annotate(sales=Sum('quantity')).order_by('-sales')[:5]
+                bar_data = [{"name": i['product__title'], "sales": int(i['sales'] or 0)} for i in top_pd]
+            except Exception as e: print(f"Bar Error: {e}")
+
+            # 5. Logs (ถ้าตาราง Log พัง ให้ข้ามไป)
+            logs_data = []
+            try:
+                logs = ActivityLog.objects.all().order_by('-timestamp')[:10]
+                logs_data = [{
+                    "user": l.user.username if l.user else "System",
+                    "action": l.action,
+                    "target": l.target,
+                    "time": l.timestamp.strftime("%d/%m %H:%M")
+                } for l in logs]
+            except Exception as e: print(f"Log Error: {e}")
+
+            return Response({
+                "total_sales": total_sales,
+                "total_orders": total_orders,
+                "total_users": total_users,
+                "pending_orders": pending_orders,
+                "pie_data": pie_data,
+                "bar_data": bar_data,
+                "logs": logs_data,
+                "sales_data": [{"name": "Sales", "sales": total_sales}],
+                "best_sellers": bar_data,
+                "low_stock": []
+            })
+        except Exception as e:
+            # 🔥 ปริ้น Error ลง Terminal เพื่อให้รู้สาเหตุที่แท้จริง
+            print(f"❌ DASHBOARD CRITICAL ERROR: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({'error': str(e)}, status=500)
+
+# =========================================
+# 🛍️ Product APIs
+# =========================================
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def products_api(request):
+    try:
+        paginator = PageNumberPagination()
+        paginator.page_size = 12
+        products = Product.objects.filter(is_active=True).order_by('-id')
+        if request.query_params.get('category') and request.query_params.get('category') != 'ทั้งหมด':
+            products = products.filter(category=request.query_params.get('category'))
+        if request.query_params.get('search'):
+            products = products.filter(title__icontains=request.query_params.get('search'))
+        result = paginator.paginate_queryset(products, request)
+        data = [{'id': p.id, 'title': p.title, 'price': p.price, 'stock': p.stock, 'category': p.category, 'thumbnail': p.thumbnail.url if p.thumbnail else None} for p in result]
+        return paginator.get_paginated_response(data)
+    except Exception as e: return Response({'error': str(e)}, 500)
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def get_all_products_admin_api(request):
+    products = Product.objects.all().order_by('-id')
+    data = [{'id': p.id, 'title': p.title, 'price': p.price, 'stock': p.stock, 'category': p.category, 'thumbnail': p.thumbnail.url if p.thumbnail else None, 'is_active': p.is_active} for p in products]
     return Response(data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_admin_logs(request):
-    if request.user.profile.role != 'super_admin': return Response(status=403)
-    logs = AdminLog.objects.all().order_by('-timestamp')
-    data = [{"admin": l.admin.username, "action": l.action, "date": l.timestamp.strftime("%d/%m %H:%M")} for l in logs]
-    return Response(data)
+@permission_classes([AllowAny])
+def categories_api(request):
+    return Response({'categories': ['ทั้งหมด'] + list(filter(None, Product.objects.values_list('category', flat=True).distinct()))})
 
-# ==========================================
-# 🔧 Product Management (Add/Edit/Delete)
-# ==========================================
+@api_view(['GET'])
+def product_detail_api(request, product_id):
+    try:
+        p = Product.objects.get(id=product_id)
+        images = [{"id": i.id, "image": i.image.url} for i in p.images.all()]
+        return Response({'id': p.id, 'title': p.title, 'price': p.price, 'stock': p.stock, 'category': p.category, 'description': p.description, 'thumbnail': p.thumbnail.url if p.thumbnail else None, 'images': images})
+    except: return Response({'error': 'Not found'}, 404)
+
+# =========================================
+# 🛠️ Admin Management
+# =========================================
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def add_product_api(request):
+    try:
+        d = request.data
+        p = Product.objects.create(title=d.get('name'), price=d.get('price',0), stock=d.get('stock',0), category=d.get('category','General'), description=d.get('description',''), thumbnail=request.FILES.get('image'))
+        for img in request.FILES.getlist('images'): ProductImage.objects.create(product=p, image=img)
+        try: ActivityLog.objects.create(user=request.user, action="เพิ่ม", target=p.title)
+        except: pass
+        return Response({'message': 'Success'}, 201)
+    except Exception as e: return Response({'error': str(e)}, 400)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def add_product_api(request):
-    if request.user.profile.role not in ['admin', 'super_admin']: 
-        return Response(status=403)
-    
-    data = request.data
-    try:
-        with transaction.atomic(): # ใช้ transaction เพื่อความปลอดภัย (ถ้าพังให้ rollback)
-            # 1. สร้างตัวสินค้า
-            p = Product.objects.create(
-                title=data['title'], 
-                description=data.get('description',''), 
-                price=data['price'], 
-                stock=data['stock'], 
-                category=data['category'], 
-                brand=data.get('brand','')
-            )
-            
-            # 2. บันทึกรูปหลัก (Thumbnail)
-            if 'thumbnail' in request.FILES:
-                p.thumbnail = request.FILES['thumbnail']
-                p.save()
-            
-            # 3. บันทึกรูปแกลเลอรี่ (New Gallery Images) ✅ เพิ่มส่วนนี้
-            new_images = request.FILES.getlist('new_gallery_images')
-            for img in new_images:
-                ProductImage.objects.create(product=p, image=img)
-                
-            AdminLog.objects.create(admin=request.user, action=f"เพิ่มสินค้า: {p.title}")
-            return Response({"message": "Added", "id": p.id}, status=201)
-            
-    except Exception as e:
-        return Response({"error": str(e)}, status=400)
-
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def edit_product_api(request, product_id):
-    if request.user.profile.role not in ['admin', 'super_admin']: return Response(status=403)
-    
-    p = Product.objects.get(id=product_id)
-    data = request.data
-    p.title = data.get('title', p.title)
-    p.description = data.get('description', p.description)
-    p.price = data.get('price', p.price)
-    p.stock = data.get('stock', p.stock)
-    p.category = data.get('category', p.category)
-    p.brand = data.get('brand', p.brand)
-    
-    if 'thumbnail' in request.FILES:
-        p.thumbnail = request.FILES['thumbnail']
-    p.save()
-    
-    new_images = request.FILES.getlist('new_gallery_images')
-    for img in new_images:
-        ProductImage.objects.create(product=p, image=img)
-        
-    delete_ids = request.data.getlist('delete_image_ids')
-    if delete_ids:
-        ProductImage.objects.filter(id__in=delete_ids, product=p).delete()
+    try:
+        p = Product.objects.get(id=product_id)
+        d = request.data
+        if d.get('name'): p.title = d['name']
+        if d.get('price'): p.price = d['price']
+        if d.get('stock'): p.stock = d['stock']
+        if d.get('category'): p.category = d['category']
+        if d.get('description'): p.description = d['description']
+        if request.FILES.get('image'): p.thumbnail = request.FILES.get('image')
+        p.save()
+        for img in request.FILES.getlist('images'): ProductImage.objects.create(product=p, image=img)
+        try: ActivityLog.objects.create(user=request.user, action="แก้ไข", target=p.title)
+        except: pass
+        return Response({'message': 'Updated'})
+    except Exception as e: return Response({'error': str(e)}, 400)
 
-    AdminLog.objects.create(admin=request.user, action=f"แก้ไขสินค้า: {p.title}")
-    return Response({"message": "Updated"})
+@api_view(['DELETE', 'POST'])
+@permission_classes([IsAdminUser])
+def delete_product_api(request, product_id):
+    Product.objects.get(id=product_id).delete()
+    return Response({'message': 'Deleted'})
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_product_api(request, product_id):
-    if request.user.profile.role not in ['admin', 'super_admin']: return Response(status=403)
-    
-    p = Product.objects.get(id=product_id)
-    p.is_active = False 
-    p.save()
-    
-    AdminLog.objects.create(admin=request.user, action=f"ลบสินค้า: {p.title}")
-    return Response({"message": "Deleted"})
+@permission_classes([IsAdminUser])
+def delete_product_image_api(request, image_id):
+    ProductImage.objects.get(id=image_id).delete()
+    return Response({'message': 'Deleted'})
 
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_orders_api(request):
+    orders = Order.objects.all().order_by('-created_at')
+    search = request.query_params.get('search')
+    if search: orders = orders.filter(Q(id__icontains=search) | Q(customer_name__icontains=search) | Q(customer_tel__icontains=search))
+    if request.query_params.get('start_date') and request.query_params.get('end_date'):
+        orders = orders.filter(created_at__date__range=[request.query_params.get('start_date'), request.query_params.get('end_date')])
+    if request.query_params.get('status') and request.query_params.get('status') != 'ทั้งหมด':
+        orders = orders.filter(status=request.query_params.get('status'))
+    data = []
+    for o in orders:
+        items = [{'product': i.product.title, 'quantity': i.quantity} for i in o.items.all()]
+        data.append({'id': o.id, 'customer': o.customer_name or o.user.username, 'tel': o.customer_tel, 'total_price': o.total_price, 'status': o.status, 'created_at': o.created_at.strftime("%Y-%m-%d %H:%M"), 'items': items})
+    return Response(data)
 
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def update_order_status_api(request, order_id):
+    o = Order.objects.get(id=order_id)
+    o.status = request.data.get('status')
+    o.save()
+    try: ActivityLog.objects.create(user=request.user, action="อัปเดตสถานะ", target=f"Order #{o.id}")
+    except: pass
+    return Response({'message': 'Updated'})
+
+# =========================================
+# 📦 Checkout & User Orders
+# =========================================
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def checkout_api(request):
     try:
-        # ใช้ transaction เพื่อถ้าตัดของไม่ได้ ให้ยกเลิกออเดอร์ทั้งหมด (กันข้อมูลพัง)
-        with transaction.atomic():
-            user = request.user
-            data = request.data
-            cart_items = data.get('items', [])
-            customer_info = data.get('customer', {})
+        items = request.data.get('items', [])
+        total = request.data.get('total', 0)
+        order = Order.objects.create(user=request.user, total_price=total, customer_name=request.data.get('name', ''), customer_tel=request.data.get('tel', ''), address=request.data.get('address', ''), status='Pending')
+        for item in items:
+            OrderItem.objects.create(order=order, product_id=item['id'], quantity=item['quantity'], price=Product.objects.get(id=item['id']).price)
+        return Response({'message': 'Success', 'order_id': order.id}, 201)
+    except Exception as e: return Response({'error': str(e)}, 400)
 
-            if not cart_items:
-                return Response({"error": "ตะกร้าสินค้าว่างเปล่า"}, status=400)
-
-            # 1. ตรวจสอบสต็อกสินค้าก่อน (ว่ามีของพอไหม)
-            total_price = 0
-            for item in cart_items:
-                product = Product.objects.select_for_update().get(id=item['id'])
-                if product.stock < item['quantity']:
-                    # ❌ ถ้าของหมด ให้แจ้ง Error กลับไปทันที
-                    raise Exception(f"สินค้า '{product.title}' มีไม่เพียงพอ (เหลือ {product.stock})")
-                total_price += product.price * item['quantity']
-
-            # 2. สร้าง Order (บันทึกว่าใครซื้อ)
-            order = Order.objects.create(
-                user=user,  # ✅ ผูกกับ User ที่ Login
-                customer_name=customer_info.get('name', user.username),
-                customer_tel=customer_info.get('tel', ''),
-                customer_email=customer_info.get('email', user.email),
-                address=customer_info.get('address', ''),
-                total_price=total_price, # ใช้ราคาที่คำนวณใหม่จาก Backend เพื่อความชัวร์
-                payment_method=data.get('paymentMethod', 'Transfer'),
-                status='Pending'
-            )
-
-            # 3. สร้าง OrderItem และ ✅ ตัดสต็อกสินค้า
-            for item in cart_items:
-                product = Product.objects.get(id=item['id'])
-                
-                # บันทึกรายการลงออเดอร์
-                OrderItem.objects.create(
-                    order=order,
-                    product=product,
-                    quantity=item['quantity'],
-                    price=product.price
-                )
-                
-                # ✂️ ตัดสต็อกตรงนี้
-                product.stock -= item['quantity']
-                product.save()
-
-            return Response({"message": "สั่งซื้อสำเร็จ!", "order_id": order.id})
-
-    except Product.DoesNotExist:
-        return Response({"error": "ไม่พบสินค้าในระบบ"}, status=404)
-    except Exception as e:
-        return Response({"error": str(e)}, status=400)
-
-# ==============================
-# 📦 ดูประวัติการสั่งซื้อ (My Orders)
-# ==============================
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_orders_api(request):
-    # ดึงออเดอร์ของ User คนนี้เท่านั้น
     orders = Order.objects.filter(user=request.user).order_by('-created_at')
-    serializer = OrderSerializer(orders, many=True)
-    return Response(serializer.data)
+    return Response([{'id': o.id, 'date': o.created_at.strftime("%Y-%m-%d"), 'total': o.total_price, 'status': o.status} for o in orders])

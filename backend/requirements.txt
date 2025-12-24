@@ -4,4 +4,5 @@ mysqlclient
 django-cors-headers
 requests
 Pillow
-gunicorn  # เพิ่มตัวนี้เพื่อความเสถียรในการรัน Server แบบ Production (ถ้าต้องการ)
+gunicorn  
+stripe 
