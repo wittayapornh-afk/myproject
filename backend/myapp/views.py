@@ -275,7 +275,7 @@ def register_api(request):
     try:
         # สร้าง User หลัก
         user = User.objects.create_user(username=username, password=password, email=email)
-        user.role = 'customer' # Default role
+        user.role = 'new_user' # Default role updated to new_user
         user.phone = phone
         
         # ถ้ารูปถูกส่งมาด้วย ให้บันทึกลง profile -> user model
