@@ -7,7 +7,7 @@ from myapp import views
 
 urlpatterns = [
     # --- Auth (ระบบสมาชิก) ---
-    path('api/login/', token_views.obtain_auth_token, name='api_token_auth'),
+    path('api/login/', views.login_api, name='api_token_auth'),
     path('api/register/', views.register_api, name='register_api'),
     path('api/logout/', views.logout_api, name='logout_api'),
     path('api/profile/', views.user_profile_api, name='user_profile'),
@@ -15,12 +15,14 @@ urlpatterns = [
     # --- Admin Users & Role ---
     path('api/admin/users/', views.get_all_users, name='get_all_users'),
     path('api/admin/users/role/', views.manage_user_role, name='manage_user_role'),
+    path('api/admin/users/<int:user_id>/delete/', views.delete_user_api, name='delete_user'),
+    path('api/update-user/<int:user_id>/', views.admin_update_user_api, name='admin_update_user'), # ✅ Simplified
 
     # --- Admin Dashboard Lists ---
     path('api/admin/products/', views.admin_products_list, name='admin_products_list'),
     
     # ✅ แก้ไข 1: เพิ่ม api/ ให้ลิงก์นี้
-    path('api/admin/orders/', views.admin_orders_api, name='admin_orders'), 
+    path('api/admin/orders/', views.admin_orders_list, name='admin_orders'), 
 
     # --- Products (สินค้า) ---
     path('api/products/', views.products_api, name='products_api'),

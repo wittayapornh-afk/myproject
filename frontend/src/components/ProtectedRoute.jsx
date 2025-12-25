@@ -6,7 +6,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  // 1. รอโหลดข้อมูล User ก่อน (สำคัญมาก: กันไม่ให้ดีดไปหน้า Login ตอนกด Refresh)
+  // ✅ Rule: คงหน้า Loading เดิมไว้ (ห้ามลบ)
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#F2F0E4]">
@@ -18,17 +18,25 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     );
   }
 
-  // 2. ถ้ายังไม่ล็อกอิน -> ดีดไปหน้า Login (พร้อมแนบ state เพื่อให้ login เสร็จแล้วเด้งกลับมาหน้านี้ได้)
+  // ถ้ายังไม่ล็อกอิน -> ดีดไป Login
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 3. ถ้าล็อกอินแล้ว แต่ Role ไม่ตรงกับที่อนุญาต (เช่น User พยายามเข้าหน้า Admin) -> ดีดกลับหน้าแรก
-  if (allowedRoles && !allowedRoles.includes(user.role_code)) {
-    return <Navigate to="/" replace />;
+  // ✅ Rule: เช็ค Role แบบยืดหยุ่น (User == user)
+  if (allowedRoles && allowedRoles.length > 0) {
+     const userRole = (user.role || '').toLowerCase();
+     const allowedRolesLower = allowedRoles.map(role => role.toLowerCase());
+
+     if (!allowedRolesLower.includes(userRole)) {
+        // ถ้าเป็น Admin แล้วเผลอเข้าหน้า User -> ดีดไป Dashboard
+        if (userRole === 'admin' || userRole === 'super_admin') {
+            return <Navigate to="/admin/dashboard" replace />;
+        }
+        return <Navigate to="/" replace />;
+     }
   }
 
-  // 4. ผ่านการตรวจสอบทุกอย่าง -> อนุญาตให้เข้าถึงหน้านั้นได้
   return children;
 };
 

@@ -1,44 +1,51 @@
 from django.contrib import admin
 from django.urls import path
-from rest_framework.authtoken import views as token_views
 from django.conf import settings
 from django.conf.urls.static import static
-from myapp import views
+from myapp import views # Import views ตัวเดียวพอ
+from myapp.views import DashboardStatsView
 
 urlpatterns = [
-    # --- Auth ---
-    path('api/login/', token_views.obtain_auth_token, name='api_token_auth'),
-    path('api/register/', views.register_api, name='register_api'),
-    path('api/logout/', views.logout_api, name='logout_api'),
-    path('api/profile/', views.user_profile_api, name='user_profile'),
-    
-    # --- Admin Dashboard Lists (เพิ่มส่วนนี้) ---
-    path('api/admin/users/', views.get_all_users, name='get_all_users'),
-    path('api/admin/users/role/', views.manage_user_role, name='manage_user_role'),
-    path('api/admin/products/', views.admin_products_list, name='admin_products_list'), # ✅ API สำหรับดึงสินค้าทั้งหมด
-    path('api/admin/orders/', views.admin_orders_list, name='admin_orders_list'),     # ✅ API สำหรับดึงออเดอร์ทั้งหมด
-
-    # --- Products ---
-    path('api/products/', views.products_api, name='products_api'),
-    path('api/products/add/', views.add_product_api, name='add_product'),
-    path('api/products/<int:product_id>/', views.product_detail_api, name='product_detail_api'),
-    path('api/products/<int:product_id>/edit/', views.edit_product_api, name='edit_product'),
-    path('api/products/<int:product_id>/delete/', views.delete_product_api, name='delete_product'),
-    
-    path('api/categories/', views.categories_api, name='categories_api'),
-
-    # --- Orders ---
-    path('api/orders/create/', views.create_order, name='create_order'),
-    path('api/orders/<int:order_id>/update/', views.update_order_status, name='update_order'),
-    path('api/my-orders/', views.my_orders_api, name='my_orders'),
-
-    # --- Admin Stats ---
-    path('api/admin-stats/', views.get_admin_stats, name='admin_stats_api'),
-    path('api/admin-logs/', views.get_admin_logs, name='get_admin_logs'),
-    
     path('admin/', admin.site.urls),
-]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    # ==============================
+    # 🔐 Auth APIs (Login/Register/Logout/Profile)
+    # ==============================
+    path('api/login/', views.login_api),
+    path('api/register/', views.register_api),
+    path('api/logout/', views.logout_api),
+    path('api/user/profile/', views.user_profile_api),
+    path('api/users/', views.get_all_users),           # Admin ดู user ทั้งหมด
+
+    # ==============================
+    # 🛒 Product APIs (หน้าบ้าน)
+    # ==============================
+    path('api/products/', views.products_api),
+    path('api/categories/', views.categories_api),
+    path('api/product/<int:product_id>/', views.product_detail_api),
+
+    # ==============================
+    # 📦 Order APIs (ลูกค้าสั่งซื้อ)
+    # ==============================
+    path('api/checkout/', views.checkout_api),     # ✅ เพิ่มให้ใน views แล้ว
+    path('api/orders/', views.my_orders_api),      # ✅ เพิ่มให้ใน views แล้ว
+
+    # ==============================
+    # 🛡️ Admin Dashboard & Management APIs
+    # ==============================
+    # 1. Dashboard Stats
+    path('api/admin/dashboard-stats/', DashboardStatsView.as_view()),
+
+    # 2. จัดการสินค้า (Admin)
+    path('api/admin/all_products/', views.get_all_products_admin_api), # ดึงสินค้าทั้งหมด (Admin)
+    path('api/add_product/', views.add_product_api),
+    path('api/edit_product/<int:product_id>/', views.edit_product_api),
+    path('api/delete_product/<int:product_id>/', views.delete_product_api),
+    path('api/delete_product_image/<int:image_id>/', views.delete_product_image_api), # ลบรูป Gallery
+
+
+    # 3. จัดการออเดอร์ (Admin)
+    path('api/admin/orders/', views.admin_orders_api), # ✅ ใช้ชื่อนี้ชื่อเดียว (ลบ admin_orders_list ออก)
+    path('api/admin/order_status/<int:order_id>/', views.update_order_status_api),
+
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

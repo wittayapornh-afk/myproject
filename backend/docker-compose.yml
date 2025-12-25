@@ -61,6 +61,7 @@ services:
       - PMA_USER=django_user
       - PMA_PASSWORD=django_password
       - PMA_ARBITRARY=1
+      
     ports:
       - "8081:80"
     networks:
