@@ -9,6 +9,10 @@ SECRET_KEY = 'django-insecure-change-me-please'
 DEBUG = True
 ALLOWED_HOSTS = ['*', 'shop-backend', 'shop_backend', 'localhost', '127.0.0.1'] # ✅ อนุญาตทุก Host เพื่อไม่ให้ติดปัญหาใน Docker
 
+STRIPE_PUBLIC_KEY = 'pk_test_...' # ใส่ Public Key ของคุณ
+STRIPE_SECRET_KEY = 'sk_test_...' # ใส่ Secret Key ของคุณ
+FRONTEND_URL = 'http://localhost:3000'
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -84,10 +88,11 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # ✅ ตั้งค่า Media (สำหรับรูปโปรไฟล์และสินค้า)
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -104,3 +109,6 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ],
 }
+
+# Custom User Model
+AUTH_USER_MODEL = 'myapp.User'

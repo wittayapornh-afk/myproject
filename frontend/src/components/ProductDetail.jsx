@@ -1,173 +1,185 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { useCart } from "../context/CartContext";
-import Swal from "sweetalert2";
-import { Star, ShoppingCart, Minus, Plus, MessageCircle, Package, Send, ArrowLeft, ShoppingBag, Box } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { 
+  ShoppingCart, Heart, ArrowLeft, Star, Plus, Minus, 
+  ChevronRight, ChevronLeft, MessageSquare, Send, Zap 
+} from 'lucide-react';
+import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
+import { useAuth } from '../context/AuthContext';
+import Swal from 'sweetalert2';
+import { formatPrice, getImageUrl } from '../utils/formatUtils';
 
 function ProductDetail() {
   const { id } = useParams();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
-  const { addToCart } = useCart();
-  
   const [product, setProduct] = useState(null);
-  const [relatedProducts, setRelatedProducts] = useState([]); 
   const [loading, setLoading] = useState(true);
-  const [mainImage, setMainImage] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(1); 
+  const [relatedProducts, setRelatedProducts] = useState([]);
   
-  const [reviews, setReviews] = useState([
-      { id: 1, user: "Sompong Happy", rating: 5, text: "สินค้าคุณภาพดีมากครับ จัดส่งไว", date: "2 วันที่แล้ว" },
-      { id: 2, user: "Marry Jane", rating: 4, text: "สวยตรงปก คุ้มราคามากค่ะ", date: "1 สัปดาห์ที่แล้ว" }
-  ]);
-  const [userRating, setUserRating] = useState(5);
-  const [userReview, setUserReview] = useState("");
+  const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useWishlist();
 
-  const getImageUrl = (path) => {
-      if (!path) return "https://via.placeholder.com/500";
-      if (path.startsWith("http")) return path;
-      return `${path}`;
-  };
+  const API_BASE_URL = "http://localhost:8000";
 
   useEffect(() => {
     window.scrollTo(0, 0);
     setLoading(true);
-    fetch(`/api/products/${id}/`)
-      .then((res) => res.json())
-      .then((data) => {
-        setProduct(data);
-        setMainImage(data.thumbnail); // เริ่มต้นใช้รูป Thumbnail
-        
-        fetch(`/api/products/?category=${data.category}`)
-            .then(res => res.json())
-            .then(relatedData => {
-                const related = (relatedData.results || relatedData.products || [])
-                    .filter(p => p.id !== data.id)
-                    .slice(0, 4);
-                setRelatedProducts(related);
-            });
-        setLoading(false);
+    setQuantity(1); 
+
+    fetch(`${API_BASE_URL}/api/product/${id}/`) 
+      .then(res => {
+        if (!res.ok) throw new Error('Not Found');
+        return res.json();
       })
-      .catch(() => setLoading(false));
+      .then(data => {
+        setProduct(data);
+        setLoading(false);
+        // ✅ ดึงสินค้าแนะนำ (หมวดเดียวกัน)
+        fetchRelatedProducts(data.category);
+      })
+      .catch(err => {
+        console.error(err);
+        setProduct(null);
+        setLoading(false);
+      });
   }, [id]);
 
-  const handleAddToCart = () => {
-    addToCart(product, quantity);
-    Swal.fire({
-      icon: "success",
-      title: "เพิ่มลงตะกร้าแล้ว",
-      text: `เพิ่ม ${product.title} จำนวน ${quantity} ชิ้น`,
-      showConfirmButton: false,
-      timer: 1500,
-    });
-  };
-
-  const adjustQuantity = (amount) => {
-      setQuantity(prev => {
-          const newQty = prev + amount;
-          return newQty < 1 ? 1 : newQty > product.stock ? product.stock : newQty;
+  const fetchRelatedProducts = (category) => {
+    // สมมติว่า Backend รองรับการ filter ?category=...
+    fetch(`${API_BASE_URL}/api/products/?category=${encodeURIComponent(category)}&page_size=4`)
+      .then(res => res.json())
+      .then(data => {
+        const items = data.results || data;
+        // กรองตัวปัจจุบันออก
+        const filtered = items.filter(item => item.id !== parseInt(id)).slice(0, 4);
+        setRelatedProducts(filtered);
       });
   };
 
-  const handleSubmitReview = (e) => {
-      e.preventDefault();
-      if (!userReview.trim()) return;
-      const newReview = {
-          id: reviews.length + 1,
-          user: "คุณ (Guest)",
-          rating: userRating,
-          text: userReview,
-          date: "เมื่อสักครู่"
-      };
-      setReviews([newReview, ...reviews]); 
-      setUserReview("");
-      Swal.fire({ icon: 'success', title: 'ขอบคุณสำหรับรีวิว!', showConfirmButton: false, timer: 1500 });
+  const handleAddToCart = () => {
+    if (product) {
+      // ✅ ส่งจำนวนที่เลือก (quantity) ไปที่ Context
+      addToCart(product, quantity); 
+      Swal.fire({
+        icon: 'success',
+        title: 'เพิ่มลงตะกร้าแล้ว',
+        text: `จำนวน ${quantity} ชิ้น`,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+        background: '#1a4d2e',
+        color: '#fff',
+      });
+    }
   };
 
-  if (loading) return <div className="p-20 text-center text-gray-500 animate-pulse">กำลังโหลดข้อมูล...</div>;
-  if (!product) return <div className="p-20 text-center">ไม่พบสินค้า</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1a4d2e]"></div></div>;
+  if (!product) return <div className="text-center pt-20">ไม่พบสินค้า <Link to="/shop" className="text-blue-500">กลับร้านค้า</Link></div>;
+
+  const isOutOfStock = product.stock <= 0;
 
   return (
-    <div className="min-h-screen bg-[#F9F9F7] py-8 px-4 font-sans">
-      <div className="max-w-6xl mx-auto space-y-8">
-        
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-[#305949] font-bold transition-all hover:-translate-x-1">
-            <ArrowLeft size={20} /> ย้อนกลับ
-        </button>
+    <div className="min-h-screen bg-[#F9F9F7] py-10 px-4 font-sans pt-28 pb-12">
+      <div className="max-w-6xl mx-auto">
+        {/* Navigation */}
+        <div className="flex justify-between items-center mb-8">
+            <button onClick={() => navigate('/shop')} className="flex items-center gap-2 text-gray-500 hover:text-[#1a4d2e] font-bold"><ArrowLeft size={20}/> Back to Shop</button>
+            <div className="flex gap-2">
+                <button onClick={() => navigate(`/product/${parseInt(id) - 1}`)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50"><ChevronLeft/></button>
+                <button onClick={() => navigate(`/product/${parseInt(id) + 1}`)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50"><ChevronRight/></button>
+            </div>
+        </div>
 
-        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden flex flex-col md:flex-row">
-          {/* Images */}
-          <div className="md:w-1/2 p-6">
-            <div className="aspect-square bg-[#F5F5F0] rounded-2xl mb-4 overflow-hidden flex items-center justify-center relative group">
-              <img src={getImageUrl(mainImage)} alt={product.title} className="max-h-full object-contain mix-blend-multiply transition duration-500 group-hover:scale-105" />
-            </div>
-            
-            {/* ✅ Gallery Loop */}
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-               <img 
-                 src={getImageUrl(product.thumbnail)} 
-                 onClick={() => setMainImage(product.thumbnail)} 
-                 className={`w-20 h-20 rounded-xl border-2 cursor-pointer object-cover transition-all bg-white ${getImageUrl(mainImage) === getImageUrl(product.thumbnail) ? 'border-[#305949] ring-2 ring-[#305949]/20' : 'border-transparent hover:border-gray-200'}`} 
-               />
-               {product.images && product.images.map((img) => (
-                  <img 
-                    key={img.id} 
-                    src={img.image} 
-                    onClick={() => setMainImage(img.image)} 
-                    className={`w-20 h-20 rounded-xl border-2 cursor-pointer object-cover transition-all bg-white ${getImageUrl(mainImage) === getImageUrl(img.image) ? 'border-[#305949] ring-2 ring-[#305949]/20' : 'border-transparent hover:border-gray-200'}`} 
-                  />
-               ))}
-            </div>
+        <div className="bg-white rounded-[3rem] shadow-sm flex flex-col md:flex-row overflow-hidden border border-gray-100 mb-12">
+          {/* Image */}
+          <div className="md:w-1/2 bg-gray-50 p-10 flex items-center justify-center relative">
+             <img src={getImageUrl(product.image || product.thumbnail)} className={`max-h-[500px] object-contain drop-shadow-2xl ${isOutOfStock ? 'grayscale opacity-50' : ''}`} alt="" />
+             
+             {isOutOfStock && <span className="absolute bg-red-600 text-white px-6 py-2 rounded-xl font-black rotate-[-12deg] shadow-xl text-xl">OUT OF STOCK</span>}
+             
+             {/* ✅ ปุ่มหัวใจในหน้า Detail */}
+             {!isAdmin && (
+                 <button onClick={() => toggleWishlist(product)} className="absolute top-10 right-10 p-3 bg-white rounded-full shadow-lg hover:scale-110 transition-transform">
+                    <Heart size={28} className={isInWishlist(product.id) ? "fill-red-500 text-red-500" : "text-gray-300"} />
+                 </button>
+             )}
           </div>
 
-          {/* Details */}
-          <div className="md:w-1/2 p-8 md:p-12 flex flex-col">
-            <div className="mb-auto">
-                <span className="text-xs font-bold text-[#305949] bg-[#305949]/10 px-3 py-1 rounded-full uppercase">{product.category}</span>
-                <h1 className="text-3xl md:text-4xl font-black text-[#263A33] mt-4 mb-2">{product.title}</h1>
-                <div className="flex items-center gap-2 mb-6">
-                    <div className="flex text-yellow-400"><Star size={18} fill="currentColor" /></div>
-                    <span className="text-gray-500 font-medium">({product.rating || 4.5})</span>
-                </div>
-                <p className="text-gray-600 mb-8">{product.description}</p>
-                <div className="text-4xl font-extrabold text-[#305949] mb-8">฿{Number(product.price).toLocaleString()}</div>
+          {/* Info */}
+          <div className="md:w-1/2 p-12 flex flex-col justify-center">
+             <span className="text-[#1a4d2e] font-black text-xs uppercase tracking-widest bg-green-50 px-3 py-1 w-fit rounded-full mb-4">{product.category}</span>
+             <h1 className="text-4xl font-black text-[#263A33] mb-4">{product.title}</h1>
+             
+             <div className="flex items-center gap-2 mb-6">
+                <div className="flex text-orange-400"><Star size={18} fill="currentColor"/><Star size={18} fill="currentColor"/><Star size={18} fill="currentColor"/><Star size={18} fill="currentColor"/><Star size={18} className="text-gray-300"/></div>
+                <span className="text-sm font-bold text-gray-400">(12 Reviews)</span>
+             </div>
 
-                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-8">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-                        <div className="flex items-center gap-4">
-                            <span className="text-gray-500 font-bold text-sm">จำนวน:</span>
-                            <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
-                                <button onClick={() => adjustQuantity(-1)} className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 hover:text-[#305949] hover:bg-gray-200 transition"><Minus size={16} /></button>
-                                <span className="w-10 text-center font-bold text-xl text-[#263A33]">{quantity}</span>
-                                <button onClick={() => adjustQuantity(1)} className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 hover:text-[#305949] hover:bg-gray-200 transition"><Plus size={16} /></button>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                            <Box size={18} className="text-gray-400"/>
-                            <span className="text-gray-500">คงเหลือ:</span>
-                            <span className={`font-bold text-lg ${product.stock > 0 ? 'text-[#305949]' : 'text-red-500'}`}>
-                                {product.stock > 0 ? `${product.stock} ชิ้น` : 'หมดชั่วคราว'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+             <p className="text-gray-500 mb-8 leading-relaxed">{product.description}</p>
 
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                <button 
-                  onClick={handleAddToCart}
-                  disabled={product.stock <= 0}
-                  className="flex-1 bg-[#305949] text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-[#305949]/20 hover:bg-[#234236] hover:-translate-y-1 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex justify-center items-center gap-2"
-                >
-                   <ShoppingCart size={22} /> {product.stock > 0 ? "เพิ่มใส่ตะกร้า" : "สินค้าหมด"}
+             {/* ✅ Quantity Selector */}
+             {!isAdmin && !isOutOfStock && (
+                <div className="flex items-center gap-6 mb-8 p-4 bg-gray-50 rounded-2xl w-fit">
+                    <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-8 h-8 bg-white rounded shadow flex items-center justify-center hover:text-red-500"><Minus size={16}/></button>
+                    <span className="font-black text-xl w-8 text-center">{quantity}</span>
+                    <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="w-8 h-8 bg-white rounded shadow flex items-center justify-center hover:text-[#1a4d2e]"><Plus size={16}/></button>
+                </div>
+             )}
+
+             <div className="flex items-end gap-4 mb-10">
+                 <span className="text-5xl font-black text-[#1a4d2e]">{formatPrice(product.price * quantity)}</span>
+                 {quantity > 1 && <span className="text-gray-400 font-bold mb-2">({formatPrice(product.price)} / ชิ้น)</span>}
+             </div>
+
+             {!isAdmin && (
+                <button onClick={handleAddToCart} disabled={isOutOfStock} className={`w-full py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 shadow-xl transition-all ${!isOutOfStock ? 'bg-[#1a4d2e] text-white hover:bg-[#143d24]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                    <ShoppingCart size={24} /> {isOutOfStock ? 'OUT OF STOCK' : `ADD TO CART (${quantity})`}
                 </button>
-                <Link to="/shop" className="px-6 py-4 rounded-xl border-2 border-gray-200 text-gray-600 font-bold hover:border-[#305949] hover:text-[#305949] transition-all flex justify-center items-center gap-2">
-                   <ShoppingBag size={20} /> ดูสินค้าอื่น
-                </Link>
-            </div>
+             )}
           </div>
         </div>
 
-        {/* Reviews section omitted for brevity (same as previous) */}
+        {/* ✅ Recommended Products */}
+        {relatedProducts.length > 0 && (
+            <div className="mt-20 mb-20">
+                <h2 className="text-3xl font-black text-[#263A33] mb-8 uppercase tracking-tighter">Recommended For You</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    {relatedProducts.map((item) => (
+                        <Link key={item.id} to={`/product/${item.id}`} className="group bg-white p-4 rounded-[2rem] shadow-sm hover:shadow-xl transition-all">
+                            <div className="aspect-square bg-gray-50 rounded-2xl mb-4 overflow-hidden p-4 flex items-center justify-center">
+                                <img src={getImageUrl(item.thumbnail || item.image)} className="w-full h-full object-contain group-hover:scale-110 transition-transform" alt=""/>
+                            </div>
+                            <h3 className="font-bold text-[#263A33] truncate">{item.title}</h3>
+                            <p className="text-[#1a4d2e] font-black">{formatPrice(item.price)}</p>
+                        </Link>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* ✅ Reviews Section */}
+        <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100">
+            <h3 className="text-2xl font-black text-[#263A33] mb-8 flex items-center gap-2"><MessageSquare /> Reviews</h3>
+            <div className="space-y-6">
+                <div className="border-b border-gray-50 pb-6">
+                    <div className="flex justify-between mb-2">
+                        <span className="font-bold text-[#1a4d2e]">Customer01</span>
+                        <div className="flex text-orange-400"><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/></div>
+                    </div>
+                    <p className="text-gray-500 text-sm">"สินค้าดีมากครับ ส่งไว แพ็คของมาดีประทับใจ"</p>
+                </div>
+                {/* Form */}
+                <div className="bg-gray-50 p-6 rounded-2xl mt-8">
+                    <p className="font-bold text-[#263A33] mb-4">เขียนรีวิวของคุณ</p>
+                    <textarea className="w-full p-4 rounded-xl border-none outline-none text-sm resize-none mb-4 focus:ring-2 focus:ring-[#1a4d2e]/10" rows="3" placeholder="แชร์ความรู้สึกของคุณ..."></textarea>
+                    <button className="bg-[#1a4d2e] text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-[#143d24]"><Send size={16}/> ส่งรีวิว</button>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
   );

@@ -1,36 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext'; // ✅ ต้อง import useAuth
+import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { CreditCard, MapPin, Truck, CheckCircle } from 'lucide-react';
+import { MapPin, Truck, CreditCard, Smartphone, ChevronLeft, ArrowRight, ShieldCheck, Mail, Phone, User } from 'lucide-react';
+// ✅ Rule 59: เรียกใช้ Utility สำหรับราคาและรูปภาพ
+import { formatPrice, getImageUrl } from '../utils/formatUtils';
 
 function CheckoutPage() {
     const { cartItems, getTotalPrice, clearCart } = useCart();
-    // 🔴 จุดที่ Error เดิม: const { token } = useAuth();
-    // ✅ แก้เป็นบรรทัดนี้ (เพิ่ม user เข้าไป):
-    const { token, user } = useAuth(); 
-    
+    const { token, user, logout } = useAuth();
     const navigate = useNavigate();
 
-    // State สำหรับเก็บข้อมูลฟอร์ม
-    const [formData, setFormData] = useState({
-        name: '',
-        tel: '',
-        email: '',
-        address: ''
-    });
-    
+    const [formData, setFormData] = useState({ name: '', tel: '', email: '', address: '' });
     const [paymentMethod, setPaymentMethod] = useState('Transfer');
+    const [loading, setLoading] = useState(false);
 
-    // ✅ ใช้ useEffect เพื่อดึงข้อมูล User มาใส่ฟอร์มอัตโนมัติเมื่อโหลดหน้าเสร็จ
+    // ✅ Rule 45: ดึงข้อมูลอัตโนมัติจาก Profile (Auto-fill)
     useEffect(() => {
         if (user) {
             setFormData({
                 name: user.username || '',
                 tel: user.phone || '',
                 email: user.email || '',
-                address: user.address || '' // ถ้ามีที่อยู่เก่าก็ดึงมาแสดง
+                address: user.address || ''
             });
         }
     }, [user]);
@@ -40,150 +33,212 @@ function CheckoutPage() {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+    e.preventDefault();
+    setLoading(true);
 
-        // 1. เช็คว่า Login หรือยัง
-        if (!token) {
-            Swal.fire('แจ้งเตือน', 'กรุณาเข้าสู่ระบบก่อนสั่งซื้อ', 'warning');
-            navigate('/login');
-            return;
+    try {
+        const response = await fetch('http://localhost:8000/api/checkout/', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Authorization': `Token ${token}` 
+            },
+            body: JSON.stringify({
+                // ✅ ปรับรูปแบบให้ตรงตามมาตรฐาน Backend ทั่วไป
+                order_items: cartItems.map(item => ({
+                    product: item.id,
+                    quantity: item.quantity,
+                    price: item.price
+                })),
+                shipping_address: formData.address,
+                phone_number: formData.tel,
+                payment_method: paymentMethod,
+                total_price: getTotalPrice()
+            })
+        });
+
+        if (response.ok) {
+            clearCart();
+            await Swal.fire({ icon: 'success', title: 'สั่งซื้อสำเร็จ', confirmButtonColor: '#1a4d2e' });
+            navigate('/order-history');
+        } else {
+            const errorData = await response.json();
+            // จะโชว์ว่า Backend แจ้งเตือนอะไรติดขัด
+            throw new Error(JSON.stringify(errorData));
         }
-
-        try {
-            Swal.showLoading();
-            
-            // 2. ส่งข้อมูลไป Backend
-            const res = await fetch('/api/checkout/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Token ${token}` // ✅ ต้องมีบรรทัดนี้
-                },
-                body: JSON.stringify({
-                    items: cartItems,
-                    customer: formData,
-                    paymentMethod: paymentMethod,
-                    totalPrice: getTotalPrice() // ส่งราคารวมไปด้วย
-                })
-            });
-
-            const result = await res.json();
-
-            if (res.ok) {
-                clearCart();
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'สั่งซื้อสำเร็จ!',
-                    text: 'ระบบได้ตัดสต็อกสินค้าเรียบร้อยแล้ว',
-                    confirmButtonColor: '#305949'
-                });
-                navigate('/order-history'); // ไปหน้าประวัติ
-            } else {
-                throw new Error(result.error || 'สั่งซื้อไม่สำเร็จ');
-            }
-        } catch (error) {
-            console.error(error);
-            Swal.fire('เกิดข้อผิดพลาด', error.message, 'error');
-        }
-    };
-
+    } catch (error) {
+        Swal.fire('เกิดข้อผิดพลาด', 'กรุณาตรวจสอบการกรอกข้อมูล: ' + error.message, 'error');
+    } finally {
+        setLoading(false);
+    }
+};
     if (cartItems.length === 0) {
-        return <div className="p-10 text-center text-gray-500">ไม่มีสินค้าในตะกร้า</div>;
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#F9F9F7]">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <MapPin className="text-gray-300" size={40} />
+                </div>
+                <h2 className="text-xl font-black text-gray-800">ไม่มีสินค้าที่ต้องชำระเงิน</h2>
+                <button onClick={() => navigate('/shop')} className="mt-4 text-[#1a4d2e] font-bold underline">กลับไปช้อปปิ้ง</button>
+            </div>
+        );
     }
 
     return (
-        <div className="min-h-screen bg-[#F9F9F7] py-12 px-4 md:px-8 font-sans">
-            <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                {/* ฝั่งซ้าย: ฟอร์มข้อมูล */}
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm">
-                    <h2 className="text-2xl font-bold text-[#263A33] mb-6 flex items-center gap-2">
-                        <MapPin className="text-[#305949]" /> ที่อยู่จัดส่ง
-                    </h2>
-                    <form id="checkout-form" onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm text-gray-500 mb-1">ชื่อผู้รับ</label>
-                            <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-[#305949]/20" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm text-gray-500 mb-1">เบอร์โทร</label>
-                                <input type="tel" name="tel" value={formData.tel} onChange={handleChange} required className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-[#305949]/20" />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-gray-500 mb-1">อีเมล</label>
-                                <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-[#305949]/20" />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm text-gray-500 mb-1">ที่อยู่จัดส่ง</label>
-                            <textarea name="address" value={formData.address} onChange={handleChange} required rows="3" className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-[#305949]/20"></textarea>
-                        </div>
+        <div className="min-h-screen bg-[#F9F9F7] py-12 px-4 md:px-8 pt-28 font-sans">
+            <div className="max-w-6xl mx-auto">
+                <button onClick={() => navigate('/cart')} className="flex items-center gap-2 text-gray-400 font-bold mb-8 hover:text-[#1a4d2e] transition-all group">
+                    <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> กลับไปแก้ไขตะกร้าสินค้า
+                </button>
 
-                        <div className="pt-6">
-                            <h3 className="text-lg font-bold text-[#263A33] mb-4 flex items-center gap-2">
-                                <CreditCard className="text-[#305949]" /> วิธีชำระเงิน
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <label className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === 'Transfer' ? 'border-[#305949] bg-[#305949]/5' : 'border-gray-100'}`}>
-                                    <input type="radio" name="payment" value="Transfer" checked={paymentMethod === 'Transfer'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
-                                    <div className="flex flex-col items-center gap-2">
-                                        <Truck size={24} className={paymentMethod === 'Transfer' ? 'text-[#305949]' : 'text-gray-400'} />
-                                        <span className={`font-bold ${paymentMethod === 'Transfer' ? 'text-[#305949]' : 'text-gray-500'}`}>โอนเงิน</span>
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
+                    {/* ฝั่งซ้าย: ฟอร์มข้อมูล (3 ส่วนจาก 5) */}
+                    <div className="lg:col-span-3 space-y-8">
+                        <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-sm border border-gray-100">
+                            <h2 className="text-2xl font-black text-[#263A33] mb-8 flex items-center gap-3">
+                                <div className="p-2 bg-green-50 text-[#1a4d2e] rounded-xl"><MapPin size={24} /></div>
+                                ข้อมูลจัดส่งสินค้า
+                            </h2>
+                            
+                            <form id="checkout-form" onSubmit={handleSubmit} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">ชื่อผู้รับสินค้า</label>
+                                    <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 focus-within:border-[#1a4d2e] transition-all">
+                                        <User size={18} className="text-gray-400"/>
+                                        <input type="text" name="name" value={formData.name} onChange={handleChange} required className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" placeholder="ระบุชื่อ-นามสกุล" />
                                     </div>
-                                </label>
-                                <label className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === 'COD' ? 'border-[#305949] bg-[#305949]/5' : 'border-gray-100'}`}>
-                                    <input type="radio" name="payment" value="COD" checked={paymentMethod === 'COD'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
-                                    <div className="flex flex-col items-center gap-2">
-                                        <CheckCircle size={24} className={paymentMethod === 'COD' ? 'text-[#305949]' : 'text-gray-400'} />
-                                        <span className={`font-bold ${paymentMethod === 'COD' ? 'text-[#305949]' : 'text-gray-500'}`}>เก็บเงินปลายทาง</span>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-
-                {/* ฝั่งขวา: สรุปรายการ */}
-                <div className="space-y-6">
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm">
-                        <h2 className="text-2xl font-bold text-[#263A33] mb-6">สรุปคำสั่งซื้อ</h2>
-                        <div className="space-y-4 mb-6 max-h-80 overflow-y-auto pr-2">
-                            {cartItems.map((item) => (
-                                <div key={item.id} className="flex gap-4 items-center">
-                                    <img src={item.thumbnail} alt={item.title} className="w-16 h-16 rounded-lg object-cover bg-gray-100" />
-                                    <div className="flex-1">
-                                        <h4 className="font-bold text-[#263A33] text-sm line-clamp-1">{item.title}</h4>
-                                        <p className="text-xs text-gray-500">จำนวน: {item.quantity} ชิ้น</p>
-                                    </div>
-                                    <p className="font-bold text-[#305949]">฿{(item.price * item.quantity).toLocaleString()}</p>
                                 </div>
-                            ))}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">เบอร์โทรศัพท์ติดต่อ</label>
+                                        <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 focus-within:border-[#1a4d2e] transition-all">
+                                            <Phone size={18} className="text-gray-400"/>
+                                            <input type="tel" name="tel" value={formData.tel} onChange={handleChange} required className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" placeholder="08XXXXXXXX" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">อีเมล</label>
+                                        <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 focus-within:border-[#1a4d2e] transition-all">
+                                            <Mail size={18} className="text-gray-400"/>
+                                            <input type="email" name="email" value={formData.email} onChange={handleChange} required className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" placeholder="example@mail.com" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">ที่อยู่สำหรับการจัดส่ง</label>
+                                    <div className="flex gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 focus-within:border-[#1a4d2e] transition-all">
+                                        <MapPin size={18} className="text-gray-400 mt-1 flex-shrink-0"/>
+                                        <textarea name="address" value={formData.address} onChange={handleChange} required rows="3" className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none" placeholder="บ้านเลขที่, ถนน, แขวง/ตำบล, เขต/อำเภอ, จังหวัด..."></textarea>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
-                        <div className="border-t pt-4 space-y-2">
-                            <div className="flex justify-between text-gray-500">
-                                <span>ยอดรวมสินค้า</span>
-                                <span>฿{getTotalPrice().toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between text-gray-500">
-                                <span>ค่าจัดส่ง</span>
-                                <span>ฟรี</span>
-                            </div>
-                            <div className="flex justify-between text-xl font-bold text-[#263A33] pt-2">
-                                <span>ยอดสุทธิ</span>
-                                <span>฿{getTotalPrice().toLocaleString()}</span>
+
+                        {/* ✅ Rule 47: วิธีชำระเงินแบบ Card Selection */}
+                        <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-sm border border-gray-100">
+                            <h2 className="text-2xl font-black text-[#263A33] mb-8 flex items-center gap-3">
+                                <div className="p-2 bg-green-50 text-[#1a4d2e] rounded-xl"><CreditCard size={24} /></div>
+                                วิธีชำระเงิน
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label className={`group relative p-6 rounded-3xl border-2 cursor-pointer transition-all duration-300 ${paymentMethod === 'Transfer' ? 'border-[#1a4d2e] bg-green-50/50 shadow-lg shadow-green-100' : 'border-gray-50 hover:border-gray-200'}`}>
+                                    <input type="radio" name="payment" value="Transfer" checked={paymentMethod === 'Transfer'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-2xl transition-colors ${paymentMethod === 'Transfer' ? 'bg-[#1a4d2e] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                            <Truck size={24} />
+                                        </div>
+                                        <div>
+                                            <p className={`font-black text-sm ${paymentMethod === 'Transfer' ? 'text-[#1a4d2e]' : 'text-gray-600'}`}>โอนเงินธนาคาร</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">ยืนยันยอดภายใน 24 ชม.</p>
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label className={`group relative p-6 rounded-3xl border-2 cursor-pointer transition-all duration-300 ${paymentMethod === 'qr' ? 'border-[#1a4d2e] bg-green-50/50 shadow-lg shadow-green-100' : 'border-gray-50 hover:border-gray-200'}`}>
+                                    <input type="radio" name="payment" value="qr" checked={paymentMethod === 'qr'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-2xl transition-colors ${paymentMethod === 'qr' ? 'bg-[#1a4d2e] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                            <Smartphone size={24} />
+                                        </div>
+                                        <div>
+                                            <p className={`font-black text-sm ${paymentMethod === 'qr' ? 'text-[#1a4d2e]' : 'text-gray-600'}`}>สแกน QR Code</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">ชำระทันทีผ่านแอป</p>
+                                        </div>
+                                    </div>
+                                </label>
                             </div>
                         </div>
-                        <button 
-                            type="submit" 
-                            form="checkout-form"
-                            className="w-full mt-6 py-4 bg-[#305949] text-white font-bold rounded-2xl shadow-lg hover:bg-[#234236] transition-all"
-                        >
-                            ยืนยันการสั่งซื้อ
-                        </button>
+                    </div>
+
+                    {/* ฝั่งขวา: สรุปรายการ (2 ส่วนจาก 5) */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-[#1a4d2e] p-8 md:p-10 rounded-[3rem] text-white shadow-2xl sticky top-28">
+                            <h2 className="text-2xl font-black mb-8 border-b border-white/10 pb-4">สรุปคำสั่งซื้อ</h2>
+                            <div className="space-y-4 mb-8 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {cartItems.map((item) => (
+                                    <div key={item.id} className="flex gap-4 items-center group">
+                                        {/* ✅ Rule 31: รูปภาพสินค้า */}
+                                        <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 bg-white/10 p-1">
+                                            <img src={getImageUrl(item.thumbnail || item.image)} alt={item.title} className="w-full h-full object-contain" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-bold text-sm truncate">{item.title}</h4>
+                                            <p className="text-[10px] text-white/50 font-black">จำนวน: {item.quantity} x {formatPrice(item.price)}</p>
+                                        </div>
+                                        <p className="font-black text-sm">{formatPrice(item.price * item.quantity)}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="space-y-4 pt-6 border-t border-white/10">
+                                <div className="flex justify-between text-sm font-bold text-white/60 uppercase tracking-widest">
+                                    <span>ยอดรวมสินค้า</span>
+                                    <span>{formatPrice(getTotalPrice())}</span>
+                                </div>
+                                <div className="flex justify-between text-sm font-bold text-white/60 uppercase tracking-widest">
+                                    <span>ค่าจัดส่ง</span>
+                                    <span className="text-green-400">FREE</span>
+                                </div>
+                                <div className="pt-4 flex justify-between items-end">
+                                    <div>
+                                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Grand Total</p>
+                                        <span className="text-3xl font-black">ยอดสุทธิ</span>
+                                    </div>
+                                    <span className="text-4xl font-black">{formatPrice(getTotalPrice())}</span>
+                                </div>
+                                {/* ✅ Rule 50: หมายเหตุภาษี */}
+                                <p className="text-[9px] text-center text-white/30 font-bold uppercase tracking-widest pt-2">
+                                    * ราคานี้รวมภาษีมูลค่าเพิ่ม 7% แล้ว
+                                </p>
+                            </div>
+
+                            {/* ✅ Rule 13: ปุ่มสถานะการทำงาน */}
+                            <button 
+                                type="submit" 
+                                form="checkout-form" 
+                                disabled={loading} 
+                                className={`w-full mt-10 py-5 rounded-[1.5rem] font-black text-lg transition-all shadow-xl flex items-center justify-center gap-3 transform active:scale-95 ${loading ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-[#1a4d2e] hover:shadow-green-900/20 hover:-translate-y-1'}`}
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-[#1a4d2e] border-t-transparent rounded-full animate-spin"></div>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        ยืนยันการสั่งซื้อ <ArrowRight size={20} />
+                                    </>
+                                )}
+                            </button>
+
+                            <div className="mt-6 flex items-center justify-center gap-2 text-[10px] font-black text-white/30 uppercase tracking-widest">
+                                <ShieldCheck size={14} /> 100% Secure & Encrypted Payment
+                            </div>
+                        </div>
                     </div>
                 </div>
-
             </div>
         </div>
     );

@@ -1,71 +1,81 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  // ใช้ localStorage อย่างระมัดระวัง
-  const [token, setToken] = useState(() => localStorage.getItem('token')); 
-  const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-  const fetchUser = async (authToken) => {
-    try {
-        const res = await fetch('/api/profile/', {
-            headers: { 
-                'Authorization': `Token ${authToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (res.ok) {
-            const data = await res.json();
-            setUser(data); 
-        } else {
-            // Token หมดอายุหรือ Invalid -> เคลียร์ทิ้ง
-            console.error("Token invalid, logging out...");
-            logout();
+    // ✅ Rule: Backend Port 8000
+    const API_BASE_URL = "http://localhost:8000";
+
+    const getToken = () => localStorage.getItem('token');
+
+    const fetchUser = async (tokenOverride) => {
+        const token = tokenOverride || getToken();
+
+        if (!token) {
+            setLoading(false);
+            return;
         }
-    } catch (error) {
-        console.error("Failed to fetch user:", error);
-        // กรณี Network Error อาจจะไม่ Logout ทันที แต่แจ้งเตือน
-        // แต่เพื่อความปลอดภัยในเคสนี้ ให้ Logout ไปก่อน
-        logout();
-    } finally {
-        setLoading(false); // ✅ จบการโหลดเสมอ ไม่ว่าจะสำเร็จหรือไม่
-    }
-  };
 
-  useEffect(() => {
-    if (token) {
-        fetchUser(token);
-    } else {
-        setLoading(false); // ถ้าไม่มี Token ก็ไม่ต้องโหลดอะไร
-    }
-  }, [token]);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/user/profile/`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
 
-  const login = (newToken) => {
-      localStorage.setItem('token', newToken);
-      setToken(newToken);
-      // fetchUser จะทำงานเองผ่าน useEffect เมื่อ token เปลี่ยน
-  };
-  
-  const logout = () => {
-      // เรียก API Logout ฝั่ง Server ด้วย (Optional แต่แนะนำ)
-      fetch('/api/logout/', {
-          method: 'POST',
-          headers: { 'Authorization': `Token ${token}` }
-      }).catch(err => console.warn("Logout server error", err));
+            if (response.ok) {
+                const userData = await response.json();
 
-      localStorage.removeItem('token');
-      setToken(null);
-      setUser(null);
-  };
+                // ✅ Rule: Backend may return role (display) and role_code (value)
+                // We should use role_code for logic if available
+                const userRole = userData.role_code || userData.role;
+                if (userRole) userData.role = userRole.toLowerCase();
 
-  return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
-      {!loading && children} {/* ✅ ป้องกันการ render App ก่อนเช็ค User เสร็จ */}
-    </AuthContext.Provider>
-  );
+                setUser(userData);
+            } else {
+                // ✅ Rule: เจอ 401 (Token หมดอายุ) ให้ Logout ทันที
+                console.error("Session expired");
+                logout();
+            }
+        } catch (error) {
+            console.error("Error fetching user:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchUser();
+    }, []);
+
+    const login = (token, userData) => {
+        localStorage.setItem('token', token);
+        if (userData) {
+            const userRole = userData.role_code || userData.role;
+            if (userRole) userData.role = userRole.toLowerCase();
+            setUser(userData);
+        } else {
+            fetchUser(token);
+        }
+    };
+
+    // ✅ Rule: Clear ข้อมูลให้เกลี้ยงตอน Logout
+    const logout = () => {
+        localStorage.removeItem('token');
+        setUser(null);
+        window.location.href = '/login';
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, loading, login, logout, fetchUser, token: getToken() }}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
 
 export const useAuth = () => useContext(AuthContext);

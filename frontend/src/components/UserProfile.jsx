@@ -1,150 +1,147 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
-import { Mail, Phone, MapPin, Edit2, Save, LogOut, Camera, User, X } from 'lucide-react';
+import { Camera, Save, User, Mail, Phone, MapPin, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { getImageUrl } from '../utils/formatUtils';
 
 function UserProfile() {
-  const { token, logout } = useAuth();
-  const [profile, setProfile] = useState(null);
+  const { user, token, fetchUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({});
+  const [loading, setLoading] = useState(false);
+  
+  const [formData, setFormData] = useState({ username: '', email: '', phone: '', address: '' });
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // ดึงข้อมูลโปรไฟล์
+  const API_BASE_URL = "http://localhost:8000";
+
   useEffect(() => {
-    fetch('/api/profile/', {
-      headers: { 'Authorization': `Token ${token}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-        setProfile(data);
-        setFormData(data);
-    })
-    .catch(() => Swal.fire('Error', 'โหลดข้อมูลไม่สำเร็จ', 'error'));
-  }, [token]);
-
-  // จัดการเมื่อเลือกไฟล์รูป
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreviewImage(URL.createObjectURL(file));
+    if (user) {
+      setFormData({
+        username: user.username || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        address: user.address || ''
+      });
     }
-  };
+  }, [user]);
 
-  // บันทึกข้อมูล
-  const handleSave = async () => {
-    const data = new FormData();
-    data.append('username', formData.username); 
-    data.append('email', formData.email);
-    data.append('phone', formData.phone || '');
-    data.append('address', formData.address || ''); // ✅ ส่งที่อยู่ไปด้วย
-    if (selectedFile) data.append('avatar', selectedFile);
-
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setLoading(true); // ✅ Rule: เริ่ม Loading
     try {
-        Swal.showLoading();
-        const res = await fetch('/api/profile/', {
-            method: 'PUT', // ✅ ใช้ PUT สำหรับแก้ไข
-            headers: { 'Authorization': `Token ${token}` },
-            body: data
-        });
-        
-        if (res.ok) {
-            await Swal.fire('สำเร็จ', 'อัปเดตข้อมูลเรียบร้อย', 'success');
-            window.location.reload(); // รีโหลดหน้าเพื่อแสดงข้อมูลใหม่
-        } else {
-            throw new Error("Update failed");
-        }
-    } catch (err) {
-        Swal.fire('Error', 'อัปเดตข้อมูลไม่สำเร็จ (ชื่อผู้ใช้อาจซ้ำ)', 'error');
+      const data = new FormData();
+      data.append('username', formData.username);
+      data.append('phone', formData.phone);
+      data.append('address', formData.address);
+      if (selectedFile) data.append('avatar', selectedFile);
+
+      const res = await fetch(`${API_BASE_URL}/api/profile/`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Token ${token}` },
+        body: data
+      });
+
+      if (res.ok) {
+        await fetchUser();
+        setIsEditing(false);
+        Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', confirmButtonColor: '#1a4d2e', timer: 1500 });
+      } else {
+        throw new Error('บันทึกไม่สำเร็จ');
+      }
+    } catch (error) {
+      Swal.fire('Error', 'เกิดข้อผิดพลาด', 'error');
+    } finally {
+      setLoading(false); // ✅ Rule: จบ Loading
     }
   };
 
-  if (!profile) return <div className="py-20 text-center">กำลังโหลดข้อมูล...</div>;
+  if (!user) return <div className="p-20 text-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-[#F9F9F7] py-12 px-4">
-      <div className="max-w-4xl mx-auto bg-white rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F5F5F5] py-10 px-4 flex justify-center pt-24">
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
         
-        {/* Left: Avatar */}
-        <div className="w-full md:w-1/3 bg-[#305949] p-10 text-white flex flex-col items-center justify-center text-center relative">
-            <div className="w-32 h-32 rounded-full border-4 border-white/20 mb-4 overflow-hidden relative group bg-white/10 flex items-center justify-center">
-                {previewImage || profile.avatar ? (
-                    <img src={previewImage || profile.avatar} className="w-full h-full object-cover" alt="Profile" />
-                ) : (
-                    <User size={48} className="text-white/50" />
-                )}
-                {isEditing && (
-                    <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition duration-300">
-                        <Camera size={24} className="mb-1" />
-                        <span className="text-[10px]">เปลี่ยนรูป</span>
-                        <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
-                    </label>
-                )}
-            </div>
-            
-            {isEditing ? (
-                 <input 
-                    type="text" 
-                    value={formData.username || ''} 
-                    onChange={e => setFormData({...formData, username: e.target.value})}
-                    className="bg-white/10 border border-white/30 rounded px-2 py-1 text-center text-white font-bold w-full focus:outline-none focus:bg-white/20"
-                 />
-            ) : (
-                <h2 className="text-2xl font-bold">{profile.username}</h2>
-            )}
-            
-            <span className="bg-white/20 px-3 py-1 rounded-full text-xs mt-2 uppercase tracking-wider font-bold">
-                {profile.role}
-            </span>
-            <button onClick={logout} className="mt-8 text-sm text-white/70 hover:text-white underline flex items-center gap-2">
-                <LogOut size={16} /> ออกจากระบบ
-            </button>
-        </div>
+        {/* ✅ Rule: ปุ่มย้อนกลับ */}
+        <Link to="/shop" className="absolute top-4 left-4 z-10 bg-black/20 hover:bg-black/30 text-white px-3 py-1.5 rounded-full text-sm font-bold backdrop-blur-md flex items-center gap-1 transition-all">
+            <ArrowLeft size={16}/> กลับ
+        </Link>
 
-        {/* Right: Info Form */}
-        <div className="flex-1 p-10">
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-[#263A33] flex items-center gap-2">
-                    <User size={24} /> ข้อมูลส่วนตัว
-                </h3>
-                {!isEditing ? (
-                    <button onClick={() => setIsEditing(true)} className="text-[#305949] font-bold hover:underline flex items-center gap-1">
-                        <Edit2 size={16} /> แก้ไขข้อมูล
-                    </button>
-                ) : (
-                    <div className="flex gap-3">
-                        <button onClick={() => setIsEditing(false)} className="text-gray-400 font-bold hover:text-gray-600 flex items-center gap-1">
-                            <X size={16} /> ยกเลิก
-                        </button>
-                        <button onClick={handleSave} className="bg-[#305949] text-white px-4 py-1.5 rounded-lg font-bold shadow-sm flex items-center gap-2">
-                            <Save size={16} /> บันทึก
-                        </button>
+        <div className="h-32 bg-[#1a4d2e]"></div>
+
+        <div className="px-8 pb-8">
+            <div className="relative -mt-16 mb-6 flex flex-col items-center">
+                <div className="relative group">
+                    <img 
+                        src={previewImage || getImageUrl(user.avatar)} 
+                        className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md bg-gray-100"
+                        alt="Profile"
+                        onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
+                    />
+                    {isEditing && (
+                        <label className="absolute bottom-1 right-1 bg-[#1a4d2e] text-white p-2 rounded-full cursor-pointer hover:bg-[#143d24] border-2 border-white shadow-sm transition-transform hover:scale-110">
+                            <Camera size={18} />
+                            <input type="file" className="hidden" onChange={(e) => {
+                                if(e.target.files[0]) {
+                                    setSelectedFile(e.target.files[0]);
+                                    setPreviewImage(URL.createObjectURL(e.target.files[0]));
+                                }
+                            }} />
+                        </label>
+                    )}
+                </div>
+                <h2 className="mt-3 text-2xl font-bold text-gray-800">{user.username}</h2>
+                <span className="text-gray-500 font-medium bg-gray-100 px-3 py-0.5 rounded-full text-sm mt-1 uppercase">{user.role}</span>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4">
+                {/* ... (Fields เหมือนเดิม) ... */}
+                {/* ✅ Rule: Email Read-only */}
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">อีเมล</label>
+                    <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-3 cursor-not-allowed">
+                        <Mail size={18} className="text-gray-400"/>
+                        <input type="email" value={formData.email} disabled className="bg-transparent w-full outline-none text-sm font-bold text-gray-500 cursor-not-allowed" />
                     </div>
-                )}
-            </div>
+                </div>
 
-            <div className="space-y-4">
-                <div>
-                    <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><User size={14} /> ชื่อผู้ใช้</label>
-                    <input type="text" disabled={!isEditing} value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">เบอร์โทรศัพท์</label>
+                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
+                        <Phone size={18} className="text-gray-400"/>
+                        <input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" placeholder="-" />
+                    </div>
                 </div>
-                <div>
-                    <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><Mail size={14} /> อีเมล</label>
-                    <input type="text" disabled={!isEditing} value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
+                
+                 {/* ... Address Field ... */}
+                 <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">ที่อยู่จัดส่ง</label>
+                    <div className="flex gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
+                        <MapPin size={18} className="text-gray-400 mt-0.5"/>
+                        <textarea rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none" placeholder="ระบุที่อยู่..."></textarea>
+                    </div>
                 </div>
-                <div>
-                    <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><Phone size={14} /> เบอร์โทรศัพท์</label>
-                    <input type="text" disabled={!isEditing} value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition" />
+
+                <div className="pt-6 flex justify-center gap-3">
+                    {!isEditing ? (
+                        <button type="button" onClick={() => setIsEditing(true)} className="w-full md:w-auto px-8 py-3 bg-[#1a4d2e] text-white rounded-xl font-bold hover:bg-[#143d24] transition-all shadow-md">
+                            แก้ไขข้อมูล
+                        </button>
+                    ) : (
+                        <>
+                            <button type="button" onClick={() => {setIsEditing(false); setPreviewImage(null);}} className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors">
+                                ยกเลิก
+                            </button>
+                            {/* ✅ Rule: ปุ่ม Loading state */}
+                            <button type="submit" disabled={loading} className={`px-8 py-3 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1a4d2e] text-white hover:bg-[#143d24]'}`}>
+                                {loading ? 'กำลังบันทึก...' : <><Save size={18} /> บันทึก</>}
+                            </button>
+                        </>
+                    )}
                 </div>
-                <div>
-                    <label className="text-sm text-gray-400 mb-1 flex items-center gap-2"><MapPin size={14} /> ที่อยู่จัดส่ง</label>
-                    <textarea rows="3" disabled={!isEditing} value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 disabled:opacity-60 focus:ring-2 focus:ring-[#305949]/20 transition"></textarea>
-                </div>
-            </div>
+            </form>
         </div>
-
       </div>
     </div>
   );
