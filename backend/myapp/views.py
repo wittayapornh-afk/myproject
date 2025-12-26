@@ -272,7 +272,9 @@ def register_api(request):
     username = data.get('username')
     password = data.get('password')
     email = data.get('email')
-    phone = data.get('phone', '') # รับเบอร์โทร
+    phone = data.get('phone', '') 
+    first_name = data.get('first_name', '') # รับชื่อจริง
+    last_name = data.get('last_name', '')   # รับนามสกุล
     
     if User.objects.filter(username=username).exists():
         return Response({"error": "Username already exists"}, status=400)
@@ -280,8 +282,10 @@ def register_api(request):
     try:
         # สร้าง User หลัก
         user = User.objects.create_user(username=username, password=password, email=email)
-        user.role = 'new_user' # Default role updated to new_user
+        user.role = 'new_user' 
         user.phone = phone
+        user.first_name = first_name # บันทึกชื่อจริง
+        user.last_name = last_name   # บันทึกนามสกุล
         
         # ถ้ารูปถูกส่งมาด้วย ให้บันทึกลง profile -> user model
         if 'avatar' in request.FILES:
@@ -307,8 +311,16 @@ def login_api(request):
         token, _ = Token.objects.get_or_create(user=user)
         return Response({
             "token": token.key,
+            "id": user.id,
+            "username": user.username,
             "role": user.role,
-            "username": user.username
+            "role_code": user.role,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "phone": user.phone,
+            "address": user.address,
+            "avatar": user.image.url if user.image else ""
         })
     return Response({"error": "Invalid credentials"}, status=400)
 
@@ -357,7 +369,20 @@ def user_profile_api(request):
         
         user.save()
 
-        return Response({"message": "Profile updated successfully"})
+        # Return full user object to update frontend immediately
+        return Response({
+            "message": "Profile updated successfully",
+            "id": user.id,
+            "username": user.username,
+            "role": user.get_role_display(),
+            "role_code": user.role,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "phone": user.phone,
+            "address": user.address,
+            "avatar": user.image.url if user.image else ""
+        })
 
 # ==========================================
 # 📦 Order & Stats

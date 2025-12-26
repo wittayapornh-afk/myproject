@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { getImageUrl } from '../utils/formatUtils';
 
 function UserProfile() {
-  const { user, token, fetchUser } = useAuth();
+  const { user, token, fetchUser, login } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -55,9 +55,26 @@ function UserProfile() {
       });
 
       if (res.ok) {
-        await fetchUser();
+        const responseData = await res.json();
+
+        if (login) {
+          // Use authoritative data from backend to update state
+          login(token, responseData);
+
+          // 2. Call fetchUser to sync with backend (with cache busting)
+          await fetchUser();
+        }
         setIsEditing(false);
-        Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', confirmButtonColor: '#1a4d2e', timer: 1500 });
+        Swal.fire({
+          icon: 'success',
+          title: 'บันทึกสำเร็จ',
+          text: 'ข้อมูลได้รับการอัปเดตแล้ว',
+          confirmButtonColor: '#1a4d2e',
+          timer: 1500
+        }).then(() => {
+          // Optional: Reload page to ensure everything is fresh if state sync fails
+          // window.location.reload(); 
+        });
       } else {
         throw new Error('บันทึกไม่สำเร็จ');
       }

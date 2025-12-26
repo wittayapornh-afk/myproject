@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/user/profile/`, {
+            const response = await fetch(`${API_BASE_URL}/api/user/profile/?_=${new Date().getTime()}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Token ${token}`,
