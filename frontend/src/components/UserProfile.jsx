@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { Camera, Save, User, Mail, Phone, MapPin, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getImageUrl } from '../utils/formatUtils';
+import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
 
 function UserProfile() {
   const { user, token, fetchUser, login } = useAuth();
@@ -102,7 +102,7 @@ function UserProfile() {
           <div className="relative -mt-16 mb-6 flex flex-col items-center">
             <div className="relative group">
               <img
-                src={previewImage || getImageUrl(user.avatar)}
+                src={previewImage || getUserAvatar(user.avatar)}
                 className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md bg-gray-100"
                 alt="Profile"
                 onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
