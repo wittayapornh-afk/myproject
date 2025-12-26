@@ -19,7 +19,16 @@ export const formatDate = (dateString) => {
 export const getImageUrl = (path) => {
     const API_BASE_URL = "http://localhost:8000";
     // เปลี่ยนจาก via.placeholder.com เป็น placehold.co
-    if (!path) return "https://placehold.co/500x500?text=No+Image"; 
+    if (!path) return "https://placehold.co/500x500?text=No+Image";
     if (path.startsWith("http")) return path;
     return `${API_BASE_URL}${path}`;
+};
+
+export const getUserAvatar = (path) => {
+    // User requested specific default image (Man in suit)
+    // Using external URL as local file copy failed
+    const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+
+    if (!path) return DEFAULT_AVATAR;
+    return getImageUrl(path);
 };
