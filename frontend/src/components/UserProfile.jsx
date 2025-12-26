@@ -9,8 +9,15 @@ function UserProfile() {
   const { user, token, fetchUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  
-  const [formData, setFormData] = useState({ username: '', email: '', phone: '', address: '' });
+
+  const [formData, setFormData] = useState({
+    username: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    address: ''
+  });
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -20,6 +27,8 @@ function UserProfile() {
     if (user) {
       setFormData({
         username: user.username || '',
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
         email: user.email || '',
         phone: user.phone || '',
         address: user.address || ''
@@ -33,11 +42,13 @@ function UserProfile() {
     try {
       const data = new FormData();
       data.append('username', formData.username);
+      data.append('first_name', formData.first_name);
+      data.append('last_name', formData.last_name);
       data.append('phone', formData.phone);
       data.append('address', formData.address);
       if (selectedFile) data.append('avatar', selectedFile);
 
-      const res = await fetch(`${API_BASE_URL}/api/profile/`, {
+      const res = await fetch(`${API_BASE_URL}/api/user/profile/`, {
         method: 'PUT',
         headers: { 'Authorization': `Token ${token}` },
         body: data
@@ -62,85 +73,108 @@ function UserProfile() {
   return (
     <div className="min-h-screen bg-[#F5F5F5] py-10 px-4 flex justify-center pt-24">
       <div className="w-full max-w-2xl bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
-        
+
         {/* ✅ Rule: ปุ่มย้อนกลับ */}
         <Link to="/shop" className="absolute top-4 left-4 z-10 bg-black/20 hover:bg-black/30 text-white px-3 py-1.5 rounded-full text-sm font-bold backdrop-blur-md flex items-center gap-1 transition-all">
-            <ArrowLeft size={16}/> กลับ
+          <ArrowLeft size={16} /> กลับ
         </Link>
 
         <div className="h-32 bg-[#1a4d2e]"></div>
 
         <div className="px-8 pb-8">
-            <div className="relative -mt-16 mb-6 flex flex-col items-center">
-                <div className="relative group">
-                    <img 
-                        src={previewImage || getImageUrl(user.avatar)} 
-                        className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md bg-gray-100"
-                        alt="Profile"
-                        onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
-                    />
-                    {isEditing && (
-                        <label className="absolute bottom-1 right-1 bg-[#1a4d2e] text-white p-2 rounded-full cursor-pointer hover:bg-[#143d24] border-2 border-white shadow-sm transition-transform hover:scale-110">
-                            <Camera size={18} />
-                            <input type="file" className="hidden" onChange={(e) => {
-                                if(e.target.files[0]) {
-                                    setSelectedFile(e.target.files[0]);
-                                    setPreviewImage(URL.createObjectURL(e.target.files[0]));
-                                }
-                            }} />
-                        </label>
-                    )}
-                </div>
-                <h2 className="mt-3 text-2xl font-bold text-gray-800">{user.username}</h2>
-                <span className="text-gray-500 font-medium bg-gray-100 px-3 py-0.5 rounded-full text-sm mt-1 uppercase">{user.role}</span>
+          <div className="relative -mt-16 mb-6 flex flex-col items-center">
+            <div className="relative group">
+              <img
+                src={previewImage || getImageUrl(user.avatar)}
+                className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md bg-gray-100"
+                alt="Profile"
+                onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
+              />
+              {isEditing && (
+                <label className="absolute bottom-1 right-1 bg-[#1a4d2e] text-white p-2 rounded-full cursor-pointer hover:bg-[#143d24] border-2 border-white shadow-sm transition-transform hover:scale-110">
+                  <Camera size={18} />
+                  <input type="file" className="hidden" onChange={(e) => {
+                    if (e.target.files[0]) {
+                      setSelectedFile(e.target.files[0]);
+                      setPreviewImage(URL.createObjectURL(e.target.files[0]));
+                    }
+                  }} />
+                </label>
+              )}
+            </div>
+            <h2 className="mt-3 text-2xl font-bold text-gray-800">{user.username}</h2>
+            <span className="text-gray-500 font-medium bg-gray-100 px-3 py-0.5 rounded-full text-sm mt-1 uppercase">{user.role}</span>
+          </div>
+
+          <form onSubmit={handleSave} className="space-y-4">
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">ชื่อผู้ใช้ (Username)</label>
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
+                <User size={18} className="text-gray-400" />
+                <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" />
+              </div>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4">
-                {/* ... (Fields เหมือนเดิม) ... */}
-                {/* ✅ Rule: Email Read-only */}
-                <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">อีเมล</label>
-                    <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-3 cursor-not-allowed">
-                        <Mail size={18} className="text-gray-400"/>
-                        <input type="email" value={formData.email} disabled className="bg-transparent w-full outline-none text-sm font-bold text-gray-500 cursor-not-allowed" />
-                    </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">ชื่อจริง</label>
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
+                  <input type="text" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" placeholder="ชื่อจริง" />
                 </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">นามสกุล</label>
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
+                  <input type="text" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" placeholder="นามสกุล" />
+                </div>
+              </div>
+            </div>
 
-                <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">เบอร์โทรศัพท์</label>
-                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
-                        <Phone size={18} className="text-gray-400"/>
-                        <input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" placeholder="-" />
-                    </div>
-                </div>
-                
-                 {/* ... Address Field ... */}
-                 <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">ที่อยู่จัดส่ง</label>
-                    <div className="flex gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
-                        <MapPin size={18} className="text-gray-400 mt-0.5"/>
-                        <textarea rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none" placeholder="ระบุที่อยู่..."></textarea>
-                    </div>
-                </div>
+            {/* ✅ Rule: Email Read-only */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">อีเมล</label>
+              <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-3 cursor-not-allowed">
+                <Mail size={18} className="text-gray-400" />
+                <input type="email" value={formData.email} disabled className="bg-transparent w-full outline-none text-sm font-bold text-gray-500 cursor-not-allowed" />
+              </div>
+            </div>
 
-                <div className="pt-6 flex justify-center gap-3">
-                    {!isEditing ? (
-                        <button type="button" onClick={() => setIsEditing(true)} className="w-full md:w-auto px-8 py-3 bg-[#1a4d2e] text-white rounded-xl font-bold hover:bg-[#143d24] transition-all shadow-md">
-                            แก้ไขข้อมูล
-                        </button>
-                    ) : (
-                        <>
-                            <button type="button" onClick={() => {setIsEditing(false); setPreviewImage(null);}} className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors">
-                                ยกเลิก
-                            </button>
-                            {/* ✅ Rule: ปุ่ม Loading state */}
-                            <button type="submit" disabled={loading} className={`px-8 py-3 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1a4d2e] text-white hover:bg-[#143d24]'}`}>
-                                {loading ? 'กำลังบันทึก...' : <><Save size={18} /> บันทึก</>}
-                            </button>
-                        </>
-                    )}
-                </div>
-            </form>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">เบอร์โทรศัพท์</label>
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
+                <Phone size={18} className="text-gray-400" />
+                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700" placeholder="-" />
+              </div>
+            </div>
+
+            {/* ... Address Field ... */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">ที่อยู่จัดส่ง</label>
+              <div className="flex gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
+                <MapPin size={18} className="text-gray-400 mt-0.5" />
+                <textarea rows="2" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none" placeholder="ระบุที่อยู่..."></textarea>
+              </div>
+            </div>
+
+            <div className="pt-6 flex justify-center gap-3">
+              {!isEditing ? (
+                <button type="button" onClick={() => setIsEditing(true)} className="w-full md:w-auto px-8 py-3 bg-[#1a4d2e] text-white rounded-xl font-bold hover:bg-[#143d24] transition-all shadow-md">
+                  แก้ไขข้อมูล
+                </button>
+              ) : (
+                <>
+                  <button type="button" onClick={() => { setIsEditing(false); setPreviewImage(null); }} className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors">
+                    ยกเลิก
+                  </button>
+                  {/* ✅ Rule: ปุ่ม Loading state */}
+                  <button type="submit" disabled={loading} className={`px-8 py-3 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1a4d2e] text-white hover:bg-[#143d24]'}`}>
+                    {loading ? 'กำลังบันทึก...' : <><Save size={18} /> บันทึก</>}
+                  </button>
+                </>
+              )}
+            </div>
+          </form>
         </div>
       </div>
     </div>

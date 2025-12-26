@@ -48,4 +48,8 @@ urlpatterns = [
     path('api/admin/orders/', views.admin_orders_api), # ✅ ใช้ชื่อนี้ชื่อเดียว (ลบ admin_orders_list ออก)
     path('api/admin/order_status/<int:order_id>/', views.update_order_status_api),
 
+    # 4. จัดการผู้ใช้งาน (Admin)
+    path('api/admin/user/<int:user_id>/update/', views.admin_update_user_api),
+    path('api/admin/user/<int:user_id>/delete/', views.delete_user_api),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
