@@ -214,6 +214,11 @@ def admin_update_user_api(request, user_id):
         if 'last_name' in data: target_user.last_name = data['last_name']
         if 'phone' in data: target_user.phone = data['phone']
         if 'address' in data: target_user.address = data['address']
+        if 'is_active' in data: 
+            # Prevent self-deactivation
+            if target_user.id == request.user.id and str(data['is_active']).lower() == 'false':
+                 return Response({"error": "ไม่สามารถปิดการใช้งานบัญชีตัวเองได้"}, status=400)
+            target_user.is_active = data['is_active']
         if 'avatar' in request.FILES: target_user.image = request.FILES['avatar'] # Fixed field name to image
 
         target_user.save()
@@ -473,7 +478,10 @@ def get_all_users(request):
         "address": u.address,
         "role": u.get_role_display(), 
         "role_code": u.role,
-        "avatar": u.image.url if u.image else None 
+        "avatar": u.image.url if u.image else None,
+        "is_active": u.is_active,
+        "is_superuser": u.is_superuser,
+        "is_staff": u.is_staff
     } for u in users]
     return Response(data)
 
