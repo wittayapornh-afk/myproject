@@ -122,7 +122,7 @@ export default function Navbar() {
                   {hasAdminPanelAccess && (
                     <Link to="/admin/dashboard" className="flex items-center gap-4 px-5 py-3.5 text-sm font-black text-[#1a4d2e] hover:bg-green-50 transition-colors">
                       <div className="p-2 bg-green-100 rounded-xl"><LayoutDashboard size={18} /></div>
-                      ADMIN PANEL
+                      {user.role === 'seller' ? 'DASHBOARD' : 'ADMIN PANEL'}
                     </Link>
                   )}
 

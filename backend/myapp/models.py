@@ -89,6 +89,7 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now) # DB has created_at
     updated_at = models.DateTimeField(auto_now=True)
+    seller = models.ForeignKey('User', on_delete=models.CASCADE, null=True, blank=True, related_name='products', db_column='seller_id')
 
     class Meta:
         db_table = 'products'
