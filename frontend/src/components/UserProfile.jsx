@@ -48,7 +48,7 @@ function UserProfile() {
       data.append('address', formData.address);
       if (selectedFile) data.append('avatar', selectedFile);
 
-      const res = await fetch(`${API_BASE_URL}/api/user/profile/`, {
+      const res = await fetch(`${API_BASE_URL}/api/profile/`, {
         method: 'PUT',
         headers: { 'Authorization': `Token ${token}` },
         body: data

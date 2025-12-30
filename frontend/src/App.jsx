@@ -84,25 +84,25 @@ function App() {
                   {/* --- 👤 Customer Routes (ต้อง Login) --- */}
                   {/* ✅ Rule 12: allowedRoles รองรับหลายรูปแบบ */}
                   <Route path="/profile" element={
-                    <ProtectedRoute allowedRoles={['user', 'customer', 'admin', 'super_admin', 'seller']}>
+                    <ProtectedRoute allowedRoles={['user', 'customer', 'new_user', 'admin', 'super_admin', 'seller']}>
                       <UserProfile />
                     </ProtectedRoute>
                   } />
 
                   <Route path="/order-history" element={
-                    <ProtectedRoute allowedRoles={['user', 'customer', 'admin', 'super_admin', 'seller']}>
+                    <ProtectedRoute allowedRoles={['user', 'customer', 'new_user', 'admin', 'super_admin', 'seller']}>
                       <OrderHistory />
                     </ProtectedRoute>
                   } />
 
                   <Route path="/checkout" element={
-                    <ProtectedRoute allowedRoles={['user', 'customer', 'admin', 'super_admin', 'seller']}>
+                    <ProtectedRoute allowedRoles={['user', 'customer', 'new_user', 'admin', 'super_admin', 'seller']}>
                       <CheckoutPage />
                     </ProtectedRoute>
                   } />
 
                   <Route path="/payment" element={
-                    <ProtectedRoute allowedRoles={['user', 'customer', 'admin', 'super_admin', 'seller']}>
+                    <ProtectedRoute allowedRoles={['user', 'customer', 'new_user', 'admin', 'super_admin', 'seller']}>
                       <PaymentPage />
                     </ProtectedRoute>
                   } />
