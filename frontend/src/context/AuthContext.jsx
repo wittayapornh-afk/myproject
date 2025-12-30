@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/user/profile/?_=${new Date().getTime()}`, {
+            const response = await fetch(`${API_BASE_URL}/api/profile/?_=${new Date().getTime()}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Token ${token}`,
@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
                 // ✅ Rule: Only logout if token is explicitly invalid (401)
                 if (response.status === 401) {
                     console.error("Session expired (401). Logging out.");
-                    logout(); 
+                    logout();
                 } else {
                     console.warn(`Failed to fetch profile (Status: ${response.status}). Keeping session.`);
                 }
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
         if (userData) {
             const userRole = userData.role_code || userData.role;
             if (userRole) userData.role = userRole.toLowerCase();
-            
+
             setUser(userData);
             localStorage.setItem('user', JSON.stringify(userData)); // ✅ Cache user
         } else {

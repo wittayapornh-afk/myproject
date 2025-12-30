@@ -4,13 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice, formatDate, getImageUrl } from '../utils/formatUtils';
 // ✅ รวมไอคอนทุกตัวที่ต้องใช้ไว้ที่นี่ที่เดียว ห้าม import ซ้ำด้านล่างอีก
-import { 
-    Package, 
-    Calendar, 
-    CalendarDays, 
-    Clock, 
-    ChevronRight, 
-    ShoppingBag, 
+import {
+    Package,
+    Calendar,
+    CalendarDays,
+    Clock,
+    ChevronRight,
+    ShoppingBag,
     ChevronLeft,
     AlertCircle
 } from 'lucide-react';
@@ -30,7 +30,7 @@ function OrderHistory() {
             }
 
             try {
-                const response = await axios.get('http://localhost:8000/api/orders/', {
+                const response = await axios.get('http://localhost:8000/api/my-orders/', {
                     headers: {
                         'Authorization': `Token ${token}`
                     }
@@ -58,8 +58,8 @@ function OrderHistory() {
     return (
         <div className="min-h-screen bg-[#F9F9F7] py-12 px-4 md:px-8 pt-28 font-sans">
             <div className="max-w-4xl mx-auto">
-                <button 
-                    onClick={() => navigate('/')} 
+                <button
+                    onClick={() => navigate('/')}
                     className="flex items-center gap-2 text-gray-500 hover:text-[#1a4d2e] transition-colors mb-8 font-bold"
                 >
                     <ChevronLeft size={20} /> กลับสู่หน้าหลัก
@@ -73,8 +73,8 @@ function OrderHistory() {
                     <div className="bg-white p-12 rounded-[2.5rem] text-center shadow-sm border border-gray-100">
                         <Package size={64} className="mx-auto text-gray-200 mb-4" />
                         <h3 className="text-xl font-bold text-gray-400">ยังไม่มีรายการสั่งซื้อ</h3>
-                        <button 
-                            onClick={() => navigate('/shop')} 
+                        <button
+                            onClick={() => navigate('/shop')}
                             className="mt-6 bg-[#1a4d2e] text-white px-8 py-3 rounded-2xl font-bold hover:bg-[#263A33] transition-all"
                         >
                             เริ่มช้อปปิ้งเลย
@@ -98,10 +98,9 @@ function OrderHistory() {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">สถานะ</p>
-                                            <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter ${
-                                                order.status === 'Completed' ? 'bg-green-100 text-green-700' : 
-                                                order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
-                                            }`}>
+                                            <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter ${order.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                                    order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                                                }`}>
                                                 {order.status}
                                             </span>
                                         </div>
