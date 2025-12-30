@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: db:3306
--- Generation Time: Dec 25, 2025 at 05:17 AM
+-- Generation Time: Dec 29, 2025 at 04:52 AM
 -- Server version: 8.0.44
 -- PHP Version: 8.3.26
 
@@ -36,6 +36,15 @@ CREATE TABLE `admin_logs` (
   `admin_id` bigint NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `admin_logs`
+--
+
+INSERT INTO `admin_logs` (`id`, `action`, `timestamp`, `details`, `ip_address`, `admin_id`) VALUES
+(1, 'Updated user details: admin', '2025-12-26 03:25:56.627443', NULL, NULL, 1),
+(2, 'Updated user details: admin', '2025-12-26 04:00:12.771613', NULL, NULL, 1),
+(3, 'Updated user details: seller', '2025-12-26 07:39:54.313084', NULL, NULL, 1);
+
 -- --------------------------------------------------------
 
 --
@@ -53,7 +62,8 @@ CREATE TABLE `authtoken_token` (
 --
 
 INSERT INTO `authtoken_token` (`key`, `created`, `user_id`) VALUES
-('a6df3a56d030254de9c69ab480d9c2e55eeab716', '2025-12-25 03:07:14.592608', 1);
+('a6df3a56d030254de9c69ab480d9c2e55eeab716', '2025-12-25 03:07:14.592608', 1),
+('f46b991f31adf6e9a31b65ccaa1d35eef20671f9', '2025-12-26 07:39:04.036975', 2);
 
 -- --------------------------------------------------------
 
@@ -1051,7 +1061,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `password`, `username`, `first_name`, `last_name`, `email`, `phone`, `address`, `image`, `role`, `is_active`, `date_joined`, `last_login`, `updated_at`) VALUES
-(1, 'pbkdf2_sha256$1000000$fO3zWGz0f5pSLK2auUroml$by0ySIFOjYjoBbaSqp7IKJho2Vnl0XdQZBJHoMQslw4=', 'admin', '', '', 'admin@gmail.com', '0999999998', NULL, '', 'admin', 1, '2025-12-25 03:07:04.491326', NULL, '2025-12-25 03:07:04.678202');
+(1, 'pbkdf2_sha256$1000000$fO3zWGz0f5pSLK2auUroml$by0ySIFOjYjoBbaSqp7IKJho2Vnl0XdQZBJHoMQslw4=', 'admin', 'ad', 'min', 'admin@gmail.com', '0999999998', '', '', 'admin', 1, '2025-12-25 03:07:04.491326', NULL, '2025-12-26 08:05:29.560453'),
+(2, 'pbkdf2_sha256$1000000$mH9CqyHkMfdMjOsJm88djx$awvFNKyhU9yIg5KLMw350oSbDg5bME+A470RcY+BuZA=', 'seller', 'sel', 'ler', 'seller@gmail.com', '0888888889', '', '', 'seller', 1, '2025-12-26 07:38:54.263464', NULL, '2025-12-26 07:39:54.306349');
 
 -- --------------------------------------------------------
 
@@ -1213,7 +1224,7 @@ ALTER TABLE `users_user_permissions`
 -- AUTO_INCREMENT for table `admin_logs`
 --
 ALTER TABLE `admin_logs`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `auth_group`
@@ -1285,7 +1296,7 @@ ALTER TABLE `reviews`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `users_groups`
@@ -1374,8 +1385,30 @@ ALTER TABLE `users_groups`
 ALTER TABLE `users_user_permissions`
   ADD CONSTRAINT `users_user_permissio_permission_id_6d08dcd2_fk_auth_perm` FOREIGN KEY (`permission_id`) REFERENCES `auth_permission` (`id`),
   ADD CONSTRAINT `users_user_permissions_user_id_92473840_fk_users_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+--
+-- Update for Seller Tracking form Agent
+--
+
+ALTER TABLE `products` 
+ADD COLUMN `seller_id` bigint NULL DEFAULT NULL;
+
+ALTER TABLE `products` 
+ADD CONSTRAINT `fk_products_seller` 
+FOREIGN KEY (`seller_id`) REFERENCES `users` (`id`) 
+ON DELETE CASCADE;
+
+-- Update ALL existing products to belong to Seller (ID 2) "of this one"
+UPDATE `products` SET `seller_id` = 2;
+
+-- Example Insert linking to Seller (User ID 2)
+INSERT INTO `products` 
+(`title`, `description`, `category`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `seller_id`) 
+VALUES 
+('สินค้าใหม่จาก Seller', 'เพิ่มผ่าน SQL โดยตรง', 'general', 500.00, 20, 'MyBrand', '', 0.00, 1, NOW(), NOW(), 2);
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
