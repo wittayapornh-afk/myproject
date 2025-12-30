@@ -22,7 +22,10 @@ urlpatterns = [
     # ==============================
     path('api/products/', views.products_api),
     path('api/categories/', views.categories_api),
-    path('api/product/<int:product_id>/', views.product_detail_api),
+    # ✅ แก้เป็น products (เติม s) ให้ตรงกับ Frontend
+    path('api/products/<int:product_id>/', views.product_detail_api),
+    path('api/submit-review/', views.submit_review), # ✅ เพิ่ม path สำหรับรีวิว
+    path('api/reviews/<int:review_id>/reply/', views.reply_review_api), # ✅ เพิ่ม path สำหรับตอบกลับรีวิว
 
     # ==============================
     # 📦 Order APIs (ลูกค้าสั่งซื้อ)
@@ -45,11 +48,14 @@ urlpatterns = [
 
 
     # 3. จัดการออเดอร์ (Admin)
-    path('api/admin/orders/', views.admin_orders_api), # ✅ ใช้ชื่อนี้ชื่อเดียว (ลบ admin_orders_list ออก)
+    path('api/admin/orders_v2/', views.get_admin_orders), # ✅ Changed URL to fix 405 error
     path('api/admin/order_status/<int:order_id>/', views.update_order_status_api),
 
     # 4. จัดการผู้ใช้งาน (Admin)
     path('api/admin/user/<int:user_id>/update/', views.admin_update_user_api),
     path('api/admin/user/<int:user_id>/delete/', views.delete_user_api),
+
+    # 5. Activity Logs (Admin)
+    path('api/admin/logs/', views.get_admin_logs),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

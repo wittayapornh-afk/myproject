@@ -12,30 +12,134 @@ import { formatPrice, getImageUrl } from '../utils/formatUtils';
 
 function ProductDetail() {
   const { id } = useParams();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin, token: authToken } = useAuth(); // Get token from context (renamed to avoid conflict)
+  const isRestricted = ['admin', 'super_admin', 'seller'].includes(user?.role?.toLowerCase()); // ✅ Restriction Check
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1); 
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [activeImage, setActiveImage] = useState(null); // ✅ State สำหรับรูปที่โชว์อยู่
   
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
+  // ✅ State สำหรับรีวิว
+  const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  // ✅ State สำหรับ Reply (Admin/Seller)
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyText, setReplyText] = useState("");
+
   const API_BASE_URL = "http://localhost:8000";
+
+  const handleSubmitReview = async () => {
+    // ใช้งาน token จาก context แทน localStorage โดยตรง เพื่อความชัวร์
+    // หรือถ้า context ไม่มี token ก็ลอง fallback ไป localStorage
+    const token = authToken || localStorage.getItem('token');
+    if (!token) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'กรุณาเข้าสู่ระบบ',
+            text: 'คุณต้องเข้าสู่ระบบก่อนรีวิวสินค้า',
+            confirmButtonColor: '#1a4d2e'
+        });
+        navigate('/login');
+        return;
+    }
+
+    if (!newReview.comment.trim()) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'กรุณาใส่ข้อความ',
+            text: 'ช่วยเล่าความประทับใจของคุณหน่อยครับ',
+            confirmButtonColor: '#1a4d2e'
+        });
+        return;
+    }
+
+    setSubmitting(true);
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/submit-review/`, {
+            method: 'POST',
+            headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Token ${authToken || localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                  product_id: product.id,
+                  rating: newReview.rating,
+                  comment: newReview.comment
+              })
+          });
+          if (res.ok) {
+              Swal.fire('สำเร็จ', 'รีวิวของคุณถูกบันทึกแล้ว', 'success');
+              setNewReview({ rating: 5, comment: '' });
+              // Reload product to see new review
+              window.location.reload(); 
+          } else {
+              const errorData = await res.json();
+              throw new Error(errorData.error || 'Failed to submit review');
+          }
+      } catch (err) {
+          Swal.fire('ผิดพลาด', err.message, 'error');
+      } finally {
+          setSubmitting(false);
+      }
+  };
+
+  const handleReplySubmit = async (reviewId) => {
+      if (!replyText.trim()) return;
+      try {
+          const res = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/reply/`, {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json', 
+                  'Authorization': `Token ${authToken || localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({ reply_comment: replyText })
+          });
+          if (res.ok) {
+              const data = await res.json();
+              // Optimistic Update
+              const updatedReviews = product.reviews.map(r => 
+                  r.id === reviewId ? { ...r, reply_comment: data.reply_comment, reply_date: data.reply_date } : r
+              );
+              setProduct({ ...product, reviews: updatedReviews });
+              setReplyingTo(null);
+              setReplyText("");
+              Swal.fire({
+                icon: 'success',
+                title: 'ตอบกลับสำเร็จ',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 1500
+              });
+          } else {
+              const errorData = await res.json();
+              Swal.fire("Error", errorData.error || "Failed to reply", "error");
+          }
+      } catch (err) {
+          Swal.fire("Error", err.message || "Something went wrong", "error");
+      }
+  };
+
 
   useEffect(() => {
     window.scrollTo(0, 0);
     setLoading(true);
     setQuantity(1); 
 
-    fetch(`${API_BASE_URL}/api/product/${id}/`) 
+    fetch(`${API_BASE_URL}/api/products/${id}/`) 
       .then(res => {
         if (!res.ok) throw new Error('Not Found');
         return res.json();
       })
       .then(data => {
         setProduct(data);
+        setActiveImage(data.image || data.thumbnail); // ✅ Set main image as default
         setLoading(false);
         // ✅ ดึงสินค้าแนะนำ (หมวดเดียวกัน)
         fetchRelatedProducts(data.category);
@@ -50,12 +154,24 @@ function ProductDetail() {
   const fetchRelatedProducts = (category) => {
     // สมมติว่า Backend รองรับการ filter ?category=...
     fetch(`${API_BASE_URL}/api/products/?category=${encodeURIComponent(category)}&page_size=4`)
-      .then(res => res.json())
+      .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch related');
+          return res.json();
+      })
       .then(data => {
         const items = data.results || data;
-        // กรองตัวปัจจุบันออก
-        const filtered = items.filter(item => item.id !== parseInt(id)).slice(0, 4);
-        setRelatedProducts(filtered);
+        if (Array.isArray(items)) {
+             // กรองตัวปัจจุบันออก
+            const filtered = items.filter(item => item.id !== parseInt(id)).slice(0, 4);
+            setRelatedProducts(filtered);
+        } else {
+            console.warn("Related products API did not return an array:", data);
+            setRelatedProducts([]);
+        }
+      })
+      .catch(err => {
+          console.error("Error fetching related products:", err);
+          // ไม่ต้องทำอะไร ปล่อยให้ relatedProducts เป็น [] (ค่า default)
       });
   };
 
@@ -96,14 +212,37 @@ function ProductDetail() {
 
         <div className="bg-white rounded-[3rem] shadow-sm flex flex-col md:flex-row overflow-hidden border border-gray-100 mb-12">
           {/* Image */}
-          <div className="md:w-1/2 bg-gray-50 p-10 flex items-center justify-center relative">
-             <img src={getImageUrl(product.image || product.thumbnail)} className={`max-h-[500px] object-contain drop-shadow-2xl ${isOutOfStock ? 'grayscale opacity-50' : ''}`} alt="" />
+          <div className="md:w-1/2 bg-gray-50 p-10 flex flex-col items-center justify-center relative">
+             <img src={getImageUrl(activeImage || product.image || product.thumbnail)} className={`max-h-[600px] w-full object-contain drop-shadow-2xl mb-8 ${isOutOfStock ? 'grayscale opacity-50' : ''}`} alt="" />
              
-             {isOutOfStock && <span className="absolute bg-red-600 text-white px-6 py-2 rounded-xl font-black rotate-[-12deg] shadow-xl text-xl">OUT OF STOCK</span>}
+             {/* ✅ Gallery Thumbnails */}
+             {product.images && product.images.length > 0 && (
+                <div className="flex gap-4 overflow-x-auto p-2 w-full justify-center">
+                    {/* Show Main Image as first thumbnail */}
+                    <button 
+                        onClick={() => setActiveImage(product.image || product.thumbnail)} 
+                        className={`w-16 h-16 rounded-xl border-2 overflow-hidden flex-shrink-0 ${activeImage === (product.image || product.thumbnail) ? 'border-[#1a4d2e]' : 'border-transparent'}`}
+                    >
+                        <img src={getImageUrl(product.image || product.thumbnail)} className="w-full h-full object-cover" alt="main"/>
+                    </button>
+
+                    {product.images.map((img) => (
+                        <button 
+                            key={img.id} 
+                            onClick={() => setActiveImage(img.image)} 
+                            className={`w-16 h-16 rounded-xl border-2 overflow-hidden flex-shrink-0 ${activeImage === img.image ? 'border-[#1a4d2e]' : 'border-transparent'}`}
+                        >
+                            <img src={getImageUrl(img.image)} className="w-full h-full object-cover" alt="gallery"/>
+                        </button>
+                    ))}
+                </div>
+             )}
+
+             {isOutOfStock && <span className="absolute top-10 left-10 bg-red-600 text-white px-6 py-2 rounded-xl font-black rotate-[-12deg] shadow-xl text-xl">OUT OF STOCK</span>}
              
-             {/* ✅ ปุ่มหัวใจในหน้า Detail */}
-             {!isAdmin && (
-                 <button onClick={() => toggleWishlist(product)} className="absolute top-10 right-10 p-3 bg-white rounded-full shadow-lg hover:scale-110 transition-transform">
+             {/* ✅ ปุ่มหัวใจในหน้า Detail (ซ่อนถ้าเป็น Admin/Seller) */}
+             {!isRestricted && (
+                 <button onClick={() => toggleWishlist(product)} className="absolute top-10 right-10 p-3 bg-white rounded-full shadow-lg hover:scale-110 transition-transform z-10">
                     <Heart size={28} className={isInWishlist(product.id) ? "fill-red-500 text-red-500" : "text-gray-300"} />
                  </button>
              )}
@@ -121,8 +260,8 @@ function ProductDetail() {
 
              <p className="text-gray-500 mb-8 leading-relaxed">{product.description}</p>
 
-             {/* ✅ Quantity Selector */}
-             {!isAdmin && !isOutOfStock && (
+             {/* ✅ Quantity Selector (ซ่อนถ้าเป็น Admin/Seller) */}
+             {!isRestricted && !isOutOfStock && (
                 <div className="flex items-center gap-6 mb-8 p-4 bg-gray-50 rounded-2xl w-fit">
                     <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-8 h-8 bg-white rounded shadow flex items-center justify-center hover:text-red-500"><Minus size={16}/></button>
                     <span className="font-black text-xl w-8 text-center">{quantity}</span>
@@ -135,7 +274,8 @@ function ProductDetail() {
                  {quantity > 1 && <span className="text-gray-400 font-bold mb-2">({formatPrice(product.price)} / ชิ้น)</span>}
              </div>
 
-             {!isAdmin && (
+             {/* ปุ่มใส่ตะกร้า (ซ่อนถ้าเป็น Admin/Seller) */}
+             {!isRestricted && (
                 <button onClick={handleAddToCart} disabled={isOutOfStock} className={`w-full py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 shadow-xl transition-all ${!isOutOfStock ? 'bg-[#1a4d2e] text-white hover:bg-[#143d24]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
                     <ShoppingCart size={24} /> {isOutOfStock ? 'OUT OF STOCK' : `ADD TO CART (${quantity})`}
                 </button>
@@ -163,20 +303,85 @@ function ProductDetail() {
 
         {/* ✅ Reviews Section */}
         <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100">
-            <h3 className="text-2xl font-black text-[#263A33] mb-8 flex items-center gap-2"><MessageSquare /> Reviews</h3>
+            <h3 className="text-2xl font-black text-[#263A33] mb-8 flex items-center gap-2"><MessageSquare /> Reviews ({product.reviews ? product.reviews.length : 0})</h3>
             <div className="space-y-6">
-                <div className="border-b border-gray-50 pb-6">
-                    <div className="flex justify-between mb-2">
-                        <span className="font-bold text-[#1a4d2e]">Customer01</span>
-                        <div className="flex text-orange-400"><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/></div>
-                    </div>
-                    <p className="text-gray-500 text-sm">"สินค้าดีมากครับ ส่งไว แพ็คของมาดีประทับใจ"</p>
-                </div>
+                {product.reviews && product.reviews.length > 0 ? (
+                    product.reviews.map((review) => (
+                        <div key={review.id} className="border-b border-gray-50 pb-6">
+                            <div className="flex justify-between mb-2">
+                                <span className="font-bold text-[#1a4d2e]">{review.user}</span>
+                                <div className="flex text-orange-400">
+                                    {[...Array(5)].map((_, i) => (
+                                        <Star key={i} size={12} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "text-orange-400" : "text-gray-300"} />
+                                    ))}
+                                </div>
+                            </div>
+                            <span className="text-xs text-gray-400 block mb-2">{review.date}</span>
+                            <p className="text-gray-500 text-sm">"{review.comment}"</p>
+
+                            {/* ✅ Display Reply */}
+                            {review.reply_comment && (
+                                <div className="mt-4 ml-4 p-4 bg-gray-50 rounded-xl border-l-4 border-[#1a4d2e]">
+                                    <p className="text-xs font-bold text-[#1a4d2e] mb-1">ตอบกลับเมื่อ {review.reply_date}</p>
+                                    <p className="text-gray-600 text-sm">{review.reply_comment}</p>
+                                </div>
+                            )}
+
+                            {/* ✅ Reply Form for Admin/Seller */}
+                            {isRestricted && !review.reply_comment && (
+                                <div className="mt-4">
+                                    {replyingTo === review.id ? (
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#1a4d2e]"
+                                                placeholder="เขียนตอบกลับ..."
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                            />
+                                            <button onClick={() => handleReplySubmit(review.id)} className="bg-[#1a4d2e] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#143d24]">ส่ง</button>
+                                            <button onClick={() => setReplyingTo(null)} className="text-gray-400 px-2">ยกเลิก</button>
+                                        </div>
+                                    ) : (
+                                        <button onClick={() => { setReplyingTo(review.id); setReplyText(""); }} className="text-xs text-[#1a4d2e] font-bold hover:underline flex items-center gap-1">
+                                            <MessageSquare size={12}/> ตอบกลับรีวิว
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-gray-400">ยังไม่มีรีวิว เป็นคนแรกที่รีวิวสินค้านี้!</p>
+                )}
+
                 {/* Form */}
                 <div className="bg-gray-50 p-6 rounded-2xl mt-8">
                     <p className="font-bold text-[#263A33] mb-4">เขียนรีวิวของคุณ</p>
-                    <textarea className="w-full p-4 rounded-xl border-none outline-none text-sm resize-none mb-4 focus:ring-2 focus:ring-[#1a4d2e]/10" rows="3" placeholder="แชร์ความรู้สึกของคุณ..."></textarea>
-                    <button className="bg-[#1a4d2e] text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-[#143d24]"><Send size={16}/> ส่งรีวิว</button>
+                    
+                    <div className="flex gap-2 mb-4">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                            <button key={star} onClick={() => setNewReview({ ...newReview, rating: star })} type="button">
+                                <Star size={24} className={star <= newReview.rating ? "fill-orange-400 text-orange-400" : "text-gray-300"} />
+                            </button>
+                        ))}
+                    </div>
+
+                    <textarea 
+                        className="w-full p-4 rounded-xl border-none outline-none text-sm resize-none mb-4 focus:ring-2 focus:ring-[#1a4d2e]/10" 
+                        rows="3" 
+                        placeholder="แชร์ความรู้สึกของคุณ..."
+                        value={newReview.comment}
+                        onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                    ></textarea>
+                    
+                    <button 
+                        onClick={handleSubmitReview}
+                        disabled={submitting}
+                        className={`bg-[#1a4d2e] text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-[#143d24] ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        <Send size={16}/> {submitting ? 'กำลังส่ง...' : 'ส่งรีวิว'}
+                    </button>
                 </div>
             </div>
         </div>

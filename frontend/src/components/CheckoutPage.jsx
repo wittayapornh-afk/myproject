@@ -37,37 +37,46 @@ function CheckoutPage() {
     setLoading(true);
 
     try {
-        const response = await fetch('http://localhost:8000/api/checkout/', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Authorization': `Token ${token}` 
+        // ✅ เตรียมข้อมูล Payload ให้ตรงกับที่ Backend (views.py) รอรับ
+        const payload = {
+            items: cartItems.map(item => ({
+                id: item.id,       // ตรวจสอบว่าใน cartItems เก็บเป็น id
+                quantity: item.quantity
+            })),
+            customer: {
+                name: formData.name,
+                tel: formData.tel,
+                email: formData.email,
+                address: formData.address
             },
-            body: JSON.stringify({
-                // ✅ ปรับรูปแบบให้ตรงตามมาตรฐาน Backend ทั่วไป
-                order_items: cartItems.map(item => ({
-                    product: item.id,
-                    quantity: item.quantity,
-                    price: item.price
-                })),
-                shipping_address: formData.address,
-                phone_number: formData.tel,
-                payment_method: paymentMethod,
-                total_price: getTotalPrice()
-            })
-        });
+            paymentMethod: paymentMethod
+        };
+
+        const response = await fetch('http://localhost:8000/api/login/', { // ตรวจสอบ URL ตรงนี้
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+});
+        
 
         if (response.ok) {
+            const data = await response.json();
             clearCart();
-            await Swal.fire({ icon: 'success', title: 'สั่งซื้อสำเร็จ', confirmButtonColor: '#1a4d2e' });
+            await Swal.fire({ 
+                icon: 'success', 
+                title: 'สั่งซื้อสำเร็จ', 
+                text: data.message, 
+                confirmButtonColor: '#1a4d2e' 
+            });
             navigate('/order-history');
         } else {
             const errorData = await response.json();
-            // จะโชว์ว่า Backend แจ้งเตือนอะไรติดขัด
-            throw new Error(JSON.stringify(errorData));
+            // แจ้ง Error จาก Backend ให้ผู้ใช้ทราบ
+            throw new Error(errorData.error || 'การสั่งซื้อล้มเหลว');
         }
     } catch (error) {
-        Swal.fire('เกิดข้อผิดพลาด', 'กรุณาตรวจสอบการกรอกข้อมูล: ' + error.message, 'error');
+        console.error("Checkout Error:", error);
+        Swal.fire('เกิดข้อผิดพลาด', error.message, 'error');
     } finally {
         setLoading(false);
     }

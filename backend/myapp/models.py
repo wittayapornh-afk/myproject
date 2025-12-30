@@ -150,10 +150,11 @@ class Order(models.Model):
         return f"Order #{self.id} - {self.customer_name}"
 
 class OrderItem(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.IntegerField(default=1)
-    price_at_purchase = models.DecimalField(max_digits=10, decimal_places=2) # DB column name
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    # 🚩 แก้ไขบรรทัดนี้: เปลี่ยนจาก 'reviews' เป็น 'order_items'
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='order_items') 
+    quantity = models.PositiveIntegerField(default=1)
+    price_at_purchase = models.DecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
         db_table = 'order_items'
@@ -162,15 +163,26 @@ class OrderItem(models.Model):
     def __str__(self):
         return f"{self.product.title} (x{self.quantity})"
 
+
+
 class Review(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews")
+    # ✅ บรรทัดนี้ให้ใช้ 'reviews'
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     rating = models.IntegerField(default=5)
-    comment = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
+    comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # ✅ Fields for Reply (Admin/Seller)
+    reply_comment = models.TextField(blank=True, null=True)
+    reply_timestamp = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        db_table = 'reviews'
+        ordering = ['-created_at']
+
+
+    def __str__(self):
+        return f"{self.user.username} - {self.product.title} ({self.rating})"
 
 
 class AdminLog(models.Model):

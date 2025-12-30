@@ -102,8 +102,9 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 # ✅ ตั้งค่า Authentication (แก้ Error 403 Forbidden)
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
+   'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',

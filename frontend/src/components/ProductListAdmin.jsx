@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, Plus, Edit, Trash2, Filter, X, Image as ImageIcon, Save, UploadCloud, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext'; // ✅ Import useAuth
 
 export default function ProductListAdmin() {
+  const { token, logout } = useAuth(); // ✅ Use token and logout from context
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(['ทั้งหมด']);
   const [loading, setLoading] = useState(true);
@@ -45,16 +47,20 @@ export default function ProductListAdmin() {
   const fetchAllProducts = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      // ใช้ API ตัวใหม่ที่ดึงข้อมูลทั้งหมดมาทีเดียว
+      // ✅ Use token from Context (or fallback to localStorage if context not ready)
+      const activeToken = token || localStorage.getItem('token'); 
+      
       const response = await axios.get('http://localhost:8000/api/admin/all_products/', {
-          headers: { Authorization: `Token ${token}` }
+          headers: { Authorization: `Token ${activeToken}` }
       });
       if (Array.isArray(response.data)) {
           setProducts(response.data);
       }
     } catch (error) {
       console.error("Error:", error);
+      if (error.response && error.response.status === 401) {
+          logout(); // ✅ Force Logout on 401
+      }
     } finally {
       setLoading(false);
     }
@@ -101,13 +107,16 @@ export default function ProductListAdmin() {
   const removeExistingImage = async (imageId) => {
     if(!window.confirm("ต้องการลบรูปนี้ถาวรไหม?")) return;
     try {
-        const token = localStorage.getItem('token');
+        // ✅ Use context token
+        const activeToken = token || localStorage.getItem('token');
         await axios.delete(`http://localhost:8000/api/delete_product_image/${imageId}/`, {
-             headers: { Authorization: `Token ${token}` }
+             headers: { Authorization: `Token ${activeToken}` }
         });
         setExistingGallery(existingGallery.filter(img => img.id !== imageId));
     } catch (e) {
-        alert("ลบรูปไม่สำเร็จ");
+        console.error(e);
+        if (e.response && e.response.status === 401) logout();
+        else alert("ลบรูปไม่สำเร็จ");
     }
   }
 
@@ -141,7 +150,7 @@ export default function ProductListAdmin() {
     setGalleryPreviews([]);
 
     try {
-        const res = await axios.get(`http://localhost:8000/api/product/${product.id}/`);
+        const res = await axios.get(`http://localhost:8000/api/products/${product.id}/`);
         if(res.data.images) setExistingGallery(res.data.images);
     } catch(e) {
         setExistingGallery([]);
@@ -153,42 +162,52 @@ export default function ProductListAdmin() {
   const handleDelete = async (id) => {
     if(!window.confirm("ยืนยันการลบสินค้า?")) return;
     try {
-        const token = localStorage.getItem('token');
+        const activeToken = token || localStorage.getItem('token');
         await axios.delete(`http://localhost:8000/api/delete_product/${id}/`, {
-            headers: { Authorization: `Token ${token}` }
+            headers: { Authorization: `Token ${activeToken}` }
         });
         alert("ลบสำเร็จ");
         fetchAllProducts();
-    } catch(e) { alert("ลบไม่สำเร็จ"); }
+    } catch(e) { 
+        if (e.response && e.response.status === 401) logout();
+        else alert("ลบไม่สำเร็จ"); 
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
+    const activeToken = token || localStorage.getItem('token');
     
     const data = new FormData();
-    data.append('name', formData.name);
+    data.append('title', formData.name); // ✅ Fix: Backend expects 'title'
     data.append('price', formData.price);
     data.append('stock', formData.stock);
     data.append('category', formData.category);
     data.append('description', formData.description);
     
-    if (mainImage) data.append('image', mainImage);
-    galleryFiles.forEach(f => data.append('images', f));
+    if (mainImage) data.append('thumbnail', mainImage); // ✅ Fix: Backend expects 'thumbnail'
+    galleryFiles.forEach(f => data.append('new_gallery_images', f)); // ✅ Fix: Backend expects 'new_gallery_images'
 
     try {
         const url = isEditMode 
             ? `http://localhost:8000/api/edit_product/${currentProductId}/`
             : `http://localhost:8000/api/add_product/`;
         
-        await axios.post(url, data, {
-            headers: { Authorization: `Token ${token}` }
-        });
+        if (isEditMode) {
+             await axios.put(url, data, {
+                headers: { Authorization: `Token ${activeToken}` }
+            });
+        } else {
+             await axios.post(url, data, {
+                headers: { Authorization: `Token ${activeToken}` }
+            });
+        }
         alert(isEditMode ? "บันทึกเรียบร้อย" : "เพิ่มสินค้าสำเร็จ");
         setIsModalOpen(false);
         fetchAllProducts();
     } catch (e) {
-        alert("เกิดข้อผิดพลาด: " + (e.response?.data?.error || e.message));
+        if (e.response && e.response.status === 401) logout();
+        else alert("เกิดข้อผิดพลาด: " + (e.response?.data?.error || e.message));
     }
   };
 

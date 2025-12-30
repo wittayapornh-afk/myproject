@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, ClipboardList } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -32,6 +32,7 @@ const AdminSidebar = ({ activeTab, setActiveTab }) => {
     // Show 'users' only if NOT seller
     // Using filtered array below instead of hardcoding here
     { id: 'users', label: 'จัดการผู้ใช้งาน', icon: <Users size={20} />, restricted: true },
+    { id: 'logs', label: 'บันทึกกิจกรรม', icon: <ClipboardList size={20} />, restricted: true }, // Restricted to Admin/SuperAdmin
   ];
 
   // ✅ Filter menu items based on role

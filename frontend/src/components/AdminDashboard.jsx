@@ -15,13 +15,14 @@ import { useAuth } from '../context/AuthContext';
 // Import Components
 import AdminSidebar from './AdminSidebar';
 import AdminOrders from './OrderListAdmin';
-import ProductListAdmin from './ProductListAdmin';
+import ProductListAdmin from './ProductListAdmin'; // ✅ Restored Import
 import UserListAdmin from './UserListAdmin';
+import AdminActivityLogs from './AdminActivityLogs'; // ✅ New Import
 
 const COLORS = ['#1a4d2e', '#2d6a4f', '#40916c', '#52b788', '#74c69d'];
 
 function AdminDashboard() {
-    const { logout } = useAuth(); // ✅ Rule 15: เตรียมไว้สำหรับ Token Expired
+    const { token, logout } = useAuth(); // ✅ Rule 15: Retrieve token from Context
     const [activeTab, setActiveTab] = useState('dashboard');
     const [stats, setStats] = useState({
         total_sales: 0,
@@ -40,9 +41,12 @@ function AdminDashboard() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState('daily');
 
+    const [errorMsg, setErrorMsg] = useState(null); // ✅ Debug Error
+
     // ✅ Rule 60: ใช้ useCallback เพื่อประสิทธิภาพสูงสุดของ React
     const fetchStats = useCallback(async () => {
         setLoading(true);
+        setErrorMsg(null);
         try {
             let startStr, endStr;
             const date = new Date(selectedDate);
@@ -62,18 +66,24 @@ function AdminDashboard() {
                 endStr = lastDay.toISOString().split('T')[0];
             }
 
-            const token = localStorage.getItem('token');
-            if (!token) return;
+            const activeToken = token || localStorage.getItem('token');
+            if (!activeToken) {
+                 setErrorMsg("No Token Found");
+                 return;
+            }
 
             // ✅ Rule 21: บังคับ Port 8000
             const response = await axios.get(`http://localhost:8000/api/admin/dashboard-stats/`, {
                 params: { start_date: startStr, end_date: endStr, view_mode: viewMode },
-                headers: { Authorization: `Token ${token}` }
+                headers: { Authorization: `Token ${activeToken}` }
             });
 
             setStats(response.data);
 
         } catch (error) {
+            console.error("Dashboard Stats Fail:", error);
+            setErrorMsg(error.message + (error.response ? ` (Status: ${error.response.status})` : ""));
+            
             // ✅ Rule 15: ถ้า Error 401 ให้ Logout ทันที
             if (error.response && error.response.status === 401) {
                 logout();
@@ -82,7 +92,7 @@ function AdminDashboard() {
         } finally {
             setLoading(false);
         }
-    }, [selectedDate, viewMode, logout]);
+    }, [selectedDate, viewMode, logout, token]);
 
     useEffect(() => {
         if (activeTab === 'dashboard') {
@@ -94,16 +104,16 @@ function AdminDashboard() {
         if (activeTab === 'products') return <ProductListAdmin />;
         if (activeTab === 'orders') return <AdminOrders />;
 
-        // ✅ Security Check: Seller cannot access users
-        const { user } = useAuth();
-        if (activeTab === 'users') {
-            if (user?.role === 'seller') {
-                // Force switch back to dashboard or show error
-                setActiveTab('dashboard');
-                return null;
-            }
-            return <UserListAdmin />;
-        }
+    // ✅ Security Check: Seller can now access users (Request fulfilled)
+    // const { user } = useAuth();
+    if (activeTab === 'users') {
+        return <UserListAdmin />;
+    }
+
+
+    if (activeTab === 'logs') { // ✅ New Route
+        return <AdminActivityLogs />;
+    }
 
         return (
             <div className="space-y-8 animate-fade-in">

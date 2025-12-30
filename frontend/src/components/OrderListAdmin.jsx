@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, CheckCircle, Clock, XCircle, Truck, RefreshCw, Filter, Edit } from 'lucide-react';
+import { useAuth } from '../context/AuthContext'; // ✅ Import useAuth
 
 export default function AdminOrders() {
+  const { token, logout } = useAuth(); // ✅ Use context
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,19 +18,22 @@ export default function AdminOrders() {
 
   const fetchOrders = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const activeToken = token || localStorage.getItem('token');
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
       if (statusFilter !== 'ทั้งหมด') params.append('status', statusFilter);
 
-      const response = await axios.get(`http://localhost:8000/api/admin/orders/?${params.toString()}`, {
-        headers: { Authorization: `Token ${token}` }
+      const response = await axios.get(`http://localhost:8000/api/admin/orders_v2/?${params.toString()}`, {
+        headers: { Authorization: `Token ${activeToken}` }
       });
       setOrders(response.data);
     } catch (error) {
       console.error("Error fetching orders:", error);
+      if (error.response && error.response.status === 401) {
+          logout(); // ✅ Auto logout
+      }
     } finally {
       setLoading(false);
     }
@@ -39,18 +44,23 @@ export default function AdminOrders() {
     if (!window.confirm(`ยืนยันเปลี่ยนสถานะเป็น "${newStatus}" ?`)) return;
 
     try {
-        const token = localStorage.getItem('token');
+        // ✅ Use context token
+        const activeToken = token || localStorage.getItem('token');
         // 2. ส่งค่าไป Backend
         await axios.post(`http://localhost:8000/api/admin/order_status/${orderId}/`, 
             { status: newStatus },
-            { headers: { Authorization: `Token ${token}` } }
+            { headers: { Authorization: `Token ${activeToken}` } }
         );
         // 3. โหลดข้อมูลใหม่
         fetchOrders();
         // alert(`✅ เปลี่ยนสถานะเรียบร้อย`);
     } catch (e) {
-        alert("❌ เกิดข้อผิดพลาด");
         console.error(e);
+        if (e.response && e.response.status === 401) {
+             logout(); // ✅ Auto logout
+        } else {
+             alert("❌ เกิดข้อผิดพลาด");
+        }
     }
   };
 
@@ -127,8 +137,8 @@ export default function AdminOrders() {
                         <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                             <td className="p-4 font-mono text-sm font-bold text-[#1a4d2e]">#{order.id}</td>
                             <td className="p-4 text-sm text-gray-600">
-                                <div className="text-xs">{order.created_at.split(' ')[0]}</div>
-                                <div className="text-[10px] text-gray-400">{order.created_at.split(' ')[1]}</div>
+                                <div className="text-xs">{order.date.split(' ')[0]}</div>
+                                <div className="text-[10px] text-gray-400">{order.date.split(' ')[1]}</div>
                             </td>
                             <td className="p-4">
                                 <div className="font-bold text-gray-800 text-sm">{order.customer}</div>

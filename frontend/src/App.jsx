@@ -21,6 +21,7 @@ import AdminDashboard from './components/AdminDashboard';
 import ProductAdd from './components/ProductAdd';
 import ProductEdit from './components/ProductEdit';
 import OrderListAdmin from './components/OrderListAdmin';
+import UserListAdmin from './components/UserListAdmin';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -133,6 +134,12 @@ function App() {
                   <Route path="/admin/orders" element={
                     <ProtectedRoute allowedRoles={['admin', 'super_admin', 'seller']}>
                       <OrderListAdmin />
+                    </ProtectedRoute>
+                  } />
+
+                  <Route path="/admin/users" element={
+                    <ProtectedRoute allowedRoles={['admin', 'super_admin', 'seller']}>
+                      <UserListAdmin />
                     </ProtectedRoute>
                   } />
 

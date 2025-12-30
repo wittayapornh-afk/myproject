@@ -11,11 +11,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     {/* ✅ แก้ Warning โดยเพิ่ม future flags ใส่ลงไปใน BrowserRouter ตรงนี้ครับ */}
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <CartProvider>
-        <SearchProvider>
-          <App />
-        </SearchProvider>
-      </CartProvider>
+        <App />
     </BrowserRouter>
   </React.StrictMode>,
 )

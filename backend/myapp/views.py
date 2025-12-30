@@ -1,21 +1,21 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_200_OK
+from rest_framework import status  # ✅ ใช้ตัวนี้จัดการ HTTP Status ทั้งหมด
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.views import APIView
 from django.db.models import Sum
-from django.db import transaction
+from django.db import transaction  # ✅ สำหรับระบบ Checkout
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework.authtoken.models import Token
-from rest_framework.views import APIView
-from .models import Product, Order, OrderItem, AdminLog, ProductImage
+# ✅ รวม Model ทุกตัวไว้ในบรรทัดเดียว (ป้องกัน Error)
+from .models import Product, Order, OrderItem, AdminLog, ProductImage, Review 
 import logging
 import traceback
+from django.utils import timezone
 
-User = get_user_model() # Use custom user model
-
+User = get_user_model()
 logger = logging.getLogger(__name__)
-
 # ==========================================
 # 🔧 Admin & Super Admin Core Logic
 # ==========================================
@@ -27,12 +27,163 @@ class DashboardStatsView(APIView):
         if request.user.role not in ['seller', 'admin', 'super_admin']: 
             return Response(status=403)
         
-        total_sales = Order.objects.filter(status='Completed').aggregate(Sum('total_price'))['total_price__sum'] or 0
+        # 1. Parse Date Filters
+        view_mode = request.query_params.get('view_mode', 'daily')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+        
+        from django.utils import timezone
+        import datetime
+        from django.db.models import Count, Sum
+        from django.db.models.functions import TruncDate, TruncMonth, TruncYear
+
+        # Default range: Last 30 days if not specified
+        today = timezone.now().date()
+        
+        if start_date_str:
+            start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        else:
+            start_date = today - datetime.timedelta(days=30)
+            
+        if end_date_str:
+            end_date = datetime.datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        else:
+            end_date = today
+
+        # 2. Main Queryset (Filter by Date Range)
+        # Include Paid, Processing, Shipped, Completed as "Valid Sales"
+        valid_statuses = ['Paid', 'Processing', 'Shipped', 'Completed']
+        
+        orders_in_range = Order.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date
+        )
+        
+        # 3. Calculate Stats
+        sales_agg = orders_in_range.filter(status__in=valid_statuses).aggregate(Sum('total_price'))
+        total_sales = sales_agg['total_price__sum'] or 0
+        
+        print(f"DEBUG: Start={start_date}, End={end_date}")
+        print(f"DEBUG: Valid Statuses={valid_statuses}")
+        print(f"DEBUG: Orders in Range={orders_in_range.count()}")
+        print(f"DEBUG: Paid in Range={orders_in_range.filter(status__in=valid_statuses).count()}")
+        print(f"DEBUG: Total Sales Calculated={total_sales}")
+
+        total_orders = orders_in_range.count()
+        pending_orders = Order.objects.filter(status='Pending').count() # Pending is usually global/current
+        
+        # Global Counts (All time)
+        global_total_sales = Order.objects.filter(status__in=valid_statuses).aggregate(Sum('total_price'))['total_price__sum'] or 0
+        global_total_orders = Order.objects.count()
+
+        # 4. Graph Data
+        # Group by Date/Month depending on view_mode
+        sales_data = []
+        
+        if view_mode == 'daily':
+            # Generate all dates in range to avoid gaps
+            delta = end_date - start_date
+            sales_dict = {}
+            
+            # Query grouped by date
+            daily_stats = orders_in_range.filter(status__in=valid_statuses)\
+                .annotate(date=TruncDate('created_at'))\
+                .values('date')\
+                .annotate(sales=Sum('total_price'))\
+                .order_by('date')
+                
+            for stat in daily_stats:
+                sales_dict[stat['date']] = stat['sales']
+            
+            for i in range(delta.days + 1):
+                d = start_date + datetime.timedelta(days=i)
+                sales_data.append({
+                    "name": d.strftime("%d/%m"),
+                    "sales": sales_dict.get(d, 0)
+                })
+
+        elif view_mode == 'monthly':
+            # Logic for monthly grouping (Simplify for now: just daily within the month)
+             # ... (reuse daily logic for simplicity or implement TruncMonth)
+            delta = end_date - start_date
+            sales_dict = {}
+            daily_stats = orders_in_range.filter(status__in=valid_statuses)\
+                .annotate(date=TruncDate('created_at'))\
+                .values('date')\
+                .annotate(sales=Sum('total_price'))\
+                .order_by('date')
+            for stat in daily_stats:
+                sales_dict[stat['date']] = stat['sales']
+            for i in range(delta.days + 1):
+                d = start_date + datetime.timedelta(days=i)
+                sales_data.append({
+                    "name": d.strftime("%d/%m"),
+                    "sales": sales_dict.get(d, 0)
+                })
+        else: # Yearly (Show sales per month)
+             monthly_stats = orders_in_range.filter(status__in=valid_statuses)\
+                .annotate(month=TruncMonth('created_at'))\
+                .values('month')\
+                .annotate(sales=Sum('total_price'))\
+                .order_by('month')
+             
+             sales_map = {m['month'].strftime("%b"): m['sales'] for m in monthly_stats}
+             months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+             for m in months:
+                 sales_data.append({"name": m, "sales": sales_map.get(m, 0)})
+
+        # 2. Low Stock Products (Stock < 10)
+        low_stock_products = Product.objects.filter(stock__lt=10, is_active=True).order_by('stock')[:5]
+        low_stock_data = [{
+            "id": p.id, 
+            "title": p.title, 
+            "stock": p.stock, 
+            "thumbnail": p.thumbnail.url if p.thumbnail else ""
+        } for p in low_stock_products]
+
+        # 5. Pie Chart Data (Sales by Category)
+        category_stats = orders_in_range.filter(status__in=valid_statuses)\
+            .values('items__product__category')\
+            .annotate(value=Sum('items__price_at_purchase'))\
+            .order_by('-value')
+        
+        pie_data = []
+        for c in category_stats:
+            cat_name = c['items__product__category'] or "Uncategorized"
+            pie_data.append({"name": cat_name, "value": c['value']})
+
+        # 6. Bar Chart & Best Sellers (Top 5 Products by Quantity)
+        product_stats = orders_in_range.filter(status__in=valid_statuses)\
+            .values('items__product__title')\
+            .annotate(sales=Sum('items__quantity'))\
+            .order_by('-sales')[:5]
+            
+        bar_data = []
+        for p in product_stats:
+            p_name = p['items__product__title'] or "Unknown Product"
+            bar_data.append({"name": p_name[:15], "sales": p['sales']}) # Truncate name for bar chart
+
+        # 7. Activity Logs (Recent 5)
+        recent_logs = AdminLog.objects.all().order_by('-timestamp')[:5]
+        logs_data = [{
+            "id": l.id,
+            "action": l.action,
+            "date": l.timestamp.strftime("%d/%m %H:%M"),
+            "admin": l.admin.username
+        } for l in recent_logs]
+
         return Response({
-            "total_sales": total_sales,
-            "total_orders": Order.objects.count(),
+            "total_sales": global_total_sales, # Show ALL time sales on cards
+            "total_orders": global_total_orders,
             "total_products": Product.objects.count(),
-            "total_users": User.objects.count()
+            "total_users": User.objects.count(),
+            "pending_orders": pending_orders,
+            "low_stock": low_stock_data,
+            "sales_data": sales_data,
+            "best_sellers": bar_data, # Reuse bar data for simple best seller list if needed
+            "pie_data": pie_data,
+            "bar_data": bar_data,
+            "logs": logs_data
         })
 
 
@@ -79,13 +230,15 @@ def products_api(request):
         logger.error(err_msg)
         return Response({"error": str(e)}, status=500)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def admin_products_list(request):
-    if request.user.role not in ['admin', 'super_admin']:
+def get_all_products_admin_api(request):
+    if request.user.role not in ['admin', 'super_admin', 'seller']:
         return Response({"error": "Unauthorized"}, status=403)
     
-    products = Product.objects.all().order_by('-id')
+    # ✅ Fix: Show only Active products (Hide Deleted)
+    products = Product.objects.filter(is_active=True).order_by('-id')
     
     data = [{
         "id": p.id,
@@ -97,11 +250,6 @@ def admin_products_list(request):
         "thumbnail": p.thumbnail.url if p.thumbnail else ""
     } for p in products]
     return Response(data)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_all_products_admin_api(request):
-    return admin_products_list(request)
 
 
 @api_view(['POST'])
@@ -235,23 +383,77 @@ def admin_update_user_api(request, user_id):
 # 🛒 Public API (สินค้าหน้าบ้าน)
 # ==========================================
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reply_review_api(request, review_id):
+    try:
+        review = Review.objects.get(id=review_id)
+        # Check permission: Admin or Seller
+        if not (request.user.role in ['admin', 'super_admin', 'seller']):
+             return Response({"error": "Unauthorized"}, status=403)
+
+        review.reply_comment = request.data.get('reply_comment')
+        review.reply_timestamp = timezone.now()
+        review.save()
+        
+        # Log action
+        if request.user.role != 'seller': # Optional: log for admin
+             AdminLog.objects.create(admin=request.user, action=f"Replied to review {review_id}", details=f"Reply: {review.reply_comment[:50]}...")
+
+        return Response({"message": "Reply added", "reply_comment": review.reply_comment, "reply_date": review.reply_timestamp.strftime("%d/%m/%Y %H:%M")})
+    except Review.DoesNotExist:
+        return Response({"error": "Review not found"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def product_detail_api(request, product_id):
+    print(f"DEBUG: product_detail_api called with id={product_id}")
     try:
         p = Product.objects.get(id=product_id)
-        gallery = [{"id": img.id, "image": img.image_url.url} for img in p.images.all()] # Used image_url field name
+        gallery = []
+        try:
+            gallery = [{"id": img.id, "image": img.image_url.url} for img in p.images.all()] # Used image_url field name
+        except Exception as e:
+            print(f"Error processing gallery images for product {product_id}: {e}")
+            traceback.print_exc()
         
+        reviews = []
+        try:
+            for r in p.reviews.all():
+                reviews.append({
+                    "id": r.id,
+                    "user": r.user.username if r.user else "Anonymous",
+                    "rating": r.rating,
+                    "comment": r.comment,
+                    "date": r.created_at.strftime("%d/%m/%Y") if r.created_at else "",
+                    # ✅ Return Reply Data
+                    "reply_comment": r.reply_comment,
+                    "reply_date": r.reply_timestamp.strftime("%d/%m/%Y %H:%M") if r.reply_timestamp else ""
+                })
+        except Exception as e:
+            print(f"Error processing reviews for product {product_id}: {e}")
+            traceback.print_exc()
+
         data = {
             "id": p.id, "title": p.title, "description": p.description, 
             "category": p.category, "price": p.price, "stock": p.stock, 
             "brand": getattr(p, 'brand', ''), "rating": p.rating,
             "thumbnail": p.thumbnail.url if p.thumbnail else "",
-            "images": gallery
+            "images": gallery,
+            "reviews": reviews
         }
         return Response(data)
     except Product.DoesNotExist:
-        return Response({"error": "Not found"}, status=404)
+        # Debugging: Print all existing IDs to see what's actually in the DB
+        all_ids = list(Product.objects.values_list('id', flat=True))
+        print(f"DEBUG: Product {product_id} not found. Existing IDs: {all_ids}")
+        return Response({"error": f"Not found. Encoded ID: {product_id}. Available: {len(all_ids)} products"}, status=404)
+    except Exception as e:
+        traceback.print_exc()
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -454,35 +656,36 @@ def get_admin_stats(request):
         "total_users": User.objects.count()
     })
 
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def admin_orders_list(request):
+def get_admin_orders(request):
     if request.user.role not in ['seller', 'admin', 'super_admin']: return Response(status=403)
     orders = Order.objects.all().order_by('-created_at')
     data = [{
         "id": o.id, "customer": o.customer_name, "total_price": o.total_price,
-        "status": o.status, "date": o.created_at.strftime("%d/%m/%Y %H:%M")
+        "status": o.status, "date": o.created_at.strftime("%d/%m/%Y %H:%M"),
+        "tel": o.customer_tel, # ✅ Fix: use correct field name 'customer_tel'
+        "items": [{
+            "product": i.product.title if i.product else "Deleted Product",
+            "quantity": i.quantity,
+            "price": i.price_at_purchase # ✅ Fix: use correct field name 'price_at_purchase'
+        } for i in o.items.all()]
     } for o in orders]
     return Response(data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def update_order_status(request, order_id):
-    if request.user.role not in ['seller', 'admin', 'super_admin']: return Response(status=403)
-    order = Order.objects.get(id=order_id)
-    order.status = request.data.get('status')
-    order.save()
-    return Response({"message": "Status updated"})
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def admin_orders_api(request):
-    return admin_orders_list(request)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def update_order_status_api(request, order_id):
-    return update_order_status(request, order_id)
+    if request.user.role not in ['seller', 'admin', 'super_admin']: return Response(status=403)
+    try:
+        order = Order.objects.get(id=order_id)
+        order.status = request.data.get('status')
+        order.save()
+        return Response({"message": "Status updated"})
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found"}, status=404)
 
 
 @api_view(['GET'])
@@ -513,9 +716,31 @@ def get_all_users(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_admin_logs(request):
-    if request.user.role != 'super_admin': return Response(status=403)
+    # Allow admin and super_admin to view logs
+    if request.user.role not in ['admin', 'super_admin']: return Response(status=403)
+    
     logs = AdminLog.objects.all().order_by('-timestamp')
-    data = [{"admin": l.admin.username, "action": l.action, "date": l.timestamp.strftime("%d/%m %H:%M")} for l in logs]
+    data = []
+    for l in logs:
+        # Simple categorization logic
+        category = "General"
+        action_lower = l.action.lower()
+        if "สินค้า" in action_lower or "product" in action_lower:
+            category = "Product"
+        elif "ออเดอร์" in action_lower or "order" in action_lower:
+            category = "Order"
+        elif "ผู้ใช้" in action_lower or "user" in action_lower:
+            category = "User"
+        elif "login" in action_lower or "logout" in action_lower:
+            category = "Auth"
+            
+        data.append({
+            "id": l.id,
+            "admin": l.admin.username,
+            "action": l.action,
+            "category": category,
+            "date": l.timestamp.strftime("%d/%m/%Y %H:%M")
+        })
     return Response(data)
 
 # ==========================================
@@ -616,56 +841,106 @@ def delete_product_image_api(request, image_id):
 @permission_classes([IsAuthenticated])
 def checkout_api(request):
     try:
-        # ใช้ transaction เพื่อถ้าตัดของไม่ได้ ให้ยกเลิกออเดอร์ทั้งหมด (กันข้อมูลพัง)
+        # ใช้ transaction เพื่อความปลอดภัยของข้อมูลสต็อก
         with transaction.atomic():
             user = request.user
             data = request.data
+            
             cart_items = data.get('items', [])
             customer_info = data.get('customer', {})
+            payment_method = data.get('paymentMethod', 'Transfer')
 
             if not cart_items:
                 return Response({"error": "ตะกร้าสินค้าว่างเปล่า"}, status=400)
 
-            # 1. ตรวจสอบสต็อกสินค้าก่อน (ว่ามีของพอไหม)
             total_price = 0
+            # 🚩 1. ตรวจสอบข้อมูลและสต็อกสินค้าก่อนสร้างออเดอร์
             for item in cart_items:
-                product = Product.objects.select_for_update().get(id=item['id'])
-                if product.stock < item['quantity']:
-                    # ❌ ถ้าของหมด ให้แจ้ง Error กลับไปทันที
-                    raise Exception(f"สินค้า '{product.title}' มีไม่เพียงพอ (เหลือ {product.stock})")
-                total_price += product.price * item['quantity']
+                p_id = item.get('id') # ใช้ .get() เพื่อป้องกัน KeyError
+                if not p_id:
+                    return Response({"error": "ข้อมูลสินค้าไม่สมบูรณ์ (ขาด ID)"}, status=400)
+                
+                try:
+                    product = Product.objects.select_for_update().get(id=p_id)
+                    if product.stock < item['quantity']:
+                        return Response({"error": f"สินค้า '{product.title}' มีสต็อกไม่พอ"}, status=400)
+                    total_price += product.price * item['quantity']
+                except Product.DoesNotExist:
+                    return Response({"error": f"ไม่พบสินค้า ID: {p_id}"}, status=404)
 
-            # 2. สร้าง Order (บันทึกว่าใครซื้อ)
+            # 🚩 2. สร้าง Order
             order = Order.objects.create(
-                user=user,  # ✅ ผูกกับ User ที่ Login
+                user=user,
                 customer_name=customer_info.get('name', user.username),
                 customer_tel=customer_info.get('tel', ''),
                 customer_email=customer_info.get('email', user.email),
-                shipping_address=customer_info.get('address', ''), # field is shipping_address
-                total_price=total_price, # ใช้ราคาที่คำนวณใหม่จาก Backend เพื่อความชัวร์
-                payment_method=data.get('paymentMethod', 'Transfer'),
+                shipping_address=customer_info.get('address', ''),
+                total_price=total_price,
+                payment_method=payment_method,
                 status='Pending'
             )
 
-            # 3. สร้าง OrderItem และ ✅ ตัดสต็อกสินค้า
+            # 🚩 3. บันทึกรายการสินค้าและตัดสต็อก
             for item in cart_items:
                 product = Product.objects.get(id=item['id'])
-                
-                # บันทึกรายการลงออเดอร์
                 OrderItem.objects.create(
                     order=order,
                     product=product,
                     quantity=item['quantity'],
                     price_at_purchase=product.price
                 )
-                
-                # ✂️ ตัดสต็อกตรงนี้
+                # ตัดสต็อกจริง
                 product.stock -= item['quantity']
                 product.save()
 
-            return Response({"message": "สั่งซื้อสำเร็จ!", "order_id": order.id})
+            return Response({
+                "message": "สั่งซื้อสำเร็จแล้ว!",
+                "order_id": order.id
+            }, status=201)
 
-    except Product.DoesNotExist:
-        return Response({"error": "ไม่พบสินค้าในระบบ"}, status=404)
+    except Exception as e:
+        # พิมพ์ Error ลง Terminal ฝั่ง Backend เพื่อดูสาเหตุเชิงลึก
+        import traceback
+        print(traceback.format_exc())
+        return Response({"error": str(e)}, status=400)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_review(request):
+    try:
+        user = request.user
+        data = request.data
+        
+        product_id = data.get('product_id')
+        rating = data.get('rating')
+        comment = data.get('comment')
+
+        # 1. ตรวจสอบข้อมูลเบื้องต้น
+        if not product_id or not rating:
+            return Response({"error": "กรุณาระบุรหัสสินค้าและคะแนน"}, status=400)
+
+        # 2. ค้นหาสินค้า
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({"error": "ไม่พบสินค้าชิ้นนี้"}, status=404)
+
+        # 3. สร้างรีวิว
+        Review.objects.create(
+            product=product,
+            user=user,
+            rating=int(rating),
+            comment=comment if comment else ""
+        )
+
+        # 🚩 (ทางเลือก) อัปเดตคะแนนเฉลี่ยของ Product
+        # ถ้าใน Model Product ของคุณมีฟิลด์ rating สามารถคำนวณใหม่ได้ตรงนี้ครับ
+        all_reviews = product.reviews.all()
+        avg_rating = sum([r.rating for r in all_reviews]) / all_reviews.count()
+        product.rating = round(avg_rating, 1)
+        product.save()
+
+        return Response({"message": "บันทึกรีวิวเรียบร้อยแล้ว!"}, status=201)
+
     except Exception as e:
         return Response({"error": str(e)}, status=400)

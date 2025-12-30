@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from myapp import views
 
 urlpatterns = [
-    # --- Auth (ระบบสมาชิก) ---
+    # --- Auth (ระบบสมาชิก) --
     path('api/login/', views.login_api, name='api_token_auth'),
     path('api/register/', views.register_api, name='register_api'),
     path('api/logout/', views.logout_api, name='logout_api'),
@@ -32,6 +32,7 @@ urlpatterns = [
     path('api/products/<int:product_id>/delete/', views.delete_product_api, name='delete_product'),
     
     path('api/categories/', views.categories_api, name='categories_api'),
+    path('api/submit-review/', views.submit_review, name='submit_review'),
 
     # --- Orders & Checkout (สั่งซื้อ) ---
     # ✅ แก้ไข 2: เพิ่ม api/ ให้ลิงก์ checkout (สำคัญมาก!)

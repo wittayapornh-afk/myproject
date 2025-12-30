@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext'; // ✅ Import Auth
 import Swal from 'sweetalert2';
 
 function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const { addToCart } = useCart();
+    const { user } = useAuth(); // ✅ Get User
+    
+    // ✅ Check Restricted Role
+    const isRestricted = ['admin', 'super_admin', 'seller'].includes(user?.role?.toLowerCase());
 
     const Toast = Swal.mixin({
         toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, timerProgressBar: true
@@ -101,13 +106,15 @@ function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
 
                                     <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-50">
                                         <span className="text-2xl font-bold text-primary">฿{product.price?.toLocaleString()}</span>
-                                        <button
-                                            onClick={() => handleAddToCart(product)}
-                                            disabled={product.stock === 0}
-                                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md active:scale-90 ${product.stock === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-[#234236] hover:rotate-90'}`}
-                                        >
-                                            {product.stock === 0 ? '✕' : '+'}
-                                        </button>
+                                        {!isRestricted && (
+                                            <button
+                                                onClick={() => handleAddToCart(product)}
+                                                disabled={product.stock === 0}
+                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md active:scale-90 ${product.stock === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-[#234236] hover:rotate-90'}`}
+                                            >
+                                                {product.stock === 0 ? '✕' : '+'}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

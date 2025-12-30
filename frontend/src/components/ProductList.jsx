@@ -22,8 +22,11 @@ const ProductSkeleton = () => (
 function ProductList() {
   const { addToCart, cartItems } = useCart(); 
   const { toggleWishlist, isInWishlist } = useWishlist();
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth(); // Need to check role manually
   
+  // ✅ Restriction for Admin/Seller
+  const isRestricted = ['admin', 'super_admin', 'seller'].includes(user?.role?.toLowerCase());
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,13 +93,14 @@ function ProductList() {
   }, [fetchProducts]);
 
   const handleAddToCart = (product) => {
-    if (isAdmin || product.stock <= 0) return; 
-    addToCart(product, 1); // ✅ ส่งจำนวน 1 เสมอสำหรับหน้า Grid
+    if (isRestricted || product.stock <= 0) return; 
+    addToCart(product, 1); 
     Swal.fire({
       icon: 'success', title: 'เพิ่มลงตะกร้าแล้ว', toast: true, position: 'top-end',
       showConfirmButton: false, timer: 1000, background: '#1a4d2e', color: '#fff'
     });
   };
+
 
   const clearFilters = () => {
       setSelectedCategory('ทั้งหมด');
@@ -212,9 +216,10 @@ function ProductList() {
                 {products.map((product) => (
                   <div key={product.id} className="group bg-white rounded-[2rem] p-4 shadow-sm hover:shadow-2xl transition-all duration-300 relative border border-transparent hover:border-[#1a4d2e]/10 flex flex-col">
                     
+
                     {/* Icons Overlay */}
                     <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 translate-x-12 group-hover:translate-x-0 transition-transform duration-300">
-                        {!isAdmin && (
+                        {!isRestricted && (
                             <button onClick={() => toggleWishlist(product)} className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-md text-gray-400 hover:text-red-500 hover:scale-110 transition-all">
                                 <Heart size={16} className={isInWishlist(product.id) ? "fill-red-500 text-red-500" : ""} />
                             </button>
@@ -238,13 +243,13 @@ function ProductList() {
                         
                         <div className="flex items-center justify-between pt-4 mt-auto border-t border-gray-50">
                             <span className="font-black text-lg text-[#1a4d2e]">{formatPrice(product.price)}</span>
-                            {!isAdmin && product.stock > 0 && (
+                            {!isRestricted && product.stock > 0 && (
                                 <button onClick={() => handleAddToCart(product)} className="w-9 h-9 rounded-xl bg-[#1a4d2e] text-white flex items-center justify-center shadow-lg hover:bg-[#143d24] transition-all active:scale-90 hover:-translate-y-1">
                                     <ShoppingCart size={16} />
                                 </button>
                             )}
                         </div>
-                    </div>
+                   </div>
                   </div>
                 ))}
               </div>

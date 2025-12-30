@@ -18,9 +18,10 @@ export default function Navbar() {
 
   const API_BASE_URL = "http://localhost:8000";
 
-  // ✅ Rule 12: เช็ค Admin แบบ Case-insensitive
+  // ✅ Rule 12: เช็ค Admin/Seller Check
   const userRole = (user?.role || user?.role_code || '').toLowerCase();
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const isAdmin = ['admin', 'super_admin'].includes(userRole);
+  const isRestricted = ['admin', 'super_admin', 'seller'].includes(userRole); // ✅ New Flag for Storefront Restriction
   const hasAdminPanelAccess = isAdmin || userRole === 'seller';
 
   // ✅ Rule 4: ปิดเมนูอัตโนมัติเมื่อเปลี่ยนหน้า
@@ -28,6 +29,7 @@ export default function Navbar() {
     setIsMenuOpen(false);
     setIsProfileOpen(false);
   }, [location]);
+
 
   // ปิด Dropdown เมื่อคลิกข้างนอก (Rule 60)
   useEffect(() => {
@@ -58,8 +60,6 @@ export default function Navbar() {
           </div>
           <span className="text-2xl font-black text-[#1a4d2e] tracking-tighter uppercase">Shop.</span>
         </Link>
-
-        {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-8">
           {/* ✅ Rule 3: Active State ขีดเส้นใต้เมนูปัจจุบัน */}
           <Link to="/shop" className={`font-black text-sm uppercase tracking-widest transition-all relative py-2 ${location.pathname === '/shop' ? 'text-[#1a4d2e]' : 'text-gray-400 hover:text-[#1a4d2e]'}`}>
@@ -67,8 +67,8 @@ export default function Navbar() {
             {location.pathname === '/shop' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#1a4d2e] rounded-full animate-in fade-in slide-in-from-left-2" />}
           </Link>
 
-          {/* ✅ Rule 16: ซ่อนปุ่มตะกร้า/Wishlist สำหรับ Admin */}
-          {!isAdmin && (
+          {/* ✅ Rule 16: ซ่อนปุ่มตะกร้า/Wishlist สำหรับ Admin & Seller */}
+          {!isRestricted && (
             <div className="flex items-center gap-3 border-r border-gray-100 pr-6 mr-2">
               <Link to="/wishlist" className="relative p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all duration-300">
                 <Heart size={22} />
@@ -96,7 +96,7 @@ export default function Navbar() {
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-2xl border border-gray-100 hover:shadow-xl hover:border-[#1a4d2e]/30 bg-white transition-all duration-300 group"
               >
-                {/* ✅ Rule 39: รูปโปรไฟล์ซ้อนทับไอคอนเงา */}
+                {/* ... Profile Icon ... */}
                 <div className="w-9 h-9 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 relative shadow-inner">
                   <div className="absolute inset-0 flex items-center justify-center text-gray-300">
                     <User size={20} />
@@ -131,7 +131,7 @@ export default function Navbar() {
                     โปรไฟล์ของฉัน
                   </Link>
 
-                  {!isAdmin && (
+                  {!isRestricted && (
                     <Link to="/order-history" className="flex items-center gap-4 px-5 py-3.5 text-sm font-black text-gray-600 hover:bg-gray-50 transition-colors">
                       <div className="p-2 bg-gray-100 rounded-xl text-gray-400"><span className="text-lg">📦</span></div>
                       ประวัติการสั่งซื้อ

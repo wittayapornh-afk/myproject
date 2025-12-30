@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { User, Mail, Shield, CheckCircle, XCircle, Edit, Save, X } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { useAuth } from '../context/AuthContext'; // ✅ Import useAuth
 
 export default function UserListAdmin() {
+  const { token, logout } = useAuth(); // ✅ Use context
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState(null); // เก็บ user ที่กำลังแก้ไข
@@ -15,13 +17,16 @@ export default function UserListAdmin() {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const activeToken = token || localStorage.getItem('token');
       const response = await axios.get('http://localhost:8000/api/users/', {
-        headers: { Authorization: `Token ${token}` }
+        headers: { Authorization: `Token ${activeToken}` }
       });
       setUsers(data => response.data);
     } catch (error) {
       console.error("Error fetching users:", error);
+      if (error.response && error.response.status === 401) {
+          logout(); // ✅ Auto logout on 401
+      }
     } finally {
       setLoading(false);
     }
