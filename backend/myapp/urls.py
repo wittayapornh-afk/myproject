@@ -28,10 +28,13 @@ urlpatterns = [
     path('api/products/', views.products_api, name='products_api'),
     path('api/products/add/', views.add_product_api, name='add_product'),
     path('api/products/<int:product_id>/', views.product_detail_api, name='product_detail_api'),
+    path('api/products/<int:product_id>/related/', views.get_related_products, name='get_related_products'),
+    path('api/products/<int:product_id>/stock-history/', views.get_stock_history, name='get_stock_history'),
     path('api/products/<int:product_id>/edit/', views.edit_product_api, name='edit_product'),
     path('api/products/<int:product_id>/delete/', views.delete_product_api, name='delete_product'),
     
     path('api/categories/', views.categories_api, name='categories_api'),
+    path('api/brands/', views.brands_api, name='brands_api'),
     path('api/submit-review/', views.submit_review, name='submit_review'),
 
     # --- Orders & Checkout (สั่งซื้อ) ---

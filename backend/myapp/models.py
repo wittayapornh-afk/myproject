@@ -82,6 +82,7 @@ class Product(models.Model):
     description = models.TextField()
     category = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2) # Changed to Decimal matching DB
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) # ✅ New for "On Sale" filter
     stock = models.IntegerField(default=0)
     brand = models.CharField(max_length=100, null=True, blank=True)
     thumbnail = models.ImageField(upload_to='products/', null=True, blank=True)
@@ -114,6 +115,31 @@ class ProductImage(models.Model):
     def __str__(self):
         return f"{self.product.title} Image"
 
+class StockHistory(models.Model):
+    ACTION_CHOICES = [
+        ('sale', 'Sale'),
+        ('restock', 'Restock'),
+        ('adjustment', 'Adjustment'),
+        ('return', 'Return'),
+        ('cancel', 'Order Cancelled'),
+        ('edit', 'Edit Info') # ✅ Support General Edits
+    ]
+    
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_history')
+    change_quantity = models.IntegerField(help_text="Negative for deduction, Positive for addition")
+    remaining_stock = models.IntegerField()
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    note = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = 'stock_history'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.product.title} - {self.change_quantity} ({self.action})"
+
 # ==========================================
 # 📦 Order System
 # ==========================================
@@ -139,6 +165,16 @@ class Order(models.Model):
     
     payment_method = models.CharField(max_length=50, default='Transfer')
     payment_slip = models.CharField(max_length=255, null=True, blank=True) # DB is VARCHAR(255) for path
+    
+    # ✅ New Fields for Payment Slip Verification
+    slip_image = models.ImageField(upload_to='slips/', null=True, blank=True)
+    payment_date = models.DateTimeField(null=True, blank=True)
+    
+    # ✅ Strict Payment Verification
+    transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    transfer_date = models.DateTimeField(null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+    transfer_account_number = models.CharField(max_length=50, null=True, blank=True) # ✅ New Field
     
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

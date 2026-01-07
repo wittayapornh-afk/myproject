@@ -1,49 +1,129 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingCart, Heart, User, LogOut, Menu, X, ChevronDown, Sparkles, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, Heart, User, LogOut, Menu, X, ChevronDown, Sparkles, LayoutDashboard, Store, ClipboardList, ChevronsLeft, Search, Bell, BellOff } from 'lucide-react';
+import axios from 'axios';
+import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
 
-export default function Navbar() {
-  const { user, logout } = useAuth();
+export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
+  const { user, logout, loading } = useAuth();
   const { cartItems } = useCart();
   const { wishlistItems } = useWishlist();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownRef = useRef(null);
+
+  // ✅ Smart Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const searchTimeoutRef = useRef(null);
+
+  // ✅ Notification State
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notificationRef = useRef(null);
+
+  // ✅ Handle Notification Click
+  const handleNotificationClick = (noti) => {
+      Swal.fire({
+          title: `<h3 class="text-xl font-bold text-[#1a4d2e]">${noti.title}</h3>`,
+          html: `
+              <div class="text-left">
+                  <p class="text-gray-600 mb-4 text-sm">${noti.message}</p>
+                  <div class="flex items-center gap-2 text-xs text-gray-400 mt-2 border-t pt-2 border-gray-100">
+                      <span>🕒 ${noti.time}</span>
+                      <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 uppercase font-bold text-[10px]">${noti.type}</span>
+                  </div>
+              </div>
+          `,
+          icon: noti.type === 'alert' ? 'error' : (noti.type === 'success' ? 'success' : 'info'),
+          confirmButtonText: 'รับทราบ',
+          confirmButtonColor: '#1a4d2e',
+          buttonsStyling: false,
+          customClass: {
+              popup: 'rounded-[2rem] p-6',
+              confirmButton: 'bg-[#1a4d2e] text-white px-6 py-2 rounded-xl font-bold hover:bg-[#143d23] transition-all text-sm'
+          }
+      });
+  };
+
+  // ✅ Close Notification when clicking outside
+  useEffect(() => {
+      const handleClickOutside = (event) => {
+          if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+              setShowNotifications(false);
+          }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+          document.removeEventListener("mousedown", handleClickOutside);
+      };
+  }, []);
+
+  // ✅ Real Notification Polling
+  useEffect(() => {
+      if (!user) {
+          setNotifications([]);
+          return;
+      }
+
+      const fetchNotifications = async () => {
+          try {
+              const res = await axios.get(`${API_BASE_URL}/api/notifications/`, {
+                  headers: { Authorization: `Token ${user?.token || localStorage.getItem('token')}` }
+              });
+              setNotifications(res.data);
+          } catch (error) {
+              console.error("Failed to fetch notifications", error);
+          }
+      };
+
+      fetchNotifications(); // Initial fetch
+      const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
+
+      return () => clearInterval(interval);
+  }, [user]);
+
+  // ✅ Search Handler (Debounced)
+  const handleSearch = (value) => {
+      setSearchQuery(value);
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+      if (!value.trim()) {
+          setSearchResults([]);
+          return;
+      }
+
+      searchTimeoutRef.current = setTimeout(async () => {
+          try {
+              const res = await axios.get(`${API_BASE_URL}/api/products/?search=${value}`);
+              if (res.data && res.data.results) {
+                  setSearchResults(res.data.results.slice(0, 5)); // Limit 5 items
+              }
+          } catch (error) {
+              console.error("Search failed", error);
+          }
+      }, 300); // 300ms debounce
+  };
 
   const API_BASE_URL = "http://localhost:8000";
 
   // ✅ Rule 12: เช็ค Admin/Seller Check
   const userRole = (user?.role || user?.role_code || '').toLowerCase();
   const isAdmin = ['admin', 'super_admin'].includes(userRole);
-  const isRestricted = ['admin', 'super_admin', 'seller'].includes(userRole); // ✅ New Flag for Storefront Restriction
+  const isRestricted = ['admin', 'super_admin', 'seller'].includes(userRole);
   const hasAdminPanelAccess = isAdmin || userRole === 'seller';
 
   // ✅ Rule 4: ปิดเมนูอัตโนมัติเมื่อเปลี่ยนหน้า
   useEffect(() => {
     setIsMenuOpen(false);
-    setIsProfileOpen(false);
   }, [location]);
 
-
-  // ปิด Dropdown เมื่อคลิกข้างนอก (Rule 60)
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsProfileOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const handleLogout = () => {
-    setIsProfileOpen(false);
     logout();
     navigate('/login');
   };
@@ -53,19 +133,137 @@ export default function Navbar() {
     <nav className="bg-white/80 backdrop-blur-md fixed w-full z-[999] top-0 border-b border-gray-100 shadow-sm transition-all duration-300">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
 
-        {/* ✅ Rule 1, 9: Logo พร้อม Hover Animation */}
-        <Link to="/" className="flex items-center gap-2 group">
-          <div className="w-10 h-10 bg-[#1a4d2e] rounded-xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform duration-300">
-            <Sparkles size={20} className="group-hover:animate-pulse" />
+        {/* ✅ Left Section: Logo & Burger (for Admin) */}
+        <div className="flex items-center gap-4">
+            
+            {/* ✅ Burger Menu with << >> Animation */}
+            {user && (
+                <button 
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    className="group p-2 text-gray-500 hover:bg-[#1a4d2e] hover:text-white rounded-xl transition-all duration-300 ease-in-out transform active:scale-90 hidden md:flex items-center justify-center w-10 h-10 shadow-sm hover:shadow-green-200"
+                    title={isSidebarOpen ? "Close Menu" : "Open Menu"}
+                >
+                    <div className={`transition-transform duration-300 ${isSidebarOpen ? 'rotate-180' : 'rotate-0'}`}>
+                        {isSidebarOpen ? <ChevronsLeft size={24} /> : <Menu size={24} />}
+                    </div>
+                </button>
+            )}
+
+            {/* ✅ Rule 1, 9: Logo พร้อม Hover Animation */}
+            <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-10 h-10 bg-[#1a4d2e] rounded-xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform duration-300">
+                <Sparkles size={20} className="group-hover:animate-pulse" />
+            </div>
+            <span className="text-2xl font-black text-[#1a4d2e] tracking-tighter uppercase">Shop.</span>
+            </Link>
+        </div>
+
+        {/* ✅ Middle Section: Smart Search (New Feature) */}
+        <div className="hidden md:flex flex-1 max-w-md mx-8 relative z-[1001]">
+            <div className="relative w-full group">
+                <input 
+                    type="text" 
+                    placeholder="ค้นหาสินค้า..." 
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-2 border-transparent group-hover:border-gray-200 focus:border-[#1a4d2e] rounded-full text-sm font-medium transition-all duration-300 outline-none shadow-sm focus:shadow-md focus:bg-white"
+                    onChange={(e) => handleSearch(e.target.value)}
+                />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-[#1a4d2e] transition-colors" size={18} />
+                
+                {/* Search Results Dropdown */}
+                {searchResults.length > 0 && searchQuery && (
+                    <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                        <div className="p-2">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-3 py-2">ผลการค้นหา</p>
+                            {searchResults.map((product) => (
+                                <Link 
+                                    to={`/product/${product.id}`} 
+                                    key={product.id}
+                                    onClick={() => setSearchResults([])}
+                                    className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition-colors group/item"
+                                >
+                                    <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden relative">
+                                        {product.thumbnail ? (
+                                            <img src={API_BASE_URL + product.thumbnail} alt={product.title} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-200 text-xs font-bold text-gray-400">N/A</div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="text-sm font-bold text-gray-800 truncate group-hover/item:text-[#1a4d2e]">{product.title}</h4>
+                                        <p className="text-xs text-gray-500">฿{product.price.toLocaleString()}</p>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                        <Link to="/shop" className="block w-full py-3 text-center text-xs font-black text-[#1a4d2e] bg-green-50 hover:bg-green-100 transition-colors">
+                            ดูผลลัพธ์ทั้งหมด
+                        </Link>
+                    </div>
+                )}
+            </div>
+        </div>
+
+        <div className="hidden md:flex items-center gap-6">
+          
+          {/* ✅ Notification Center (Ex-hover, now Click) */}
+          <div className="relative" ref={notificationRef}>
+              <button 
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className={`relative p-2 rounded-full transition-all duration-300 ${showNotifications ? 'bg-green-50 text-[#1a4d2e]' : 'text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50'}`}
+              >
+                  <Bell size={22} className={notifications.length > 0 ? 'animate-swing' : ''} />
+                  {notifications.length > 0 && (
+                      <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+                  )}
+              </button>
+              
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                  <div className="absolute top-full right-0 w-80 mt-2 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[1002]">
+                      <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-white/50 backdrop-blur-sm">
+                          <h3 className="font-black text-gray-800 text-sm">การแจ้งเตือน</h3>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-[#1a4d2e]/10 text-[#1a4d2e] rounded-full">{notifications.length} ใหม่</span>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto custom-scrollbar p-2">
+                           {notifications.length > 0 ? (
+                               notifications.map((noti) => (
+                                   <div 
+                                       key={noti.id} 
+                                       onClick={() => handleNotificationClick(noti)}
+                                       className="flex gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer relative group/item"
+                                   >
+                                       <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${
+                                           {
+                                               order: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]',
+                                               alert: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]',
+                                               success: 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]',
+                                               promo: 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]',
+                                               info: 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.5)]'
+                                           }[noti.type] || 'bg-gray-300'
+                                       }`} />
+                                       <div>
+                                           <p className="text-xs font-bold text-gray-800 leading-tight mb-1 group-hover/item:text-[#1a4d2e] transition-colors">{noti.title}</p>
+                                           <p className="text-[10px] text-gray-500 leading-relaxed max-w-[200px] truncate">{noti.message}</p>
+                                           <p className="text-[9px] text-gray-400 mt-2 font-medium">{noti.time}</p>
+                                       </div>
+                                   </div>
+                               ))
+                           ) : (
+                               <div className="py-8 text-center">
+                                   <BellOff size={32} className="mx-auto text-gray-200 mb-2" />
+                                   <p className="text-xs text-gray-400 font-medium">ไม่มีการแจ้งเตือนใหม่</p>
+                                </div>
+                           )}
+                      </div>
+                      <div className="p-2 border-t border-gray-50 bg-gray-50">
+                          <button className="w-full py-2 text-[10px] font-black text-gray-500 hover:text-[#1a4d2e] uppercase tracking-wider transition-colors">
+                              ล้างการแจ้งเตือนทั้งหมด
+                          </button>
+                      </div>
+                  </div>
+              )}
           </div>
-          <span className="text-2xl font-black text-[#1a4d2e] tracking-tighter uppercase">Shop.</span>
-        </Link>
-        <div className="hidden md:flex items-center gap-8">
-          {/* ✅ Rule 3: Active State ขีดเส้นใต้เมนูปัจจุบัน */}
-          <Link to="/shop" className={`font-black text-sm uppercase tracking-widest transition-all relative py-2 ${location.pathname === '/shop' ? 'text-[#1a4d2e]' : 'text-gray-400 hover:text-[#1a4d2e]'}`}>
-            สินค้าทั้งหมด
-            {location.pathname === '/shop' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#1a4d2e] rounded-full animate-in fade-in slide-in-from-left-2" />}
-          </Link>
+
 
           {/* ✅ Rule 16: ซ่อนปุ่มตะกร้า/Wishlist สำหรับ Admin & Seller */}
           {!isRestricted && (
@@ -89,71 +287,53 @@ export default function Navbar() {
             </div>
           )}
 
-          {/* User Section */}
+
+          {/* User Section - Consolidated Logic */}
           {user ? (
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-2xl border border-gray-100 hover:shadow-xl hover:border-[#1a4d2e]/30 bg-white transition-all duration-300 group"
-              >
-                {/* ... Profile Icon ... */}
-                <div className="w-9 h-9 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 relative shadow-inner">
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-                    <User size={20} />
+            <div className="flex items-center gap-3">
+               
+               {/* 1. Order History & Cart (Hidden for Admin/Seller) */}
+               {!hasAdminPanelAccess && (
+                 <Link to="/order-history" title="ประวัติการสั่งซื้อ" className="hidden md:flex p-2.5 text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50 rounded-2xl transition-all duration-300">
+                    <ClipboardList size={22} />
+                 </Link>
+               )}
+
+               {/* 2. Profile Link (Show for ALL Users including Admin) */}
+               <Link to="/profile" title="โปรไฟล์ของฉัน" className="group flex items-center gap-3 pl-1.5 pr-2 py-1.5 rounded-full border border-gray-100 hover:border-[#1a4d2e]/30 hover:bg-white transition-all duration-300">
+                  <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-50 border border-gray-100 relative shadow-sm group-hover:shadow-md transition-all">
+                    <img
+                      src={getUserAvatar(user.avatar)}
+                      alt={user.username}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      onError={(e) => { e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" }}
+                    />
                   </div>
-                  <img
-                    src={getUserAvatar(user.avatar)}
-                    className="absolute inset-0 w-full h-full object-cover z-10 transition-transform duration-500 group-hover:scale-110"
-                    onError={(e) => { e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" }}
-                  />
-                </div>
-                <div className="text-left hidden lg:block">
-                  <p className="text-xs font-black text-gray-800 leading-tight uppercase tracking-tighter">{user.username}</p>
-                  <p className="text-[9px] text-[#1a4d2e] font-black uppercase tracking-widest opacity-70">{user.role}</p>
-                </div>
-                <ChevronDown size={14} className={`text-gray-400 transition-transform duration-300 ${isProfileOpen ? 'rotate-180' : ''}`} />
-              </button>
+                  <div className="hidden lg:block text-left pr-2">
+                    <p className="text-xs font-black text-gray-800 leading-tight uppercase tracking-tighter">{user.username}</p>
+                    <p className="text-[9px] text-[#1a4d2e] font-black uppercase tracking-widest opacity-70">{user.role}</p>
+                  </div>
+               </Link>
 
-              {/* ✅ Rule 27: Dropdown Menu พร้อม Fade/Zoom Animation */}
-              {isProfileOpen && (
-                <div className="absolute right-0 top-[calc(100%+12px)] w-64 bg-white border border-gray-100 shadow-2xl rounded-[2rem] z-50 overflow-hidden py-3 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-
-                  {/* ✅ Rule 20: ปุ่ม Dashboard สำหรับ Admin */}
-                  {hasAdminPanelAccess && (
-                    <Link to="/admin/dashboard" className="flex items-center gap-4 px-5 py-3.5 text-sm font-black text-[#1a4d2e] hover:bg-green-50 transition-colors">
-                      <div className="p-2 bg-green-100 rounded-xl"><LayoutDashboard size={18} /></div>
-                      {user.role === 'seller' ? 'DASHBOARD' : 'ADMIN PANEL'}
-                    </Link>
-                  )}
-
-                  <Link to="/profile" className="flex items-center gap-4 px-5 py-3.5 text-sm font-black text-gray-600 hover:bg-gray-50 transition-colors">
-                    <div className="p-2 bg-gray-100 rounded-xl text-gray-400"><User size={18} /></div>
-                    โปรไฟล์ของฉัน
-                  </Link>
-
-                  {!isRestricted && (
-                    <Link to="/order-history" className="flex items-center gap-4 px-5 py-3.5 text-sm font-black text-gray-600 hover:bg-gray-50 transition-colors">
-                      <div className="p-2 bg-gray-100 rounded-xl text-gray-400"><span className="text-lg">📦</span></div>
-                      ประวัติการสั่งซื้อ
-                    </Link>
-                  )}
-
-                  <div className="h-px bg-gray-100 my-2 mx-5 opacity-50"></div>
-
-                  <button onClick={handleLogout} className="w-full flex items-center gap-4 px-5 py-3.5 text-sm font-black text-red-500 hover:bg-red-50 transition-colors text-left">
-                    <div className="p-2 bg-red-100 rounded-xl"><LogOut size={18} /></div>
-                    ออกจากระบบ
-                  </button>
-                </div>
-              )}
+               {/* 3. Logout Button */}
+               <button 
+                  onClick={handleLogout} 
+                  title="ออกจากระบบ"
+                  className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-300"
+               >
+                  <LogOut size={22} />
+               </button>
             </div>
           ) : (
+            // ✅ Only show Login if definitely not loading and no token
+            (!loading && !localStorage.getItem('token')) && (
             <div className="flex gap-4">
               <Link to="/login" className="px-6 py-2.5 text-sm font-black text-gray-500 hover:text-[#1a4d2e] transition-all">เข้าสู่ระบบ</Link>
               <Link to="/register" className="px-8 py-2.5 text-sm font-black text-white bg-[#1a4d2e] hover:bg-[#143d24] rounded-2xl shadow-xl shadow-green-100 transition-all transform hover:-translate-y-1 active:scale-95">
                 สมัครสมาชิก
               </Link>
             </div>
+            )
           )}
         </div>
 
