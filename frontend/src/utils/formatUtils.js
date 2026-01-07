@@ -12,7 +12,8 @@ export const formatDate = (dateString) => {
     if (!dateString) return 'ไม่ระบุวันที่';
     return new Date(dateString).toLocaleDateString('th-TH', {
         year: 'numeric', month: 'long', day: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+        hour: '2-digit', minute: '2-digit',
+        calendar: 'buddhist' // ✅ เพิ่มบรรทัดนี้เพื่อบังคับ พ.ศ.
     });
 };
 

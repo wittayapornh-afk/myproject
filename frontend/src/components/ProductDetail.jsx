@@ -68,8 +68,8 @@ function ProductDetail() {
                   'Authorization': `Token ${authToken || localStorage.getItem('token')}`
               },
               body: JSON.stringify({
-                  product_id: product.id,
-                  rating: newReview.rating,
+                  product_id: parseInt(id), // ✅ Use URL ID directly
+                  rating: parseInt(newReview.rating),
                   comment: newReview.comment
               })
           });
@@ -141,8 +141,25 @@ function ProductDetail() {
         setProduct(data);
         setActiveImage(data.image || data.thumbnail); // ✅ Set main image as default
         setLoading(false);
+
+        // ✅ Save to Recently Viewed
+        try {
+            const recent = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+            const newEntry = {
+                id: data.id,
+                title: data.title,
+                price: data.price,
+                thumbnail: data.thumbnail || data.image,
+                category: data.category
+            };
+            const filtered = recent.filter(item => item.id !== data.id);
+            filtered.unshift(newEntry);
+            localStorage.setItem('recentlyViewed', JSON.stringify(filtered.slice(0, 10)));
+        } catch (e) {
+            console.error("Failed to save recently viewed:", e);
+        }
         // ✅ ดึงสินค้าแนะนำ (หมวดเดียวกัน)
-        fetchRelatedProducts(data.category);
+        fetchRelatedProducts();
       })
       .catch(err => {
         console.error(err);
@@ -151,27 +168,21 @@ function ProductDetail() {
       });
   }, [id]);
 
-  const fetchRelatedProducts = (category) => {
-    // สมมติว่า Backend รองรับการ filter ?category=...
-    fetch(`${API_BASE_URL}/api/products/?category=${encodeURIComponent(category)}&page_size=4`)
+  const fetchRelatedProducts = () => {
+    fetch(`${API_BASE_URL}/api/products/${id}/related/`)
       .then(res => {
           if (!res.ok) throw new Error('Failed to fetch related');
           return res.json();
       })
       .then(data => {
-        const items = data.results || data;
-        if (Array.isArray(items)) {
-             // กรองตัวปัจจุบันออก
-            const filtered = items.filter(item => item.id !== parseInt(id)).slice(0, 4);
-            setRelatedProducts(filtered);
+        if (Array.isArray(data)) {
+            setRelatedProducts(data);
         } else {
-            console.warn("Related products API did not return an array:", data);
             setRelatedProducts([]);
         }
       })
       .catch(err => {
           console.error("Error fetching related products:", err);
-          // ไม่ต้องทำอะไร ปล่อยให้ relatedProducts เป็น [] (ค่า default)
       });
   };
 
@@ -199,14 +210,47 @@ function ProductDetail() {
   const isOutOfStock = product.stock <= 0;
 
   return (
-    <div className="min-h-screen bg-[#F9F9F7] py-10 px-4 font-sans pt-28 pb-12">
+    <div className="min-h-screen bg-[#F9F9F7] py-10 px-4 font-sans pt-28 pb-12 relative">
       <div className="max-w-6xl mx-auto">
-        {/* Navigation */}
+        {/* Navigation Header */}
         <div className="flex justify-between items-center mb-8">
-            <button onClick={() => navigate('/shop')} className="flex items-center gap-2 text-gray-500 hover:text-[#1a4d2e] font-bold"><ArrowLeft size={20}/> Back to Shop</button>
-            <div className="flex gap-2">
-                <button onClick={() => navigate(`/product/${parseInt(id) - 1}`)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50"><ChevronLeft/></button>
-                <button onClick={() => navigate(`/product/${parseInt(id) + 1}`)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50"><ChevronRight/></button>
+            {/* Left: Back to Shop */}
+            <button onClick={() => navigate('/shop')} className="group flex items-center gap-3 text-gray-400 hover:text-[#1a4d2e] font-bold transition-colors">
+                <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-gray-100 group-hover:border-[#1a4d2e] transition-all">
+                    <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform"/>
+                </div>
+                <span>กลับหน้าร้านค้า</span>
+            </button>
+
+            {/* Right: Prev/Next Buttons (Moved here) */}
+            <div className="flex items-center gap-3">
+                {product.prev_id && (
+                    <button 
+                        onClick={() => navigate(`/product/${product.prev_id}`)}
+                        className="group relative flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-100 hover:border-[#1a4d2e] transition-all duration-300 hover:shadow-[0_4px_20px_rgba(26,77,46,0.15)] active:scale-95"
+                    >
+                        <ChevronLeft size={18} className="text-gray-400 group-hover:text-[#1a4d2e] transition-colors"/>
+                        <span className="text-sm font-bold text-gray-500 group-hover:text-[#1a4d2e] hidden md:inline transition-colors mb-[2px]">ก่อนหน้า</span>
+                    </button>
+                )}
+                
+                {/* Logic: If no next_id, try to use the first related product as "Next" to keep browsing */}
+                {(product.next_id || (relatedProducts.length > 0)) && (
+                    <button 
+                        onClick={() => navigate(`/product/${product.next_id || relatedProducts[0].id}`)}
+                        className="group relative flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-100 hover:border-[#1a4d2e] transition-all duration-300 hover:shadow-[0_4px_20px_rgba(26,77,46,0.15)] active:scale-95"
+                    >
+                        <span className="text-sm font-bold text-gray-500 group-hover:text-[#1a4d2e] hidden md:inline transition-colors mb-[2px]">
+                            {product.next_id ? 'ถัดไป' : 'ดูสินค้าอื่น'}
+                        </span>
+                        <ChevronRight size={18} className="text-gray-400 group-hover:text-[#1a4d2e] transition-colors"/>
+                        
+                        {/* Pulse Effect for "Discover" mode */}
+                        {!product.next_id && (
+                             <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#1a4d2e] rounded-full animate-ping opacity-75"></span>
+                        )}
+                    </button>
+                )}
             </div>
         </div>
 

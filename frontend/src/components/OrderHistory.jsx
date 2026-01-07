@@ -14,6 +14,7 @@ import {
     ChevronLeft,
     AlertCircle
 } from 'lucide-react';
+import PaymentModal from './PaymentModal';
 
 function OrderHistory() {
     const [orders, setOrders] = useState([]);
@@ -21,31 +22,49 @@ function OrderHistory() {
     const { token } = useAuth();
     const navigate = useNavigate();
 
+    const fetchOrders = async () => {
+        // 🚩 ตรวจสอบ Token ก่อนเรียก API
+        if (!token) {
+            console.log("Waiting for token...");
+            return;
+        }
+
+        try {
+            const response = await axios.get('http://localhost:8000/api/orders/', {
+                headers: {
+                    'Authorization': `Token ${token}`
+                }
+            });
+            setOrders(response.data);
+        } catch (error) {
+            console.error("Fetch Orders Error:", error.response?.data || error.message);
+            // ถ้า 401 Unauthorized อาจเป็นเพราะ Token หมดอายุ
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchOrders = async () => {
-            // 🚩 ตรวจสอบ Token ก่อนเรียก API
-            if (!token) {
-                console.log("Waiting for token...");
-                return;
-            }
-
-            try {
-                const response = await axios.get('http://localhost:8000/api/orders/', {
-                    headers: {
-                        'Authorization': `Token ${token}`
-                    }
-                });
-                setOrders(response.data);
-            } catch (error) {
-                console.error("Fetch Orders Error:", error.response?.data || error.message);
-                // ถ้า 401 Unauthorized อาจเป็นเพราะ Token หมดอายุ
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchOrders();
     }, [token]);
+
+    // ✅ Integration Logic for Payment Modal
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedOrderId, setSelectedOrderId] = useState(null);
+    const [selectedOrderTotal, setSelectedOrderTotal] = useState(0);
+    const [selectedQrPayload, setSelectedQrPayload] = useState(null);
+
+    const handleOpenPayment = (order) => {
+        setSelectedOrderId(order.id);
+        setSelectedOrderTotal(order.total_price);
+        setSelectedQrPayload(order.promptpay_payload);
+        setIsModalOpen(true);
+    };
+
+    const handlePaymentSuccess = () => {
+        // Refresh orders directly without reload
+        fetchOrders(); 
+    };
 
     if (loading) {
         return (
@@ -96,15 +115,20 @@ function OrderHistory() {
                                                 <CalendarDays size={14} className="text-gray-400" /> {order.date}
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">สถานะ</p>
-                                            <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter ${
-                                                order.status === 'Completed' ? 'bg-green-100 text-green-700' : 
-                                                order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
-                                            }`}>
-                                                {order.status}
-                                            </span>
-                                        </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">สถานะ</p>
+                                                <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter ${
+                                                    order.status === 'Completed' ? 'bg-green-100 text-green-700' : 
+                                                    order.status === 'Shipped' ? 'bg-indigo-100 text-indigo-700' :
+                                                    order.status === 'Processing' ? 'bg-blue-100 text-blue-700' :
+                                                    order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 
+                                                    'bg-amber-100 text-amber-700' // Pending
+                                                }`}>
+                                                    {order.status === 'Pending' ? (order.has_slip ? 'รอตรวจสอบยอด' : 'รอชำระเงิน') : 
+                                                     order.status === 'Shipped' ? 'จัดส่งแล้ว' : 
+                                                     order.status}
+                                                </span>
+                                            </div>
                                     </div>
                                 </div>
 
@@ -123,14 +147,42 @@ function OrderHistory() {
                                 </div>
 
                                 <div className="mt-6 pt-6 border-t border-gray-50 flex justify-between items-center">
-                                    <p className="text-sm font-bold text-gray-500">ยอดสุทธิ</p>
-                                    <p className="text-xl font-black text-[#1a4d2e]">{formatPrice(order.total_price)}</p>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-500">ยอดสุทธิ</p>
+                                        <p className="text-xl font-black text-[#1a4d2e]">{formatPrice(order.total_price)}</p>
+                                    </div>
+                                    
+                                    {/* ✅ BUTTON ACTION AREA */}
+                                    {order.status === 'Pending' && !order.has_slip && (
+                                        <button 
+                                            onClick={() => handleOpenPayment(order)}
+                                            className="bg-[#1a4d2e] text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-green-100 hover:-translate-y-1 transition-all"
+                                        >
+                                            แจ้งชำระเงิน
+                                        </button>
+                                    )}
+                                    {order.status === 'Pending' && order.has_slip && (
+                                        <div className="px-4 py-2 bg-gray-100 rounded-xl text-xs font-bold text-gray-500 flex items-center gap-2">
+                                            <Clock size={16} /> แจ้งแล้ว รอตรวจสอบ
+                                        </div>
+                                    )}
+
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
+            
+            {/* ✅ Payment Modal */}
+            <PaymentModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                orderId={selectedOrderId}
+                orderTotal={selectedOrderTotal}
+                promptPayPayload={selectedQrPayload}
+                onSuccess={handlePaymentSuccess}
+            />
         </div>
     );
 }

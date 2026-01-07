@@ -1,45 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Plus, Edit, Trash2, Filter, X, Image as ImageIcon, Save, UploadCloud, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useAuth } from '../context/AuthContext'; // ✅ Import useAuth
-
+import { Search, Plus, Edit, Trash2, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react'; // Removing unused icons
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2'; // ✅ Import Swal
 export default function ProductListAdmin() {
-  const { token, logout } = useAuth(); // ✅ Use token and logout from context
+  const { token, logout } = useAuth();
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(['ทั้งหมด']);
   const [loading, setLoading] = useState(true);
 
-  // --- Pagination State (เพิ่มใหม่) ---
+  // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // กำหนดจำนวนสินค้าต่อหน้า
+  const itemsPerPage = 10;
 
   // Filter
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ทั้งหมด');
-
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [currentProductId, setCurrentProductId] = useState(null);
-
-  // Form Data
-  const [formData, setFormData] = useState({
-    name: '', price: '', stock: '', category: '', description: ''
-  });
-  
-  // Image States
-  const [mainImage, setMainImage] = useState(null);
-  const [mainImagePreview, setMainImagePreview] = useState(null);
-  const [existingGallery, setExistingGallery] = useState([]); 
-  const [galleryFiles, setGalleryFiles] = useState([]);     
-  const [galleryPreviews, setGalleryPreviews] = useState([]); 
 
   useEffect(() => {
     fetchAllProducts();
     fetchCategories();
   }, []);
 
-  // ✅ เมื่อมีการค้นหา หรือเปลี่ยนหมวดหมู่ ให้กลับไปหน้า 1 เสมอ
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, categoryFilter]);
@@ -47,9 +31,7 @@ export default function ProductListAdmin() {
   const fetchAllProducts = async () => {
     setLoading(true);
     try {
-      // ✅ Use token from Context (or fallback to localStorage if context not ready)
       const activeToken = token || localStorage.getItem('token'); 
-      
       const response = await axios.get('http://localhost:8000/api/admin/all_products/', {
           headers: { Authorization: `Token ${activeToken}` }
       });
@@ -59,7 +41,7 @@ export default function ProductListAdmin() {
     } catch (error) {
       console.error("Error:", error);
       if (error.response && error.response.status === 401) {
-          logout(); // ✅ Force Logout on 401
+          logout();
       }
     } finally {
       setLoading(false);
@@ -74,140 +56,51 @@ export default function ProductListAdmin() {
   };
 
   // --- Handlers ---
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleMainImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setMainImage(file);
-      setMainImagePreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handleGalleryChange = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 0) {
-      setGalleryFiles([...galleryFiles, ...files]);
-      const newPreviews = files.map(f => URL.createObjectURL(f));
-      setGalleryPreviews([...galleryPreviews, ...newPreviews]);
-    }
-  };
-
-  const removeNewImage = (index) => {
-    const newFiles = [...galleryFiles];
-    newFiles.splice(index, 1);
-    setGalleryFiles(newFiles);
-    const newPreviews = [...galleryPreviews];
-    newPreviews.splice(index, 1);
-    setGalleryPreviews(newPreviews);
-  }
-
-  const removeExistingImage = async (imageId) => {
-    if(!window.confirm("ต้องการลบรูปนี้ถาวรไหม?")) return;
-    try {
-        // ✅ Use context token
-        const activeToken = token || localStorage.getItem('token');
-        await axios.delete(`http://localhost:8000/api/delete_product_image/${imageId}/`, {
-             headers: { Authorization: `Token ${activeToken}` }
-        });
-        setExistingGallery(existingGallery.filter(img => img.id !== imageId));
-    } catch (e) {
-        console.error(e);
-        if (e.response && e.response.status === 401) logout();
-        else alert("ลบรูปไม่สำเร็จ");
-    }
-  }
-
   const handleAddClick = () => {
-    setIsEditMode(false);
-    setCurrentProductId(null);
-    setFormData({ name: '', price: '', stock: '', category: '', description: '' });
-    setMainImage(null); setMainImagePreview(null);
-    setExistingGallery([]);
-    setGalleryFiles([]); setGalleryPreviews([]);
-    setIsModalOpen(true);
+    navigate('/admin/product/add');
   };
 
-  const handleEditClick = async (product) => {
-    setIsEditMode(true);
-    setCurrentProductId(product.id);
-    
-    setFormData({
-      name: product.title || product.name,
-      price: product.price,
-      stock: product.stock,
-      category: product.category,
-      description: product.description || ''
-    });
-    
-    const imgUrl = product.thumbnail ? (product.thumbnail.startsWith('http') ? product.thumbnail : `http://localhost:8000${product.thumbnail}`) : null;
-    setMainImagePreview(imgUrl);
-    setMainImage(null);
-    
-    setGalleryFiles([]); 
-    setGalleryPreviews([]);
-
-    try {
-        const res = await axios.get(`http://localhost:8000/api/products/${product.id}/`);
-        if(res.data.images) setExistingGallery(res.data.images);
-    } catch(e) {
-        setExistingGallery([]);
-    }
-
-    setIsModalOpen(true);
+  const handleEditClick = (product) => {
+    navigate(`/admin/product/edit/${product.id}`);
   };
 
   const handleDelete = async (id) => {
-    if(!window.confirm("ยืนยันการลบสินค้า?")) return;
-    try {
-        const activeToken = token || localStorage.getItem('token');
-        await axios.delete(`http://localhost:8000/api/delete_product/${id}/`, {
-            headers: { Authorization: `Token ${activeToken}` }
-        });
-        alert("ลบสำเร็จ");
-        fetchAllProducts();
-    } catch(e) { 
-        if (e.response && e.response.status === 401) logout();
-        else alert("ลบไม่สำเร็จ"); 
-    }
-  };
+    // ✅ Use SweetAlert2 for Confirmation
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบสินค้า?',
+        text: "คุณจะไม่สามารถกู้คืนสินค้านี้ได้!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'ลบสินค้าเลย!',
+        cancelButtonText: 'ยกเลิก',
+        background: '#fff',
+        borderRadius: '20px'
+    });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const activeToken = token || localStorage.getItem('token');
-    
-    const data = new FormData();
-    data.append('title', formData.name); // ✅ Fix: Backend expects 'title'
-    data.append('price', formData.price);
-    data.append('stock', formData.stock);
-    data.append('category', formData.category);
-    data.append('description', formData.description);
-    
-    if (mainImage) data.append('thumbnail', mainImage); // ✅ Fix: Backend expects 'thumbnail'
-    galleryFiles.forEach(f => data.append('new_gallery_images', f)); // ✅ Fix: Backend expects 'new_gallery_images'
-
-    try {
-        const url = isEditMode 
-            ? `http://localhost:8000/api/edit_product/${currentProductId}/`
-            : `http://localhost:8000/api/add_product/`;
-        
-        if (isEditMode) {
-             await axios.put(url, data, {
+    if (result.isConfirmed) {
+        try {
+            const activeToken = token || localStorage.getItem('token');
+            await axios.delete(`http://localhost:8000/api/delete_product/${id}/`, {
                 headers: { Authorization: `Token ${activeToken}` }
             });
-        } else {
-             await axios.post(url, data, {
-                headers: { Authorization: `Token ${activeToken}` }
+            
+            await Swal.fire({
+                title: 'ลบสำเร็จ!',
+                text: 'สินค้าถูกลบออกจากระบบแล้ว',
+                icon: 'success',
+                confirmButtonColor: '#1a4d2e'
             });
+            fetchAllProducts();
+        } catch(e) { 
+            console.error(e);
+            if (e.response && e.response.status === 401) {
+                logout();
+            } else {
+                Swal.fire('Error', 'ไม่สามารถลบสินค้าได้', 'error'); 
+            }
         }
-        alert(isEditMode ? "บันทึกเรียบร้อย" : "เพิ่มสินค้าสำเร็จ");
-        setIsModalOpen(false);
-        fetchAllProducts();
-    } catch (e) {
-        if (e.response && e.response.status === 401) logout();
-        else alert("เกิดข้อผิดพลาด: " + (e.response?.data?.error || e.message));
     }
   };
 
@@ -219,13 +112,12 @@ export default function ProductListAdmin() {
     return matchName && matchCat;
   });
 
-  // --- Pagination Logic (คำนวณการตัดแบ่งหน้า) ---
+  // --- Pagination Logic ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
 
-  // ปุ่มเปลี่ยนหน้า
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   return (
@@ -307,7 +199,6 @@ export default function ProductListAdmin() {
                         <ChevronLeft size={16}/>
                     </button>
                     
-                    {/* Generate Page Numbers */}
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(number => (
                         <button 
                             key={number} 
@@ -333,84 +224,6 @@ export default function ProductListAdmin() {
             </div>
         )}
       </div>
-
-      {/* Modal (คงเดิม) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-                <div className="bg-[#1a4d2e] p-4 flex justify-between items-center text-white shrink-0">
-                    <h3 className="font-bold text-lg flex items-center gap-2">{isEditMode ? <Edit/> : <Plus/>} {isEditMode ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าใหม่'}</h3>
-                    <button onClick={()=>setIsModalOpen(false)} className="hover:bg-white/20 p-1 rounded-full"><X/></button>
-                </div>
-                
-                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
-                    <div className="flex flex-col md:flex-row gap-6">
-                        {/* Image Upload UI */}
-                        <div className="w-full md:w-1/3 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">รูปหลัก (Thumbnail)</label>
-                                <div className="relative border-2 border-dashed rounded-lg aspect-square flex flex-col items-center justify-center bg-gray-50 hover:border-[#1a4d2e] transition-colors cursor-pointer group overflow-hidden">
-                                    {mainImagePreview ? (
-                                        <img src={mainImagePreview} className="w-full h-full object-cover"/>
-                                    ) : (
-                                        <div className="text-center text-gray-400 p-4">
-                                            <ImageIcon size={32} className="mx-auto mb-1"/>
-                                            <span className="text-xs">คลิกเพื่อเพิ่มรูปหลัก</span>
-                                        </div>
-                                    )}
-                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleMainImageChange} accept="image/*"/>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium mb-2">อัลบั้มรูป (Gallery)</label>
-                                {isEditMode && existingGallery.length > 0 && (
-                                    <div className="mb-2 grid grid-cols-3 gap-2">
-                                        {existingGallery.map((img) => (
-                                            <div key={img.id} className="aspect-square relative group">
-                                                <img src={img.image.startsWith('http') ? img.image : `http://localhost:8000${img.image}`} className="w-full h-full object-cover rounded border"/>
-                                                <button type="button" onClick={() => removeExistingImage(img.id)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow hover:scale-110"><XCircle size={14}/></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {galleryPreviews.length > 0 && (
-                                    <div className="mb-2 grid grid-cols-3 gap-2">
-                                        {galleryPreviews.map((src, i) => (
-                                            <div key={i} className="aspect-square relative">
-                                                <img src={src} className="w-full h-full object-cover rounded border border-green-400"/>
-                                                <button type="button" onClick={() => removeNewImage(i)} className="absolute -top-1 -right-1 bg-gray-500 text-white rounded-full p-0.5"><X size={12}/></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                <div className="aspect-[3/1] border-2 border-dashed rounded-lg flex flex-col items-center justify-center relative bg-gray-50 hover:border-[#1a4d2e] cursor-pointer text-gray-400 hover:text-[#1a4d2e]">
-                                    <UploadCloud size={20}/>
-                                    <span className="text-xs mt-1">เพิ่มรูปอัลบั้ม</span>
-                                    <input type="file" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleGalleryChange} accept="image/*"/>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Text Inputs UI */}
-                        <div className="flex-1 space-y-4">
-                            <div><label className="block text-sm font-medium mb-1">ชื่อสินค้า</label><input required name="name" value={formData.name} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none"/></div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-sm font-medium mb-1">ราคา</label><input required type="number" min="0" name="price" value={formData.price} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none"/></div>
-                                <div><label className="block text-sm font-medium mb-1">สต็อก</label><input required type="number" min="0" name="stock" value={formData.stock} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none"/></div>
-                            </div>
-                            <div><label className="block text-sm font-medium mb-1">หมวดหมู่</label><input required list="catOptions" name="category" value={formData.category} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none"/><datalist id="catOptions">{categories.map((c,i)=><option key={i} value={c}/>)}</datalist></div>
-                            <div><label className="block text-sm font-medium mb-1">รายละเอียด</label><textarea rows="5" name="description" value={formData.description} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none resize-none"></textarea></div>
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t shrink-0">
-                        <button type="button" onClick={()=>setIsModalOpen(false)} className="px-5 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium">ยกเลิก</button>
-                        <button type="submit" className="px-6 py-2 bg-[#1a4d2e] text-white rounded-lg shadow-md hover:bg-[#143d24] flex items-center gap-2 font-medium"><Save size={18}/> บันทึก</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-      )}
     </div>
   );
 }

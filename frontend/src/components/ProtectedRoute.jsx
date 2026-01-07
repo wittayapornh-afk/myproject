@@ -1,9 +1,19 @@
+
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, loading } = useAuth();
+   const { user, loading } = useAuth();
+   const token = localStorage.getItem('token'); 
+   
+   console.log("🛡️ ProtectedRoute Check:", { hasUser: !!user, hasToken: !!token, loading });
+
+   // If token exists (even if context is syncing) but user not yet loaded, allow rendering children
+   if (!user && token) {
+     console.log("🛡️ Bypassing: Token exists, waiting for user...");
+     return children;
+   }
   const location = useLocation();
 
   // ✅ Rule: คงหน้า Loading เดิมไว้ (ห้ามลบ)

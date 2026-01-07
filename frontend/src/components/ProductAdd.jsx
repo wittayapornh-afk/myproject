@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { useAuth } from '../context/AuthContext'; // ✅ 1. นำเข้า AuthContext
+import { useAuth } from '../context/AuthContext';
+import { ArrowLeft } from 'lucide-react'; // ✅ Import Icon
 
 function ProductAdd() {
   const navigate = useNavigate();
@@ -113,7 +114,16 @@ function ProductAdd() {
                     <div><label className={styles.label}>หมวดหมู่</label><input type="text" className={styles.input} onChange={e => setFormData({...formData, category: e.target.value})} /></div>
                 </div>
                 <div><label className={styles.label}>รายละเอียด</label><textarea rows="4" className={styles.input} onChange={e => setFormData({...formData, description: e.target.value})}></textarea></div>
-                <button type="submit" className="w-full bg-[#305949] text-white py-4 rounded-2xl font-bold hover:bg-[#234236]">บันทึก</button>
+                
+                {/* ✅ Button Group */}
+                <div className="flex gap-4 pt-6">
+                    <button type="submit" className="flex-[2] bg-[#305949] text-white py-4 rounded-2xl font-bold hover:bg-[#234236] shadow-lg hover:shadow-xl transition-all">
+                        บันทึกสินค้า
+                    </button>
+                    <Link to="/admin/dashboard?tab=products" className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-center hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                        <ArrowLeft size={18}/> ย้อนกลับ
+                    </Link>
+                </div>
             </form>
         </div>
     </div>

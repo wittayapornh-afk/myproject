@@ -43,6 +43,11 @@ function ProductList() {
   const [totalPages, setTotalPages] = useState(1);
   const [showMobileFilter, setShowMobileFilter] = useState(false);
 
+  // ✅ New Filter States
+  const [brands, setBrands] = useState([]);
+  const [selectedBrand, setSelectedBrand] = useState('ทั้งหมด');
+  const [showInStockOnly, setShowInStockOnly] = useState(false);
+
   const API_BASE_URL = "http://localhost:8000";
 
   // 1. โหลดหมวดหมู่
@@ -56,6 +61,14 @@ function ProductList() {
       .catch(err => console.error(err));
   }, []);
 
+  // 1.2 โหลดแบรนด์
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/brands/`)
+      .then(res => res.json())
+      .then(data => setBrands(data.brands || []))
+      .catch(err => console.error(err));
+  }, []);
+
   // 2. ฟังก์ชันโหลดสินค้า (รวมทุกเงื่อนไข)
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -63,6 +76,9 @@ function ProductList() {
         let url = `${API_BASE_URL}/api/products/?page=${currentPage}&sort=${sortOption}`;
         
         if (selectedCategory !== 'ทั้งหมด') url += `&category=${encodeURIComponent(selectedCategory)}`;
+        if (selectedBrand !== 'ทั้งหมด') url += `&brand=${encodeURIComponent(selectedBrand)}`;
+        if (showInStockOnly) url += `&in_stock=true`;
+
         if (searchQuery) url += `&search=${encodeURIComponent(searchQuery.trim())}`;
         if (minPrice) url += `&min_price=${minPrice}`;
         if (maxPrice) url += `&max_price=${maxPrice}`;
@@ -84,7 +100,7 @@ function ProductList() {
     } finally {
         setLoading(false);
     }
-  }, [currentPage, selectedCategory, sortOption, searchQuery, minPrice, maxPrice, minRating]);
+  }, [currentPage, selectedCategory, selectedBrand, showInStockOnly, sortOption, searchQuery, minPrice, maxPrice, minRating]);
 
   // Debounce Search
   useEffect(() => {
@@ -104,6 +120,8 @@ function ProductList() {
 
   const clearFilters = () => {
       setSelectedCategory('ทั้งหมด');
+      setSelectedBrand('ทั้งหมด');
+      setShowInStockOnly(false);
       setSearchQuery('');
       setMinPrice('');
       setMaxPrice('');
@@ -162,6 +180,35 @@ function ProductList() {
                             </label>
                         ))}
                     </div>
+                    </div>
+
+
+                {/* แบรนด์ */}
+                <div>
+                    <h3 className="font-black text-sm text-[#263A33] uppercase tracking-widest mb-4">Brands</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                        {brands.map(brand => (
+                            <label key={brand} className="flex items-center gap-3 cursor-pointer group">
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${selectedBrand === brand ? 'border-[#1a4d2e]' : 'border-gray-300'}`}>
+                                    {selectedBrand === brand && <div className="w-2.5 h-2.5 bg-[#1a4d2e] rounded-full" />}
+                                </div>
+                                <span className={`text-sm font-bold ${selectedBrand === brand ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>{brand}</span>
+                                <input type="radio" name="brand" className="hidden" checked={selectedBrand === brand} onChange={() => { setSelectedBrand(brand); setCurrentPage(1); }} />
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* สถานะสินค้า (In Stock Only) */}
+                <div>
+                    <h3 className="font-black text-sm text-[#263A33] uppercase tracking-widest mb-4">Availability</h3>
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-all ${showInStockOnly ? 'bg-[#1a4d2e] border-[#1a4d2e]' : 'border-gray-300 bg-white'}`}>
+                             {showInStockOnly && <CheckCircle size={14} className="text-white" />}
+                        </div>
+                        <span className={`text-sm font-bold ${showInStockOnly ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>In Stock Only</span>
+                        <input type="checkbox" className="hidden" checked={showInStockOnly} onChange={(e) => { setShowInStockOnly(e.target.checked); setCurrentPage(1); }} />
+                    </label>
                 </div>
 
                 {/* ช่วงราคา */}
@@ -200,9 +247,9 @@ function ProductList() {
                 <div className="flex items-center gap-2">
                     <SlidersHorizontal size={14} className="text-gray-400" />
                     <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); setCurrentPage(1); }} className="bg-transparent text-xs font-bold text-[#263A33] outline-none cursor-pointer">
-                        <option value="newest">Sort by: Newest</option>
-                        <option value="price_asc">Price: Low to High</option>
-                        <option value="price_desc">Price: High to Low</option>
+                        <option value="newest">เรียงตาม: ใหม่ล่าสุด</option>
+                        <option value="price_asc">ราคา: ต่ำไปสูง</option>
+                        <option value="price_desc">ราคา: สูงไปต่ำ</option>
                     </select>
                 </div>
             </div>
