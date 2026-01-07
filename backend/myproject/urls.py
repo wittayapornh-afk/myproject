@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from myapp import views # Import views ตัวเดียวพอ
@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/register/', views.register_api),
     path('api/logout/', views.logout_api),
     path('api/user/profile/', views.user_profile_api),
+    path('api/auth/reset-password/', views.reset_password_api), # ✅ Password Reset
     path('api/users/', views.get_all_users),           # Admin ดู user ทั้งหมด
 
     # ==============================
@@ -22,8 +23,10 @@ urlpatterns = [
     # ==============================
     path('api/products/', views.products_api),
     path('api/categories/', views.categories_api),
+    path('api/brands/', views.brands_api), # ✅ Add brands API
     # ✅ แก้เป็น products (เติม s) ให้ตรงกับ Frontend
     path('api/products/<int:product_id>/', views.product_detail_api),
+    path('api/products/<int:product_id>/related/', views.get_related_products), # ✅ Add Related Products
     path('api/submit-review/', views.submit_review), # ✅ เพิ่ม path สำหรับรีวิว
     path('api/reviews/<int:review_id>/reply/', views.reply_review_api), # ✅ เพิ่ม path สำหรับตอบกลับรีวิว
 
@@ -32,12 +35,20 @@ urlpatterns = [
     # ==============================
     path('api/checkout/', views.checkout_api),     # ✅ เพิ่มให้ใน views แล้ว
     path('api/orders/', views.my_orders_api),      # ✅ เพิ่มให้ใน views แล้ว
+    path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
+    path('api/payment/promptpay_payload/', views.get_promptpay_payload), # ✅ Helper for Checkout UI
+    
+    # ==============================
+    # 🔔 Notification API
+    # ==============================
+    path('api/notifications/', views.get_notifications),
 
     # ==============================
     # 🛡️ Admin Dashboard & Management APIs
     # ==============================
     # 1. Dashboard Stats
-    path('api/admin/dashboard-stats/', DashboardStatsView.as_view()),
+    path('api/admin/dashboard-stats/', views.get_admin_stats), # ✅ Use function view directly
+    path('api/admin/export_orders/', views.export_orders_csv), # ✅ New Export CSV
 
     # 2. จัดการสินค้า (Admin)
     path('api/admin/all_products/', views.get_all_products_admin_api), # ดึงสินค้าทั้งหมด (Admin)
@@ -57,5 +68,6 @@ urlpatterns = [
 
     # 5. Activity Logs (Admin)
     path('api/admin/logs/', views.get_admin_logs),
+    path('api/admin/stock-history/', views.get_all_stock_history), # ✅ Global Stock History
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

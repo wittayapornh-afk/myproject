@@ -8,18 +8,23 @@ export const AuthProvider = ({ children }) => {
         const savedUser = localStorage.getItem('user');
         return savedUser ? JSON.parse(savedUser) : null;
     });
-    const [loading, setLoading] = useState(true);
+    // ✅ Init token from localStorage
+    const [token, setToken] = useState(() => localStorage.getItem('token'));
+    
+    // If token exists, start loading. If not, no need to load.
+    const [loading, setLoading] = useState(() => !!localStorage.getItem('token'));
     const [lastApiStatus, setLastApiStatus] = useState(null); // 🔍 Debug
 
     // ✅ Rule: Backend Port 8000
     const API_BASE_URL = "http://localhost:8000";
 
-    const getToken = () => localStorage.getItem('token');
+    // const getToken = () => localStorage.getItem('token'); // ❌ Deprecated
 
     const fetchUser = async (tokenOverride) => {
-        const token = tokenOverride || getToken();
+        const currentToken = tokenOverride || token || localStorage.getItem('token'); 
 
-        if (!token) {
+        if (!currentToken) {
+            // ✅ Fix: Don't auto-clear session here.
             setLoading(false);
             return;
         }
@@ -28,7 +33,7 @@ export const AuthProvider = ({ children }) => {
             const response = await fetch(`${API_BASE_URL}/api/user/profile/?_=${new Date().getTime()}`, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': `Token ${currentToken}`,
                     'Content-Type': 'application/json',
                 },
             });
@@ -47,8 +52,7 @@ export const AuthProvider = ({ children }) => {
             } else {
                 // ✅ Rule: Only logout if token is explicitly invalid (401)
                 if (response.status === 401) {
-                    console.error("Session expired (401). Logging out.");
-                    logout(); 
+                    console.error("Session expired (401). Keeping token for retry.");
                 } else {
                     console.warn(`Failed to fetch profile (Status: ${response.status}). Keeping session.`);
                 }
@@ -62,15 +66,13 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        // If we already have user (from localStorage), loading can be false initially?
-        // Better to still fetch to validate token, but we are not "loading" in the sense of "unknown state"
-        // But for safety, keep loading true until first fetch check is done, OR rely on staled data.
-        // User wants "Stay logged in", so reusing localStorage is best.
         fetchUser();
     }, []);
 
-    const login = (token, userData) => {
-        localStorage.setItem('token', token);
+    const login = (newToken, userData) => {
+        setToken(newToken);
+        localStorage.setItem('token', newToken);
+        
         if (userData) {
             const userRole = userData.role_code || userData.role;
             if (userRole) userData.role = userRole.toLowerCase();
@@ -78,12 +80,13 @@ export const AuthProvider = ({ children }) => {
             setUser(userData);
             localStorage.setItem('user', JSON.stringify(userData)); // ✅ Cache user
         } else {
-            fetchUser(token);
+            fetchUser(newToken);
         }
     };
 
     // ✅ Rule: Clear ข้อมูลให้เกลี้ยงตอน Logout
     const logout = () => {
+        setToken(null);
         localStorage.removeItem('token');
         localStorage.removeItem('user'); // ✅ Clear cached user
         setUser(null);
@@ -91,7 +94,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, fetchUser, token: getToken(), lastApiStatus }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, fetchUser, token, lastApiStatus }}>
             {children}
         </AuthContext.Provider>
     );

@@ -2,28 +2,37 @@ import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { registerLocale } from "react-datepicker";
+import th from "date-fns/locale/th";
+
+// ✅ Register Thai Locale
+registerLocale("th", th);
+
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, BarChart, Bar, Legend
 } from 'recharts';
-import { Clock, Activity, TrendingUp, Calendar, ChevronDown, Package, AlertTriangle } from 'lucide-react';
+import { Clock, Activity, TrendingUp, Calendar, Package, AlertTriangle, Download } from 'lucide-react';
 
-// ✅ Rule 59: เรียกใช้ Utility ที่เราสร้างไว้เพื่อความเป็นระเบียบ
 import { formatPrice, formatDate } from '../utils/formatUtils';
 import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom'; // ✅ Use URL Params
 
 // Import Components
-import AdminSidebar from './AdminSidebar';
+// Removed AdminSidebar import (Global)
 import AdminOrders from './OrderListAdmin';
-import ProductListAdmin from './ProductListAdmin'; // ✅ Restored Import
+import ProductListAdmin from './ProductListAdmin';
 import UserListAdmin from './UserListAdmin';
-import AdminActivityLogs from './AdminActivityLogs'; // ✅ New Import
+import AdminActivityLogs from './AdminActivityLogs';
+import AdminStockHistory from './AdminStockHistory'; // ✅ Import New Component
 
 const COLORS = ['#1a4d2e', '#2d6a4f', '#40916c', '#52b788', '#74c69d'];
 
 function AdminDashboard() {
-    const { token, logout } = useAuth(); // ✅ Rule 15: Retrieve token from Context
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const { token, logout } = useAuth();
+    const [searchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'dashboard'; // ✅ URL Driven State
+
     const [stats, setStats] = useState({
         total_sales: 0,
         total_orders: 0,
@@ -40,10 +49,8 @@ function AdminDashboard() {
 
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState('daily');
+    const [errorMsg, setErrorMsg] = useState(null);
 
-    const [errorMsg, setErrorMsg] = useState(null); // ✅ Debug Error
-
-    // ✅ Rule 60: ใช้ useCallback เพื่อประสิทธิภาพสูงสุดของ React
     const fetchStats = useCallback(async () => {
         setLoading(true);
         setErrorMsg(null);
@@ -72,9 +79,11 @@ function AdminDashboard() {
                  return;
             }
 
-            // ✅ Rule 21: บังคับ Port 8000
+            // Fix Timezone Issue: Send YYYY-MM-DD in Local Time
+            const dateParam = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
             const response = await axios.get(`http://localhost:8000/api/admin/dashboard-stats/`, {
-                params: { start_date: startStr, end_date: endStr, view_mode: viewMode },
+                params: { period: viewMode, date: dateParam },
                 headers: { Authorization: `Token ${activeToken}` }
             });
 
@@ -84,11 +93,9 @@ function AdminDashboard() {
             console.error("Dashboard Stats Fail:", error);
             setErrorMsg(error.message + (error.response ? ` (Status: ${error.response.status})` : ""));
             
-            // ✅ Rule 15: ถ้า Error 401 ให้ Logout ทันที
             if (error.response && error.response.status === 401) {
                 logout();
             }
-            console.error("Dashboard Stats Fail:", error);
         } finally {
             setLoading(false);
         }
@@ -103,26 +110,17 @@ function AdminDashboard() {
     const renderContent = () => {
         if (activeTab === 'products') return <ProductListAdmin />;
         if (activeTab === 'orders') return <AdminOrders />;
-
-    // ✅ Security Check: Seller can now access users (Request fulfilled)
-    // const { user } = useAuth();
-    if (activeTab === 'users') {
-        return <UserListAdmin />;
-    }
-
-
-    if (activeTab === 'logs') { // ✅ New Route
-        return <AdminActivityLogs />;
-    }
+        if (activeTab === 'users') return <UserListAdmin />;
+        if (activeTab === 'history') return <AdminStockHistory />; // ✅ Stock History Tab
+        if (activeTab === 'logs') return <AdminActivityLogs />;
 
         return (
             <div className="space-y-8 animate-fade-in">
-                {/* 1. Header Stats Cards (✅ Rule 55: Summary Stats) */}
+                {/* 1. Header Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <StatCard title="ยอดขายรวม" value={formatPrice(stats.total_sales)} color="bg-gradient-to-br from-[#1a4d2e] to-[#2d6a4f]" icon={<span className="text-2xl">💰</span>} />
                     <StatCard title="ออเดอร์ทั้งหมด" value={stats.total_orders || 0} color="bg-white border border-gray-200 text-gray-800" icon={<Package className="text-[#1a4d2e]" />} isLight />
                     <StatCard title="ลูกค้าทั้งหมด" value={stats.total_users || 0} color="bg-white border border-gray-200 text-gray-800" icon={<span className="text-2xl">👥</span>} isLight />
-                    {/* ✅ Rule 52: สีสถานะส้มสำหรับรอตรวจสอบ */}
                     <StatCard title="รอตรวจสอบ" value={stats.pending_orders || 0} color="bg-orange-500 text-white shadow-orange-100 shadow-lg" icon={<span className="text-2xl">⏳</span>} />
                 </div>
 
@@ -155,7 +153,7 @@ function AdminDashboard() {
                         </h3>
                         <div className="h-[300px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.bar_data}>
+                                <BarChart data={stats.best_sellers || []}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
                                     <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
                                     <YAxis fontSize={12} tickLine={false} axisLine={false} />
@@ -210,7 +208,7 @@ function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* 4. Row 3: Low Stock (✅ Rule 56: Stock Alert) */}
+                {/* 4. Row 3: Low Stock */}
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
                     <h2 className="text-xl font-black mb-6 text-[#263A33] flex items-center gap-2">
                         <AlertTriangle className="text-red-500" /> สินค้าที่ต้องเติมสต็อกด่วน
@@ -236,18 +234,22 @@ function AdminDashboard() {
 
     return (
         <div className="flex min-h-screen bg-[#F2F0E4]">
-            {/* ✅ Rule 2: Sidebar Z-index High */}
-            <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-
-            <div className="flex-1 ml-64 p-8 transition-all">
+            {/* ✅ Removed AdminSidebar - Global Sidebar is in App.jsx */}
+            
+            {/* Main Content - No margins here, handled by App.jsx wrapper */}
+            {/* Actually, App.jsx wrapper has the margin transition. So here we just need generic padding */}
+            <div className="flex-1 w-full p-6 md:p-10 transition-all">
                 {/* Top Header */}
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white/80 backdrop-blur-md p-6 rounded-[2rem] shadow-sm border border-gray-100 sticky top-4 z-[50]">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white/80 backdrop-blur-md p-6 rounded-[2rem] shadow-sm border border-gray-100 sticky top-24 z-[30]">
                     <div>
                         <h1 className="text-2xl font-black text-[#1a4d2e] tracking-tight uppercase">
                             {activeTab} Management
                         </h1>
-                        {/* ✅ Rule 58: วันที่ไทย */}
-                        <p className="text-xs text-gray-400 font-bold">ข้อมูลอัปเดต: {formatDate(new Date())}</p>
+                        <p className="text-xs text-gray-400 font-bold">
+                             {viewMode === 'daily' && `ข้อมูลวันที่: ${formatDate(selectedDate)}`}
+                             {viewMode === 'monthly' && `ข้อมูลประจำเดือน: ${selectedDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}`}
+                             {viewMode === 'yearly' && `ข้อมูลประจำปี: ${selectedDate.getFullYear() + 543}`}
+                        </p>
                     </div>
 
                     {activeTab === 'dashboard' && (
@@ -267,9 +269,57 @@ function AdminDashboard() {
                                     dateFormat={viewMode === 'yearly' ? "yyyy" : viewMode === 'monthly' ? "MM/yyyy" : "dd/MM/yyyy"}
                                     showMonthYearPicker={viewMode === 'monthly'}
                                     showYearPicker={viewMode === 'yearly'}
+                                    locale="th" // ✅ Set Locale to Thai
                                     className="text-xs font-black outline-none w-20 text-center text-gray-600 bg-transparent cursor-pointer"
                                 />
                             </div>
+                            
+                            {/* ✅ Export CSV Button */}
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        const authToken = token || localStorage.getItem('token');
+                                        
+                                        // Fix Timezone for Export
+                                        const dateParam = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                                        
+                                        console.log("Export:", viewMode, dateParam); 
+                                        
+                                        const response = await axios.get('http://localhost:8000/api/admin/export_orders/', {
+                                            params: { period: viewMode, date: dateParam },
+                                            headers: { Authorization: `Token ${authToken}` },
+                                            responseType: 'blob', // Important for file download
+                                        });
+                                        const url = window.URL.createObjectURL(new Blob([response.data]));
+                                        const link = document.createElement('a');
+                                        link.href = url;
+                                        link.setAttribute('download', 'orders_export.xlsx');
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        link.remove();
+                                        // alert("Export successful! Check your downloads.");
+                                    } catch (e) {
+                                        console.error("Export Failed", e);
+                                        if (e.response && e.response.data instanceof Blob) {
+                                            const reader = new FileReader();
+                                            reader.onload = () => {
+                                                try {
+                                                    const errMsg = JSON.parse(reader.result).error || reader.result;
+                                                    alert("Export Error: " + errMsg);
+                                                } catch {
+                                                    alert("Export Error: " + reader.result);
+                                                }
+                                            };
+                                            reader.readAsText(e.response.data);
+                                        } else {
+                                            alert("Export Failed: " + (e.response?.data?.error || e.message));
+                                        }
+                                    }
+                                }}
+                                className="flex items-center gap-2 bg-[#1a4d2e] text-white px-4 py-2 rounded-2xl shadow-lg shadow-green-200 hover:bg-[#143d24] transition-all text-xs font-bold"
+                            >
+                                <Download size={14} /> Export Excel
+                            </button>
                         </div>
                     )}
                 </div>
@@ -286,13 +336,13 @@ function AdminDashboard() {
 }
 
 const StatCard = ({ title, value, color, icon, isLight }) => (
-    <div className={`p-8 rounded-[2.5rem] shadow-sm border border-transparent transition-all duration-500 hover:shadow-xl hover:-translate-y-2 ${color}`}>
-        <div className="flex justify-between items-center">
-            <div>
-                <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${isLight ? 'text-gray-400' : 'text-white/60'}`}>{title}</p>
-                <h3 className={`text-3xl font-black ${isLight ? 'text-[#1a4d2e]' : 'text-white'}`}>{value}</h3>
+    <div className={`p-6 xl:p-8 rounded-[2.5rem] shadow-sm border border-transparent transition-all duration-500 hover:shadow-xl hover:-translate-y-2 ${color}`}>
+        <div className="flex justify-between items-start gap-4">
+            <div className="min-w-0">
+                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isLight ? 'text-gray-400' : 'text-white/60'}`}>{title}</p>
+                <h3 className={`text-2xl xl:text-3xl font-black truncate ${isLight ? 'text-[#1a4d2e]' : 'text-white'}`} title={value}>{value}</h3>
             </div>
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isLight ? 'bg-gray-50 text-[#1a4d2e]' : 'bg-white/20 text-white'}`}>
+            <div className={`w-12 h-12 xl:w-14 xl:h-14 rounded-2xl flex items-center justify-center shadow-inner shrink-0 ${isLight ? 'bg-gray-50 text-[#1a4d2e]' : 'bg-white/20 text-white'}`}>
                 {icon}
             </div>
         </div>
