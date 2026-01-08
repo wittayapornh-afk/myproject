@@ -50,8 +50,23 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        fetchUser();
-    }, []);
+    const loadUser = async () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                // เรียก API Profile เพื่อเช็คว่า Token ยังใช้ได้ไหม
+                const res = await axios.get('http://localhost:8000/api/profile/', {
+                    headers: { Authorization: `Token ${token}` }
+                });
+                setUser(res.data); // ✅ เซ็ต user กลับเข้า state
+            } catch (err) {
+                localStorage.removeItem('token'); // ถ้า token บูดให้ลบออก
+            }
+        }
+        setLoading(false); // ✅ เลิกโหลด และแสดงหน้าเว็บปกติ
+    };
+    loadUser();
+}, []);
 
     const login = (token, userData) => {
         localStorage.setItem('token', token);

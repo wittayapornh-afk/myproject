@@ -8,7 +8,7 @@ from django.db import transaction
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
-from .models import Product, Order, OrderItem, AdminLog, ProductImage
+from .models import Product, Order, OrderItem, AdminLog, ProductImage, Category
 import logging
 import traceback
 
@@ -45,7 +45,7 @@ def products_api(request):
         search = request.query_params.get('search')
         
         if category and category != "ทั้งหมด":
-            products = products.filter(category=category)
+            products = products.filter(cat_id__name=category) # Filter by related Category name
         if search:
             products = products.filter(title__icontains=search)
 
@@ -63,7 +63,7 @@ def products_api(request):
                 data.append({
                     "id": p.id,
                     "title": p.title,
-                    "category": p.category,
+                    "category": p.cat_id.name if p.cat_id else "Uncategorized",
                     "price": p.price,
                     "stock": p.stock,
                     "rating": p.rating,
@@ -92,7 +92,7 @@ def admin_products_list(request):
         "title": p.title,
         "price": p.price,
         "stock": p.stock,
-        "category": p.category,
+        "category": p.cat_id.name if p.cat_id else "Uncategorized",
         "is_active": p.is_active,
         "thumbnail": p.thumbnail.url if p.thumbnail else ""
     } for p in products]
@@ -239,7 +239,7 @@ def product_detail_api(request, product_id):
         
         data = {
             "id": p.id, "title": p.title, "description": p.description, 
-            "category": p.category, "price": p.price, "stock": p.stock, 
+            "category": p.cat_id.name if p.cat_id else "Uncategorized", "price": p.price, "stock": p.stock, 
             "brand": getattr(p, 'brand', ''), "rating": p.rating,
             "thumbnail": p.thumbnail.url if p.thumbnail else "",
             "images": gallery
@@ -251,8 +251,17 @@ def product_detail_api(request, product_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def categories_api(request):
-    categories = Product.objects.filter(is_active=True).values_list('category', flat=True).distinct()
-    return Response({"categories": ["ทั้งหมด"] + list(categories)})
+    # ✅ ดึงหมวดหมู่ทั้งหมดที่มีในฐานข้อมูล
+    cats = Category.objects.values_list('name', flat=True).distinct()
+    return Response({"categories": ["ทั้งหมด"] + list(cats)})
+
+@api_view(['GET'])
+@permission_classes([AllowAny]) # Or IsAuthenticated depending on need
+def category_list_api(request):
+    # API สำหรับ Dropdown ในหน้า Admin (เลือก ID)
+    cats = Category.objects.all().order_by('name')
+    data = [{"id": c.id, "name": c.name} for c in cats]
+    return Response(data)
 
 # ==========================================
 # 📝 Auth & Profile
@@ -391,24 +400,26 @@ def create_order(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_orders_api(request):
+    """ ✅ แก้ไข: ดึงประวัติการสั่งซื้อพร้อมรายการสินค้าให้ Frontend โชว์ได้ """
     orders = Order.objects.filter(user=request.user).order_by('-created_at')
     data = []
     for o in orders:
-        try:
-            items = []
-            for i in o.items.all(): # related_name='items' in OrderItem
-                if not i.product: continue
-                thumb = i.product.thumbnail.url if i.product.thumbnail else ""
-                items.append({"title": i.product.title, "quantity": i.quantity, "price": i.price_at_purchase, "thumbnail": thumb})
-            
-            date_str = o.created_at.strftime("%d/%m/%Y") if o.created_at else "-"
-            data.append({
-                "id": o.id, "date": date_str, 
-                "total_price": o.total_price, "status": o.status, "items": items
+        items = []
+        for i in o.items.all(): # อ้างอิงตาม related_name='items' ใน Model OrderItem
+            items.append({
+                "title": i.product.title if i.product else "สินค้าถูกลบจากระบบ",
+                "quantity": i.quantity,
+                "price": i.price_at_purchase,
+                "thumbnail": i.product.thumbnail.url if i.product and i.product.thumbnail else ""
             })
-        except Exception as e:
-            print(f"Error processing order {o.id}: {e}")
-            continue
+        
+        data.append({
+            "id": o.id,
+            "date": o.created_at.strftime("%d/%m/%Y"),
+            "total_price": o.total_price,
+            "status": o.status,
+            "items": items
+        })
     return Response(data)
 
 @api_view(['GET'])
@@ -499,12 +510,18 @@ def add_product_api(request):
     try:
         with transaction.atomic(): # ใช้ transaction เพื่อความปลอดภัย (ถ้าพังให้ rollback)
             # 1. สร้างตัวสินค้า
+            # category from frontend might be ID now
+            cat_id_val = data.get('category') or data.get('cat_id')
+            category_instance = None
+            if cat_id_val:
+                category_instance = Category.objects.filter(id=cat_id_val).first()
+
             p = Product.objects.create(
                 title=data['title'], 
                 description=data.get('description',''), 
                 price=data['price'], 
                 stock=data['stock'], 
-                category=data['category'], 
+                cat_id=category_instance, 
                 brand=data.get('brand','')
             )
             
@@ -535,7 +552,12 @@ def edit_product_api(request, product_id):
     p.description = data.get('description', p.description)
     p.price = data.get('price', p.price)
     p.stock = data.get('stock', p.stock)
-    p.category = data.get('category', p.category)
+    
+    # Check for category update
+    new_cat_id = data.get('category') or data.get('cat_id')
+    if new_cat_id:
+        p.cat_id = Category.objects.filter(id=new_cat_id).first()
+        
     p.brand = data.get('brand', p.brand)
     
     if 'thumbnail' in request.FILES:
@@ -636,3 +658,75 @@ def checkout_api(request):
         return Response({"error": "ไม่พบสินค้าในระบบ"}, status=404)
     except Exception as e:
         return Response({"error": str(e)}, status=400)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def checkout(request):
+    user = request.user
+    # 🚫 บล็อก Admin ไม่ให้ซื้อ
+    if user.is_staff or getattr(user, 'role', '') == 'admin':
+        return Response({"error": "Admin ไม่สามารถสั่งซื้อสินค้าได้"}, status=403)
+
+    data = request.data
+    # ✅ พยายามดึงข้อมูลจากทุกคีย์ที่เป็นไปได้ (และย่อหน้าให้ถูกต้อง)
+    cart_items = data.get('items') or data.get('cart_items') or data.get('cart')
+
+    if not cart_items or len(cart_items) == 0:
+        # พิมพ์ดูใน log ของ server ว่าจริงๆ แล้ว frontend ส่งอะไรมา
+        print(f"DEBUG: Received data but no items found: {data}")
+        return Response({"error": "ตะกร้าสินค้าว่างเปล่า", "received_data": data}, status=400)
+
+    try:
+        with transaction.atomic():
+            order = Order.objects.create(
+                user=user, 
+                total_price=0, 
+                status='Pending',
+                shipping_address=data.get('address') or user.address
+            )
+            total = 0
+            # ✅ เปลี่ยนเป็น cart_items ให้ชื่อตรงกับข้างบน
+            for item in cart_items:
+                p = Product.objects.select_for_update().get(id=item['id'])
+                if p.stock < item['quantity']: 
+                    raise ValueError(f"{p.title} สินค้าไม่พอ")
+                
+                OrderItem.objects.create(
+                    order=order, 
+                    product=p, 
+                    quantity=item['quantity'], 
+                    price_at_purchase=p.price
+                )
+                
+                p.stock -= item['quantity'] # ✂️ ตัดสต็อกจริง
+                p.save()
+                total += p.price * item['quantity']
+            
+            order.total_price = total
+            order.save()
+            return Response({"message": "สั่งซื้อสำเร็จ", "order_id": order.id}, status=201)
+            
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
+
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_review_api(request, product_id):
+    try:
+        product = Product.objects.get(id=product_id)
+        comment = request.data.get('comment')
+        rating = request.data.get('rating', 5)
+
+        if not comment:
+            return Response({"error": "กรุณากรอกข้อความรีวิว"}, status=400)
+
+        Review.objects.create(
+            user=request.user,
+            product=product,
+            comment=comment, # ✅ บันทึกข้อความที่นี่
+            rating=rating
+        )
+        return Response({"message": "รีวิวสำเร็จ"}, status=201)
+    except:
+        return Response({"error": "ไม่พบสินค้า"}, status=404)

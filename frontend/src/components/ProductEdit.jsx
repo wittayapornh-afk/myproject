@@ -21,6 +21,14 @@ function ProductEdit() {
   const [deleteImageIds, setDeleteImageIds] = useState([]); // ID รูปที่จะลบ
   const [newGalleryFiles, setNewGalleryFiles] = useState([]); // ไฟล์ใหม่
   const [newGalleryPreviews, setNewGalleryPreviews] = useState([]); // Preview รูปใหม่
+  const [categories, setCategories] = useState([]); // ✅ State
+
+  useEffect(() => {
+    // Fetch Categories
+    axios.get(`${API_BASE_URL}/api/categories-list/`)
+        .then(res => setCategories(res.data))
+        .catch(err => console.error(err));
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -34,7 +42,8 @@ function ProductEdit() {
         const p = res.data;
         setFormData({
           title: p.title, description: p.description, price: p.price,
-          category: p.category, stock: p.stock, brand: p.brand || ''
+          category: p.cat_id || '', // Use cat_id (ID) not category (name)
+          stock: p.stock, brand: p.brand || ''
         });
         setCurrentThumbnail(p.thumbnail || p.image);
         setGalleryImages(p.images || []);
@@ -158,12 +167,10 @@ function ProductEdit() {
                 <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Category</label>
                     <select name="category" value={formData.category} onChange={handleChange} className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#1a4d2e]/20 font-bold text-gray-600 outline-none">
-                        <option value="smartphones">Smartphones</option>
-                        <option value="laptops">Laptops</option>
-                        <option value="fragrances">Fragrances</option>
-                        <option value="skincare">Skincare</option>
-                        <option value="groceries">Groceries</option>
-                        <option value="home-decoration">Home Decoration</option>
+                        <option value="" disabled>เลือกหมวดหมู่...</option>
+                        {categories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
                     </select>
                 </div>
                 <div className="space-y-1">

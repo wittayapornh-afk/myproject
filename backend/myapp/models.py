@@ -74,20 +74,37 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.role == 'admin'
 
 # ==========================================
+# 📂 Category System
+# ==========================================
+
+class Category(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    # slug = models.SlugField(unique=True, allow_unicode=True) # Optional for URL friendly
+
+    class Meta:
+        db_table = 'categories'
+
+    def __str__(self):
+        return self.name
+
+# ==========================================
 # 🛒 Product System
 # ==========================================
 
 class Product(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
-    category = models.CharField(max_length=100)
-    price = models.DecimalField(max_digits=10, decimal_places=2) # Changed to Decimal matching DB
+    
+    # ⚠️ [Refactor Complete] category field removed
+    cat_id = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', db_column='cat_id')
+    
+    price = models.DecimalField(max_digits=10, decimal_places=2) 
     stock = models.IntegerField(default=0)
     brand = models.CharField(max_length=100, null=True, blank=True)
     thumbnail = models.ImageField(upload_to='products/', null=True, blank=True)
-    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00) # Changed to Decimal
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(default=timezone.now) # DB has created_at
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

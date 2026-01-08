@@ -11,19 +11,18 @@ export default function UserListAdmin() {
   }, []);
 
   const fetchUsers = async () => {
-    try {
-        const token = localStorage.getItem('token');
-        // *Backend ต้องมี ViewSet สำหรับ User
-        const response = await axios.get('http://localhost:8000/api/users/', {
-            headers: { Authorization: `Token ${token}` }
-        });
-        setUsers(response.data);
-    } catch (error) {
-        console.error("Error fetching users:", error);
-    } finally {
-        setLoading(false);
-    }
-  };
+  const token = localStorage.getItem('token'); // ดึง token มา
+  try {
+    const res = await axios.get('http://localhost:8000/api/admin/users/', {
+      headers: { 
+        Authorization: `Token ${token}` // ✅ ต้องมีบรรทัดนี้เสมอสำหรับ API ที่ต้องล็อกอิน
+      }
+    });
+    setUsers(res.data);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   return (
     <div className="animate-fade-in space-y-6">

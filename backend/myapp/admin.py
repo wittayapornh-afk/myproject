@@ -29,8 +29,8 @@ class ProductImageInline(admin.TabularInline):
 
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline]
-    list_display = ['title', 'category', 'price', 'stock', 'is_active']
-    list_filter = ['category', 'is_active']
+    list_display = ['title', 'cat_id', 'price', 'stock', 'is_active']
+    list_filter = ['cat_id', 'is_active']
     search_fields = ['title']
 
 # Register updated models

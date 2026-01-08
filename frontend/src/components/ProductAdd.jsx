@@ -11,9 +11,18 @@ function ProductAdd() {
   const [galleryFiles, setGalleryFiles] = useState([]); 
   const [previewImage, setPreviewImage] = useState(null);
   const [galleryPreviews, setGalleryPreviews] = useState([]);
+  const [categories, setCategories] = useState([]); // ✅ State สำหรับเก็บหมวดหมู่
   
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+
+  // ✅ Fetch Categories
+  useEffect(() => {
+    fetch('/api/categories-list/')
+        .then(res => res.json())
+        .then(data => setCategories(data))
+        .catch(err => console.error(err));
+  }, []);
 
   // ✅ 3. เช็คสิทธิ์ด้วย role_code ให้ตรงกับระบบ login
   useEffect(() => {
@@ -110,7 +119,19 @@ function ProductAdd() {
                 </div>
                 <div className="grid grid-cols-2 gap-6">
                     <div><label className={styles.label}>จำนวน</label><input type="number" className={styles.input} onChange={e => setFormData({...formData, stock: e.target.value})} /></div>
-                    <div><label className={styles.label}>หมวดหมู่</label><input type="text" className={styles.input} onChange={e => setFormData({...formData, category: e.target.value})} /></div>
+                    <div>
+                        <label className={styles.label}>หมวดหมู่</label>
+                        <select 
+                            className={styles.input} 
+                            onChange={e => setFormData({...formData, category: e.target.value})}
+                            defaultValue=""
+                        >
+                            <option value="" disabled>เลือกหมวดหมู่...</option>
+                            {categories.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
                 <div><label className={styles.label}>รายละเอียด</label><textarea rows="4" className={styles.input} onChange={e => setFormData({...formData, description: e.target.value})}></textarea></div>
                 <button type="submit" className="w-full bg-[#305949] text-white py-4 rounded-2xl font-bold hover:bg-[#234236]">บันทึก</button>

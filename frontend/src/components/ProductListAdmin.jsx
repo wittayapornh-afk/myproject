@@ -4,7 +4,7 @@ import { Search, Plus, Edit, Trash2, Filter, X, Image as ImageIcon, Save, Upload
 
 export default function ProductListAdmin() {
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState(['ทั้งหมด']);
+  const [categories, setCategories] = useState([]); // Array of objects {id, name}
   const [loading, setLoading] = useState(true);
 
   // --- Pagination State (เพิ่มใหม่) ---
@@ -62,8 +62,8 @@ export default function ProductListAdmin() {
 
   const fetchCategories = async () => {
     try {
-        const res = await axios.get('http://localhost:8000/api/categories/');
-        if(res.data.categories) setCategories(res.data.categories);
+        const res = await axios.get('http://localhost:8000/api/categories-list/');
+        setCategories(res.data);
     } catch (e) { console.error(e); }
   };
 
@@ -129,7 +129,7 @@ export default function ProductListAdmin() {
       name: product.title || product.name,
       price: product.price,
       stock: product.stock,
-      category: product.category,
+      category: product.cat_id || '', // Use ID
       description: product.description || ''
     });
     
@@ -196,7 +196,7 @@ export default function ProductListAdmin() {
   const filteredProducts = products.filter(p => {
     const pName = p.title || p.name || '';
     const matchName = pName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchCat = categoryFilter === 'ทั้งหมด' || p.category === categoryFilter;
+    const matchCat = categoryFilter === 'ทั้งหมด' || p.category === categoryFilter || (p.cat_id && p.cat_id.name === categoryFilter); // Check both for safety
     return matchName && matchCat;
   });
 
@@ -220,7 +220,8 @@ export default function ProductListAdmin() {
         </div>
         <select className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-[#1a4d2e]"
             value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}>
-            {categories.map((c,i)=><option key={i} value={c}>{c}</option>)}
+            <option value="ทั้งหมด">ทั้งหมด</option>
+            {categories.map((c)=><option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
         <button onClick={handleAddClick} className="bg-[#1a4d2e] text-white px-4 py-2 rounded-lg flex gap-2 items-center hover:bg-[#143d24]">
             <Plus size={20}/> เพิ่มสินค้า
@@ -380,7 +381,15 @@ export default function ProductListAdmin() {
                                 <div><label className="block text-sm font-medium mb-1">ราคา</label><input required type="number" min="0" name="price" value={formData.price} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none"/></div>
                                 <div><label className="block text-sm font-medium mb-1">สต็อก</label><input required type="number" min="0" name="stock" value={formData.stock} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none"/></div>
                             </div>
-                            <div><label className="block text-sm font-medium mb-1">หมวดหมู่</label><input required list="catOptions" name="category" value={formData.category} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none"/><datalist id="catOptions">{categories.map((c,i)=><option key={i} value={c}/>)}</datalist></div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">หมวดหมู่</label>
+                                <select required name="category" value={formData.category} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none">
+                                    <option value="" disabled>เลือกหมวดหมู่...</option>
+                                    {categories.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div><label className="block text-sm font-medium mb-1">รายละเอียด</label><textarea rows="5" name="description" value={formData.description} onChange={handleInputChange} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#1a4d2e] outline-none resize-none"></textarea></div>
                         </div>
                     </div>
