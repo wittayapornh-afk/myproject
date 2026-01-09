@@ -1,23 +1,26 @@
-// src/pages/RegisterPage.jsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { User, Lock, Mail, Phone, UserPlus, Camera } from 'lucide-react';
+import { User, Lock, Mail, Phone, UserPlus, Camera, ArrowLeft } from 'lucide-react';
 
 function RegisterPage() {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
+    first_name: '',
+    last_name: '',
     email: '',
     phone: ''
   });
   const [avatar, setAvatar] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -29,121 +32,167 @@ function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     const data = new FormData();
-    Object.entries(formData).forEach(([k, v]) => data.append(k, v));
+    data.append('username', formData.username);
+    data.append('password', formData.password);
+    data.append('first_name', formData.first_name);
+    data.append('last_name', formData.last_name);
+    data.append('email', formData.email);
+    data.append('phone', formData.phone);
     if (avatar) data.append('avatar', avatar);
 
     try {
-      Swal.showLoading();
-      const res = await fetch('/api/register/', { method: 'POST', body: data });
+      const res = await fetch('http://localhost:8000/api/register/', {
+        method: 'POST',
+        body: data
+      });
+
       const responseData = await res.json();
 
       if (res.ok) {
         Swal.fire({
           icon: 'success',
           title: 'สมัครสมาชิกสำเร็จ!',
-          confirmButtonColor: '#305949'
-        }).then(() => navigate('/login'));
+          text: 'ยินดีด้วย! บัญชีของคุณถูกสร้างเรียบร้อยแล้ว',
+          confirmButtonColor: '#1a4d2e',
+          background: '#fff',
+          customClass: {
+             title: 'font-black text-[#1a4d2e]',
+             popup: 'rounded-[2rem]'
+          }
+        }).then(() => {
+          navigate('/login');
+        });
       } else {
-        Swal.fire('Error', responseData.error || 'ข้อมูลไม่ถูกต้อง', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'เกิดข้อผิดพลาด',
+          text: responseData.error || 'กรุณาตรวจสอบข้อมูลอีกครั้ง',
+          confirmButtonColor: '#d33',
+          background: '#fff',
+           customClass: {
+             title: 'font-black text-red-600',
+             popup: 'rounded-[2rem]'
+          }
+        });
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       Swal.fire('Error', 'ไม่สามารถเชื่อมต่อ Server ได้', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const inputs = [
-    { name: 'username', label: 'Username', type: 'text', icon: User },
-    { name: 'email', label: 'Email', type: 'email', icon: Mail },
-    { name: 'phone', label: 'Phone', type: 'tel', icon: Phone },
-    { name: 'password', label: 'Password', type: 'password', icon: Lock, auto: 'new-password' }
-  ];
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F2F0E4] via-[#E7EFEA] to-[#F2F0E4] px-4">
-      <div className="relative w-full max-w-md rounded-[3rem] bg-white/85 backdrop-blur-xl
-                      shadow-[0_30px_80px_rgba(0,0,0,0.12)]
-                      border border-white/70 p-10">
+    <div className="min-h-screen flex items-center justify-center bg-[#F9F9F7] py-12 px-4 font-sans relative overflow-hidden">
+      
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#1a4d2e]/5 rounded-full blur-[100px] translate-x-1/3 -translate-y-1/3"></div>
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[80px] -translate-x-1/3 translate-y-1/3"></div>
 
-        {/* Background glow */}
-        <div className="absolute -top-24 -right-24 w-72 h-72 bg-[#305949]/10 rounded-full blur-3xl" />
-
-        <div className="relative z-10 text-center">
-          <h2 className="text-3xl font-extrabold text-[#263A33] tracking-tight">
-            สร้างบัญชีใหม่
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            เริ่มต้นใช้งานภายใน 1 นาที
-          </p>
+      <div className="max-w-2xl w-full bg-white/80 backdrop-blur-2xl p-8 md:p-12 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.08)] border border-white/60 relative z-10 animate-in fade-in zoom-in-95 duration-500">
+        
+        <Link to="/" className="absolute top-8 left-8 text-gray-400 hover:text-[#1a4d2e] transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+            <ArrowLeft size={16} /> กลับหน้าหลัก
+        </Link>
+        
+        <div className="text-center mb-10 mt-6">
+          <h2 className="text-4xl font-black text-[#263A33] mb-3 tracking-tighter">Create Account</h2>
+          <p className="text-gray-500 font-medium">เข้าร่วมกับเราเพื่อประสบการณ์การช้อปปิ้งที่ดีที่สุด</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="relative z-10 mt-8 space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* Avatar */}
-          <div className="flex flex-col items-center">
-            <div className="relative group">
-              <img
-                src={preview || 'https://via.placeholder.com/150?text=Avatar'}
-                alt="avatar"
-                className="w-28 h-28 rounded-full object-cover
-                           ring-4 ring-white shadow-xl
-                           group-hover:ring-[#305949]/40 transition"
-              />
-              <label className="absolute bottom-2 right-2 bg-[#305949] text-white
-                                p-2 rounded-full cursor-pointer
-                                hover:scale-110 active:scale-95
-                                transition shadow-md">
-                <Camera size={14} />
+          {/* Avatar Upload */}
+          <div className="flex flex-col items-center mb-8">
+            <div className="relative group cursor-pointer w-28 h-28">
+               <div className="w-full h-full rounded-full border-4 border-white shadow-xl overflow-hidden bg-gray-100 relative">
+                  <img
+                    src={preview || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
+                    alt="Profile Preview"
+                    className="w-full h-full object-cover"
+                  />
+                  {!preview && <div className="absolute inset-0 flex items-center justify-center bg-black/5"><Camera size={32} className="text-gray-400 opacity-50"/></div>}
+               </div>
+               <label className="absolute bottom-1 right-1 bg-[#1a4d2e] text-white p-2.5 rounded-full cursor-pointer hover:bg-[#143d24] border-4 border-white shadow-lg transition-all transform hover:scale-110 active:scale-95">
+                <Camera size={16} />
                 <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
               </label>
             </div>
-            <p className="text-xs text-gray-400 mt-2">รูปโปรไฟล์ (ไม่บังคับ)</p>
+            <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-wider">อัปโหลดรูปโปรไฟล์</p>
           </div>
 
-          {/* Floating Inputs */}
-          {inputs.map(({ name, label, type, icon: Icon, auto }) => (
-            <div key={name} className="relative">
-              <input
-                type={type}
-                name={name}
-                autoComplete={auto}
-                required
-                onChange={handleChange}
-                placeholder=" "
-                className="peer w-full px-5 py-4 pl-12 rounded-2xl
-                           bg-gray-50 border border-transparent
-                           focus:bg-white focus:ring-2 focus:ring-[#305949]/30
-                           hover:bg-white transition-all"
-              />
-              <label
-                className="absolute left-12 top-1/2 -translate-y-1/2 text-gray-400
-                           peer-focus:-top-2 peer-focus:scale-90 peer-focus:text-[#305949]
-                           peer-not-placeholder-shown:-top-2 peer-not-placeholder-shown:scale-90
-                           transition-all origin-left bg-white px-2 rounded">
-                {label}
-              </label>
-              <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            </div>
-          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               {/* Username */}
+               <div className="group md:col-span-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Username</label>
+                    <div className="relative">
+                        <User className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
+                        <input
+                            type="text"
+                            name="username"
+                            onChange={handleChange}
+                            className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-bold shadow-sm placeholder-gray-300"
+                            placeholder="ชื่อผู้ใช้งาน"
+                            required
+                        />
+                    </div>
+               </div>
 
-          {/* Button */}
+              {/* Names */}
+              <div className="group">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">First Name</label>
+                 <input type="text" name="first_name" onChange={handleChange} placeholder="ชื่อจริง" className="w-full px-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-bold shadow-sm placeholder-gray-300" />
+              </div>
+              <div className="group">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Last Name</label>
+                 <input type="text" name="last_name" onChange={handleChange} placeholder="นามสกุล" className="w-full px-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-bold shadow-sm placeholder-gray-300" />
+              </div>
+          </div>
+
+          {/* Email & Phone */}
+          <div className="space-y-6">
+              <div className="group">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Email</label>
+                    <div className="relative">
+                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
+                        <input type="email" name="email" onChange={handleChange} className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-bold shadow-sm placeholder-gray-300" placeholder="อีเมลของคุณ" required />
+                    </div>
+               </div>
+
+               <div className="group">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Phone Number</label>
+                    <div className="relative">
+                        <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
+                        <input type="tel" name="phone" onChange={handleChange} className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-bold shadow-sm placeholder-gray-300" placeholder="เบอร์โทรศัพท์" required />
+                    </div>
+               </div>
+          </div>
+
+          {/* Password */}
+          <div className="group">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Password</label>
+                <div className="relative">
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
+                    <input type="password" name="password" onChange={handleChange} className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-black shadow-sm placeholder-gray-300" placeholder="••••••••" required autoComplete="new-password"/>
+                </div>
+          </div>
+
           <button
             type="submit"
-            className="w-full py-4 rounded-2xl font-bold text-white
-                       bg-gradient-to-r from-[#305949] to-[#234236]
-                       shadow-lg shadow-[#305949]/30
-                       hover:shadow-xl hover:-translate-y-1
-                       active:translate-y-0 active:shadow-md
-                       transition-all flex items-center justify-center gap-2"
+            disabled={loading}
+            className="w-full bg-[#1a4d2e] text-white py-5 rounded-2xl font-black text-lg hover:bg-[#143d24] transition-all shadow-xl shadow-green-900/10 flex items-center justify-center gap-3 mt-8 hover:scale-[1.02] active:scale-95 disabled:bg-gray-300 disabled:cursor-not-allowed group"
           >
-            <UserPlus size={20} /> สมัครสมาชิก
+             {loading ? 'กำลังดำเนินการ...' : <><UserPlus size={22} /> สมัครสมาชิก</>}
           </button>
 
-          <div className="text-center pt-6 border-t border-gray-100">
-            <p className="text-sm text-gray-500">
+          <div className="text-center pt-4">
+            <p className="text-sm font-bold text-gray-400">
               มีบัญชีอยู่แล้ว?{' '}
-              <Link to="/login" className="font-bold text-[#305949] hover:underline">
+              <Link to="/login" className="text-[#1a4d2e] hover:underline font-black">
                 เข้าสู่ระบบ
               </Link>
             </p>

@@ -58,7 +58,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['email', 'first_name', 'last_name']
 
     class Meta:
-        db_table = 'users'
+        db_table = 'users' # ชื่อตารางในฐานข้อมูล
+
 
 
     def __str__(self):
@@ -74,38 +75,61 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.role == 'admin'
 
 # ==========================================
-# 📂 Category System
+# 🛒 Product System
 # ==========================================
 
+# ==========================================
+# 📂 Category System (New)
+# ==========================================
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    # slug = models.SlugField(unique=True, allow_unicode=True) # Optional for URL friendly
-
+    
     class Meta:
         db_table = 'categories'
+        verbose_name_plural = 'Categories'
 
     def __str__(self):
         return self.name
 
 # ==========================================
-# 🛒 Product System
+# 🏷️ Tag System (New)
 # ==========================================
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    
+    class Meta:
+        db_table = 'tags'
+
+    def __str__(self):
+        return self.name
 
 class Product(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     
-    # ⚠️ [Refactor Complete] category field removed
-    cat_id = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', db_column='cat_id')
+    # ✅ Change from CharField to ForeignKey
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     
-    price = models.DecimalField(max_digits=10, decimal_places=2) 
+    # ✅ New Fields for Normalization
+    tags = models.ManyToManyField(Tag, blank=True, related_name='products')
+    sku = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) # Weight in Kg/Lb
+    
+    # Dimensions (Embedded vs Separate Table - keeping simple as fields for now)
+    width = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    height = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    depth = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    price = models.DecimalField(max_digits=10, decimal_places=2) # Changed to Decimal matching DB
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) # ✅ New for "On Sale" filter
     stock = models.IntegerField(default=0)
     brand = models.CharField(max_length=100, null=True, blank=True)
     thumbnail = models.ImageField(upload_to='products/', null=True, blank=True)
-    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(default=timezone.now)
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00) # คะแนนเฉลี่ย (เต็ม 5)
+    is_active = models.BooleanField(default=True) # สถานะสินค้า (True=ขาย, False=ปิดการขาย)
+    created_at = models.DateTimeField(default=timezone.now) # DB has created_at
     updated_at = models.DateTimeField(auto_now=True)
+    seller = models.ForeignKey('User', on_delete=models.CASCADE, null=True, blank=True, related_name='products', db_column='seller_id')
 
     class Meta:
         db_table = 'products'
@@ -130,6 +154,31 @@ class ProductImage(models.Model):
     def __str__(self):
         return f"{self.product.title} Image"
 
+class StockHistory(models.Model):
+    ACTION_CHOICES = [
+        ('sale', 'Sale'),
+        ('restock', 'Restock'),
+        ('adjustment', 'Adjustment'),
+        ('return', 'Return'),
+        ('cancel', 'Order Cancelled'),
+        ('edit', 'Edit Info') # ✅ Support General Edits
+    ]
+    
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_history')
+    change_quantity = models.IntegerField(help_text="Negative for deduction, Positive for addition")
+    remaining_stock = models.IntegerField()
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    note = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = 'stock_history'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.product.title} - {self.change_quantity} ({self.action})"
+
 # ==========================================
 # 📦 Order System
 # ==========================================
@@ -149,12 +198,23 @@ class Order(models.Model):
     customer_tel = models.CharField(max_length=20)
     customer_email = models.CharField(max_length=254, null=True, blank=True) # DB VARCHAR(254)
     shipping_address = models.TextField() # DB 'shipping_address'
+    shipping_province = models.CharField(max_length=100, null=True, blank=True) # ✅ New: Store Province separately for Analytics
     
     total_price = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     
-    payment_method = models.CharField(max_length=50, default='Transfer')
-    payment_slip = models.CharField(max_length=255, null=True, blank=True) # DB is VARCHAR(255) for path
+    payment_method = models.CharField(max_length=50, default='Transfer') # วิธีการชำระเงิน (Transfer/Credit)
+    payment_slip = models.CharField(max_length=255, null=True, blank=True) # เก็บ path รูปสลิป (เวอร์ชั่นเก่า)
+    
+    # ✅ New Fields for Payment Slip Verification (ข้อมูลสำหรับการตรวจสอบสลิป)
+    slip_image = models.ImageField(upload_to='slips/', null=True, blank=True)
+    payment_date = models.DateTimeField(null=True, blank=True)
+    
+    # ✅ Strict Payment Verification (ข้อมูลสลิปที่ตรวจสอบแล้ว)
+    transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    transfer_date = models.DateTimeField(null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+    transfer_account_number = models.CharField(max_length=50, null=True, blank=True) # ✅ เลขบัญชีที่โอนเข้า
     
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -167,10 +227,11 @@ class Order(models.Model):
         return f"Order #{self.id} - {self.customer_name}"
 
 class OrderItem(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.IntegerField(default=1)
-    price_at_purchase = models.DecimalField(max_digits=10, decimal_places=2) # DB column name
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    # 🚩 แก้ไขบรรทัดนี้: เปลี่ยนจาก 'reviews' เป็น 'order_items'
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='order_items') 
+    quantity = models.PositiveIntegerField(default=1)
+    price_at_purchase = models.DecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
         db_table = 'order_items'
@@ -179,15 +240,26 @@ class OrderItem(models.Model):
     def __str__(self):
         return f"{self.product.title} (x{self.quantity})"
 
+
+
 class Review(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews")
+    # ✅ บรรทัดนี้ให้ใช้ 'reviews'
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     rating = models.IntegerField(default=5)
-    comment = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
+    comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # ✅ Fields for Reply (Admin/Seller)
+    reply_comment = models.TextField(blank=True, null=True)
+    reply_timestamp = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        db_table = 'reviews'
+        ordering = ['-created_at']
+
+
+    def __str__(self):
+        return f"{self.user.username} - {self.product.title} ({self.rating})"
 
 
 class AdminLog(models.Model):

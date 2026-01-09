@@ -3,94 +3,100 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    // ✅ Init user from localStorage if available (Persist Login)
+    const [user, setUser] = useState(() => {
+        const savedUser = localStorage.getItem('user');
+        return savedUser ? JSON.parse(savedUser) : null;
+    });
+    // ✅ Init token from localStorage
+    const [token, setToken] = useState(() => localStorage.getItem('token'));
+    
+    // If token exists, start loading. If not, no need to load.
+    const [loading, setLoading] = useState(() => !!localStorage.getItem('token'));
+    const [lastApiStatus, setLastApiStatus] = useState(null); // 🔍 Debug
 
     // ✅ Rule: Backend Port 8000
     const API_BASE_URL = "http://localhost:8000";
 
-    const getToken = () => localStorage.getItem('token');
+    // const getToken = () => localStorage.getItem('token'); // ❌ Deprecated
 
     const fetchUser = async (tokenOverride) => {
-        const token = tokenOverride || getToken();
+        const currentToken = tokenOverride || token || localStorage.getItem('token'); 
 
-        if (!token) {
+        if (!currentToken) {
+            // ✅ Fix: Don't auto-clear session here.
             setLoading(false);
             return;
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/user/profile/`, {
+            const response = await fetch(`${API_BASE_URL}/api/user/profile/?_=${new Date().getTime()}`, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': `Token ${currentToken}`,
                     'Content-Type': 'application/json',
                 },
             });
+
+            setLastApiStatus(response.status); // 🔍 Save status
 
             if (response.ok) {
                 const userData = await response.json();
 
                 // ✅ Rule: Backend may return role (display) and role_code (value)
-                // We should use role_code for logic if available
                 const userRole = userData.role_code || userData.role;
                 if (userRole) userData.role = userRole.toLowerCase();
 
                 setUser(userData);
+                localStorage.setItem('user', JSON.stringify(userData)); // ✅ Save up-to-date user
             } else {
-                // ✅ Rule: เจอ 401 (Token หมดอายุ) ให้ Logout ทันที
-                console.error("Session expired");
-                logout();
+                // ✅ Rule: Only logout if token is explicitly invalid (401)
+                if (response.status === 401) {
+                    console.error("Session expired (401). Keeping token for retry.");
+                } else {
+                    console.warn(`Failed to fetch profile (Status: ${response.status}). Keeping session.`);
+                }
             }
         } catch (error) {
             console.error("Error fetching user:", error);
+            setLastApiStatus("Network Error");
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-    const loadUser = async () => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                // เรียก API Profile เพื่อเช็คว่า Token ยังใช้ได้ไหม
-                const res = await axios.get('http://localhost:8000/api/profile/', {
-                    headers: { Authorization: `Token ${token}` }
-                });
-                setUser(res.data); // ✅ เซ็ต user กลับเข้า state
-            } catch (err) {
-                localStorage.removeItem('token'); // ถ้า token บูดให้ลบออก
-            }
-        }
-        setLoading(false); // ✅ เลิกโหลด และแสดงหน้าเว็บปกติ
-    };
-    loadUser();
-}, []);
+        fetchUser();
+    }, []);
 
-    const login = (token, userData) => {
-        localStorage.setItem('token', token);
+    const login = (newToken, userData) => {
+        setToken(newToken);
+        localStorage.setItem('token', newToken);
+        
         if (userData) {
             const userRole = userData.role_code || userData.role;
             if (userRole) userData.role = userRole.toLowerCase();
+            
             setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData)); // ✅ Cache user
         } else {
-            fetchUser(token);
+            fetchUser(newToken);
         }
     };
 
     // ✅ Rule: Clear ข้อมูลให้เกลี้ยงตอน Logout
     const logout = () => {
+        setToken(null);
         localStorage.removeItem('token');
+        localStorage.removeItem('user'); // ✅ Clear cached user
         setUser(null);
         window.location.href = '/login';
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, fetchUser, token: getToken() }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, fetchUser, token, lastApiStatus }}>
             {children}
         </AuthContext.Provider>
     );
 };
-
 export const useAuth = () => useContext(AuthContext);

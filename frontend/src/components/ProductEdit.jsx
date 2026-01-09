@@ -10,30 +10,26 @@ function ProductEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
-
+  
+  // States
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', category: '', stock: '', brand: ''
   });
+  
   const [currentThumbnail, setCurrentThumbnail] = useState('');
   const [newThumbnail, setNewThumbnail] = useState(null);
   
-  const [galleryImages, setGalleryImages] = useState([]); // รูปเดิมจาก Server
-  const [deleteImageIds, setDeleteImageIds] = useState([]); // ID รูปที่จะลบ
-  const [newGalleryFiles, setNewGalleryFiles] = useState([]); // ไฟล์ใหม่
-  const [newGalleryPreviews, setNewGalleryPreviews] = useState([]); // Preview รูปใหม่
-  const [categories, setCategories] = useState([]); // ✅ State
+  const [galleryImages, setGalleryImages] = useState([]); // Existing gallery (from DB)
+  const [newGalleryFiles, setNewGalleryFiles] = useState([]); // New files to upload
+  const [newGalleryPreviews, setNewGalleryPreviews] = useState([]); // Previews for new files
+  
+  // Stock History
 
-  useEffect(() => {
-    // Fetch Categories
-    axios.get(`${API_BASE_URL}/api/categories-list/`)
-        .then(res => setCategories(res.data))
-        .catch(err => console.error(err));
-  }, []);
 
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-
-  const API_BASE_URL = "http://localhost:8000";
+  const API_BASE_URL = 'http://localhost:8000'; // Or use env variable
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -42,113 +38,147 @@ function ProductEdit() {
         const p = res.data;
         setFormData({
           title: p.title, description: p.description, price: p.price,
-          category: p.cat_id || '', // Use cat_id (ID) not category (name)
-          stock: p.stock, brand: p.brand || ''
+          category: p.category, stock: p.stock, brand: p.brand || ''
         });
         setCurrentThumbnail(p.thumbnail || p.image);
         setGalleryImages(p.images || []);
         setLoading(false);
+
+
+
+
       } catch (error) {
         console.error("Error:", error);
         Swal.fire('Error', 'ไม่พบข้อมูลสินค้าในระบบ', 'error');
         navigate('/shop');
       }
     };
-    fetchProduct();
-  }, [id, navigate]);
+    fetchProduct(); // ✅ Run always (internal logic handles token fallback)
+  }, [id, navigate, token]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  // ✅ Rule 40: Preview รูปปก
   const handleThumbnailChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // ✅ Rule 38
-        return Swal.fire('ไฟล์ใหญ่เกินไป', 'รูปภาพต้องมีขนาดไม่เกิน 2MB', 'warning');
-      }
-      setNewThumbnail(file);
-      setCurrentThumbnail(URL.createObjectURL(file));
+        setNewThumbnail(file);
+        setCurrentThumbnail(URL.createObjectURL(file)); // Show preview of new file
     }
   };
 
-  // ✅ Rule 37: เพิ่มรูปเข้า Gallery (Preview Only)
   const handleNewGalleryChange = (e) => {
-      if (e.target.files) {
-          const files = Array.from(e.target.files);
-          const validFiles = files.filter(f => f.size <= 2 * 1024 * 1024);
-          
-          if (validFiles.length < files.length) {
-              Swal.fire('แจ้งเตือน', 'บางไฟล์มีขนาดเกิน 2MB และถูกคัดออก', 'info');
-          }
-
-          setNewGalleryFiles(validFiles);
-          const previews = validFiles.map(file => URL.createObjectURL(file));
-          setNewGalleryPreviews(previews);
-      }
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+        setNewGalleryFiles(prev => [...prev, ...files]);
+        const newPreviews = files.map(f => URL.createObjectURL(f));
+        setNewGalleryPreviews(prev => [...prev, ...newPreviews]);
+    }
   };
 
-  const handleDeleteGalleryImage = (imgId) => {
-      setDeleteImageIds([...deleteImageIds, imgId]);
-      setGalleryImages(galleryImages.filter(img => img.id !== imgId));
+  const handleDeleteGalleryImage = async (imageId) => {
+      // ✅ Custom Styled Confirm for Gallery Delete
+      const result = await Swal.fire({
+          title: 'ลบรูปภาพนี้?',
+          text: "รูปภาพจะถูกลบถาวรและไม่สามารถกู้คืนได้",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#E5E7EB',
+          cancelButtonText: '<span style="color:#374151">ยกเลิก</span>',
+          confirmButtonText: 'ลบทันที',
+          reverseButtons: true, // เอาปุ่มลบไว้ขวา
+          focusCancel: true
+      });
+
+      if (!result.isConfirmed) return;
+
+      try {
+          await axios.delete(`${API_BASE_URL}/api/delete_product_image/${imageId}/`, {
+              headers: { Authorization: `Token ${token}` }
+          });
+          setGalleryImages(galleryImages.filter(img => img.id !== imageId));
+          
+          const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
+          });
+          
+          Toast.fire({
+            icon: 'success',
+            title: 'ลบรูปภาพเรียบร้อยแล้ว'
+          });
+
+      } catch (e) {
+          console.error(e);
+          Swal.fire('Error', 'ลบรูปไม่สำเร็จ', 'error');
+      }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    const dataToSend = new FormData();
-    Object.keys(formData).forEach(key => dataToSend.append(key, formData[key]));
-
-    if (newThumbnail) dataToSend.append('thumbnail', newThumbnail);
-    deleteImageIds.forEach(did => dataToSend.append('delete_image_ids', did));
-    newGalleryFiles.forEach(file => dataToSend.append('new_gallery_images', file));
-
-    try {
-      await axios.put(`${API_BASE_URL}/api/admin/product/${id}/edit/`, dataToSend, {
-        headers: {
-          'Authorization': `Token ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
+      e.preventDefault();
+      setSubmitting(true);
+      
+      const data = new FormData();
+      data.append('title', formData.title);
+      data.append('description', formData.description);
+      data.append('price', formData.price);
+      data.append('category', formData.category);
+      data.append('stock', formData.stock);
+      data.append('brand', formData.brand);
+      
+      if (newThumbnail) {
+          data.append('thumbnail', newThumbnail);
+      }
+      
+      newGalleryFiles.forEach((file) => {
+          data.append('new_gallery_images', file);
       });
-      Swal.fire({ 
-        icon: 'success', 
-        title: 'อัปเดตข้อมูลสำเร็จ', 
-        showConfirmButton: false, 
-        timer: 1500,
-        background: '#1a4d2e',
-        color: '#fff'
-      }).then(() => navigate(`/product/${id}`));
-    } catch (error) {
-      console.error("Error updating:", error);
-      Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง', 'error');
-    } finally {
-      setSubmitting(false);
-    }
+
+      try {
+          await axios.put(`${API_BASE_URL}/api/edit_product/${id}/`, data, {
+  headers: {
+    'Authorization': `Token ${token}`
+  }
+});
+          
+          await Swal.fire({
+              icon: 'success',
+              title: 'บันทึกสำเร็จ!',
+              text: 'ข้อมูลสินค้าถูกแก้ไขเรียบร้อยแล้ว',
+              confirmButtonColor: '#1a4d2e'
+          });
+          
+          // Refresh data
+          navigate('/admin/product/list'); 
+          
+      } catch (error) {
+          console.error('Update error:', error);
+          Swal.fire('Error', 'เกิดข้อผิดพลาดในการบันทึก', 'error');
+      } finally {
+          setSubmitting(false);
+      }
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F9F9F7]">
-        <div className="text-center">
-            <div className="w-12 h-12 border-4 border-[#1a4d2e] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-[#1a4d2e] font-black animate-pulse">กำลังโหลดข้อมูลสินค้า...</p>
-        </div>
-    </div>
-  );
+  if (loading) return <div className="text-center py-20">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-[#F9F9F7] py-12 px-4 pt-28">
-      <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-[3rem] shadow-xl border border-gray-100">
+      <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-[3rem] shadow-xl border border-gray-100 mb-8">
+        {/* ... Form Header ... */}
         <div className="flex items-center justify-between mb-10">
             <h1 className="text-3xl font-black text-[#263A33] tracking-tighter flex items-center gap-3">
                 <div className="p-2 bg-green-50 text-[#1a4d2e] rounded-xl"><ImageIcon size={28}/></div>
                 แก้ไขรายละเอียดสินค้า
             </h1>
-            <Link to="/admin/dashboard" className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+            <Link to="/admin/dashboard?tab=products" className="p-2 text-gray-400 hover:text-red-500 transition-colors">
                 <XCircle size={28} />
             </Link>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* ข้อมูลพื้นฐาน */}
           <div className="space-y-4">
             <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Product Title</label>
@@ -167,10 +197,12 @@ function ProductEdit() {
                 <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Category</label>
                     <select name="category" value={formData.category} onChange={handleChange} className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#1a4d2e]/20 font-bold text-gray-600 outline-none">
-                        <option value="" disabled>เลือกหมวดหมู่...</option>
-                        {categories.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
+                        <option value="smartphones">Smartphones</option>
+                        <option value="laptops">Laptops</option>
+                        <option value="fragrances">Fragrances</option>
+                        <option value="skincare">Skincare</option>
+                        <option value="groceries">Groceries</option>
+                        <option value="home-decoration">Home Decoration</option>
                     </select>
                 </div>
                 <div className="space-y-1">
@@ -215,7 +247,6 @@ function ProductEdit() {
                         </button>
                     </div>
                 ))}
-                {/* ✅ Rule 37: Preview รูปใหม่ก่อนอัปโหลด */}
                 {newGalleryPreviews.map((url, i) => (
                     <div key={i} className="relative aspect-square opacity-70 border-2 border-dashed border-[#1a4d2e] rounded-xl overflow-hidden">
                         <img src={url} className="w-full h-full object-cover" />
@@ -239,12 +270,14 @@ function ProductEdit() {
             >
               {submitting ? 'กำลังบันทึกข้อมูล...' : <><Save size={20}/> บันทึกการเปลี่ยนแปลง</>}
             </button>
-            <Link to={`/product/${id}`} className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-center hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+            <Link to="/admin/dashboard?tab=products" className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-center hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
                 <ArrowLeft size={18}/> ยกเลิก
             </Link>
           </div>
         </form>
       </div>
+      
+
     </div>
   );
 }

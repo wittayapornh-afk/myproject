@@ -38,6 +38,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # ✅ Custom Error Detection Middleware (ระบบตรวจจับ Error)
+    'myapp.middleware.ErrorDebugMiddleware',
 ]
 
 ROOT_URLCONF = 'myproject.urls'
@@ -99,48 +101,21 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ✅ ตั้งค่า CORS (ให้ Frontend ยิง API ได้)
 CORS_ALLOW_ALL_ORIGINS = True 
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'authorization',
+    'content-type',
+] 
 
 # ✅ ตั้งค่า Authentication (แก้ Error 403 Forbidden)
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
+   'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
+        # 'rest_framework.authentication.SessionAuthentication', # ❌ CSRF Fix
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
-    # ✅ [ระบบ Error ใหม่] เปิดใช้ Custom Exception Handler
-    'EXCEPTION_HANDLER': 'myapp.exception_handler.custom_exception_handler',
-}
-
-# ✅ [ระบบ Error ใหม่] ตั้งค่า Logging (แสดงผลทาง Console เท่านั้น ไม่บันทึกไฟล์)
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '\n🔴 ERROR at {asctime}\n📂 File: {pathname}\n🔢 Line: {lineno}\n🔧 Func: {funcName}\n💬 Msg: {message}\n',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'ERROR',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
-        'myapp': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-    },
 }
 
 # Custom User Model

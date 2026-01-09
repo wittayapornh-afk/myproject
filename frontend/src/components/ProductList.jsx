@@ -22,8 +22,11 @@ const ProductSkeleton = () => (
 function ProductList() {
   const { addToCart, cartItems } = useCart(); 
   const { toggleWishlist, isInWishlist } = useWishlist();
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth(); // Need to check role manually
   
+  // ✅ Restriction for Admin/Seller
+  const isRestricted = ['admin', 'super_admin', 'seller'].includes(user?.role?.toLowerCase());
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +43,11 @@ function ProductList() {
   const [totalPages, setTotalPages] = useState(1);
   const [showMobileFilter, setShowMobileFilter] = useState(false);
 
+  // ✅ New Filter States
+  const [brands, setBrands] = useState([]);
+  const [selectedBrand, setSelectedBrand] = useState('ทั้งหมด');
+  const [showInStockOnly, setShowInStockOnly] = useState(false);
+
   const API_BASE_URL = "http://localhost:8000";
 
   // 1. โหลดหมวดหมู่
@@ -53,6 +61,14 @@ function ProductList() {
       .catch(err => console.error(err));
   }, []);
 
+  // 1.2 โหลดแบรนด์
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/brands/`)
+      .then(res => res.json())
+      .then(data => setBrands(data.brands || []))
+      .catch(err => console.error(err));
+  }, []);
+
   // 2. ฟังก์ชันโหลดสินค้า (รวมทุกเงื่อนไข)
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -60,6 +76,9 @@ function ProductList() {
         let url = `${API_BASE_URL}/api/products/?page=${currentPage}&sort=${sortOption}`;
         
         if (selectedCategory !== 'ทั้งหมด') url += `&category=${encodeURIComponent(selectedCategory)}`;
+        if (selectedBrand !== 'ทั้งหมด') url += `&brand=${encodeURIComponent(selectedBrand)}`;
+        if (showInStockOnly) url += `&in_stock=true`;
+
         if (searchQuery) url += `&search=${encodeURIComponent(searchQuery.trim())}`;
         if (minPrice) url += `&min_price=${minPrice}`;
         if (maxPrice) url += `&max_price=${maxPrice}`;
@@ -81,7 +100,7 @@ function ProductList() {
     } finally {
         setLoading(false);
     }
-  }, [currentPage, selectedCategory, sortOption, searchQuery, minPrice, maxPrice, minRating]);
+  }, [currentPage, selectedCategory, selectedBrand, showInStockOnly, sortOption, searchQuery, minPrice, maxPrice, minRating]);
 
   // Debounce Search
   useEffect(() => {
@@ -90,16 +109,19 @@ function ProductList() {
   }, [fetchProducts]);
 
   const handleAddToCart = (product) => {
-    if (isAdmin || product.stock <= 0) return; 
-    addToCart(product, 1); // ✅ ส่งจำนวน 1 เสมอสำหรับหน้า Grid
+    if (isRestricted || product.stock <= 0) return; 
+    addToCart(product, 1); 
     Swal.fire({
       icon: 'success', title: 'เพิ่มลงตะกร้าแล้ว', toast: true, position: 'top-end',
       showConfirmButton: false, timer: 1000, background: '#1a4d2e', color: '#fff'
     });
   };
 
+
   const clearFilters = () => {
       setSelectedCategory('ทั้งหมด');
+      setSelectedBrand('ทั้งหมด');
+      setShowInStockOnly(false);
       setSearchQuery('');
       setMinPrice('');
       setMaxPrice('');
@@ -158,6 +180,35 @@ function ProductList() {
                             </label>
                         ))}
                     </div>
+                    </div>
+
+
+                {/* แบรนด์ */}
+                <div>
+                    <h3 className="font-black text-sm text-[#263A33] uppercase tracking-widest mb-4">Brands</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                        {brands.map(brand => (
+                            <label key={brand} className="flex items-center gap-3 cursor-pointer group">
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${selectedBrand === brand ? 'border-[#1a4d2e]' : 'border-gray-300'}`}>
+                                    {selectedBrand === brand && <div className="w-2.5 h-2.5 bg-[#1a4d2e] rounded-full" />}
+                                </div>
+                                <span className={`text-sm font-bold ${selectedBrand === brand ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>{brand}</span>
+                                <input type="radio" name="brand" className="hidden" checked={selectedBrand === brand} onChange={() => { setSelectedBrand(brand); setCurrentPage(1); }} />
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* สถานะสินค้า (In Stock Only) */}
+                <div>
+                    <h3 className="font-black text-sm text-[#263A33] uppercase tracking-widest mb-4">Availability</h3>
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-all ${showInStockOnly ? 'bg-[#1a4d2e] border-[#1a4d2e]' : 'border-gray-300 bg-white'}`}>
+                             {showInStockOnly && <CheckCircle size={14} className="text-white" />}
+                        </div>
+                        <span className={`text-sm font-bold ${showInStockOnly ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>In Stock Only</span>
+                        <input type="checkbox" className="hidden" checked={showInStockOnly} onChange={(e) => { setShowInStockOnly(e.target.checked); setCurrentPage(1); }} />
+                    </label>
                 </div>
 
                 {/* ช่วงราคา */}
@@ -196,9 +247,9 @@ function ProductList() {
                 <div className="flex items-center gap-2">
                     <SlidersHorizontal size={14} className="text-gray-400" />
                     <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); setCurrentPage(1); }} className="bg-transparent text-xs font-bold text-[#263A33] outline-none cursor-pointer">
-                        <option value="newest">Sort by: Newest</option>
-                        <option value="price_asc">Price: Low to High</option>
-                        <option value="price_desc">Price: High to Low</option>
+                        <option value="newest">เรียงตาม: ใหม่ล่าสุด</option>
+                        <option value="price_asc">ราคา: ต่ำไปสูง</option>
+                        <option value="price_desc">ราคา: สูงไปต่ำ</option>
                     </select>
                 </div>
             </div>
@@ -212,9 +263,10 @@ function ProductList() {
                 {products.map((product) => (
                   <div key={product.id} className="group bg-white rounded-[2rem] p-4 shadow-sm hover:shadow-2xl transition-all duration-300 relative border border-transparent hover:border-[#1a4d2e]/10 flex flex-col">
                     
+
                     {/* Icons Overlay */}
                     <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 translate-x-12 group-hover:translate-x-0 transition-transform duration-300">
-                        {!isAdmin && (
+                        {!isRestricted && (
                             <button onClick={() => toggleWishlist(product)} className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-md text-gray-400 hover:text-red-500 hover:scale-110 transition-all">
                                 <Heart size={16} className={isInWishlist(product.id) ? "fill-red-500 text-red-500" : ""} />
                             </button>
@@ -238,13 +290,13 @@ function ProductList() {
                         
                         <div className="flex items-center justify-between pt-4 mt-auto border-t border-gray-50">
                             <span className="font-black text-lg text-[#1a4d2e]">{formatPrice(product.price)}</span>
-                            {!isAdmin && product.stock > 0 && (
+                            {!isRestricted && product.stock > 0 && (
                                 <button onClick={() => handleAddToCart(product)} className="w-9 h-9 rounded-xl bg-[#1a4d2e] text-white flex items-center justify-center shadow-lg hover:bg-[#143d24] transition-all active:scale-90 hover:-translate-y-1">
                                     <ShoppingCart size={16} />
                                 </button>
                             )}
                         </div>
-                    </div>
+                   </div>
                   </div>
                 ))}
               </div>

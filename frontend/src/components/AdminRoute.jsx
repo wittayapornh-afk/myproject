@@ -11,7 +11,7 @@ const AdminRoute = ({ children }) => {
   }
 
   // ถ้าไม่มี User หรือ User ไม่ใช่ Admin/Super Admin ให้เตะกลับไปหน้าแรก
-  if (!user || (user.role !== 'admin' && user.role !== 'super_admin' && user.role_code !== 'super_admin')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'super_admin' && user.role_code !== 'super_admin' && user.role !== 'seller')) {
     return <Navigate to="/" replace />;
   }
 
