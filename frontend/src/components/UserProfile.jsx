@@ -11,7 +11,25 @@ function UserProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  const [formData, setFormData] = useState({ username: '', email: '', phone: '', address: '' });
+  const [formData, setFormData] = useState({ 
+    username: '', 
+    first_name: '', 
+    last_name: '', 
+    email: '', 
+    phone: '', 
+    address: '' 
+  });
+  
+  // Placeholder for Map Feature to prevent crashes
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const handleOpenMap = () => {
+    Swal.fire({
+        title: 'Coming Soon',
+        text: 'ระบบปักหมุดแผนที่กำลังอยู่ในระหว่างการพัฒนา',
+        icon: 'info',
+        confirmButtonColor: '#1a4d2e'
+    });
+  };
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -170,14 +188,41 @@ function UserProfile() {
                     </div>
                 </div>
                 
-                 {/* ... Address Field ... */}
-                 <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">ที่อยู่จัดส่ง</label>
-                    <div className="flex gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-3">
-                        <MapPin size={18} className="text-gray-400 mt-0.5"/>
-                        <textarea rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none" placeholder="ระบุที่อยู่..."></textarea>
-                    </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="group">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">First Name</label>
+                <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
+                  <input type="text" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" placeholder="ชื่อจริง" />
                 </div>
+              </div>
+              <div className="group">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">Last Name</label>
+                <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
+                  <input type="text" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" placeholder="นามสกุล" />
+                </div>
+              </div>
+            </div>
+
+            <div className="group">
+              <div className="flex justify-between items-center mb-1.5 ml-1">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Address</label>
+                {isEditing && (
+                  <button
+                    type="button"
+                    onClick={handleOpenMap}
+                    disabled={gpsLoading}
+                    className="px-4 py-2 bg-[#1a4d2e]/10 hover:bg-[#1a4d2e] text-[#1a4d2e] hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 group"
+                  >
+                    <MapPin size={16} className={`transition-transform group-hover:scale-110 ${gpsLoading ? "animate-spin" : ""}`} />
+                    {gpsLoading ? 'กำลังโหลด...' : 'เลือกจากแผนที่'}
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
+                <MapPin size={20} className="text-gray-400 mt-1 group-focus-within:text-[#1a4d2e]" />
+                <textarea rows="2" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none placeholder-gray-300" placeholder="ที่อยู่จัดส่งสินค้า..."></textarea>
+              </div>
+            </div>
 
             <div className="pt-8 flex justify-center gap-4">
               {!isEditing ? (
