@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
     });
     // ✅ Init token from localStorage
     const [token, setToken] = useState(() => localStorage.getItem('token'));
-    
+
     // If token exists, start loading. If not, no need to load.
     const [loading, setLoading] = useState(() => !!localStorage.getItem('token'));
     const [lastApiStatus, setLastApiStatus] = useState(null); // 🔍 Debug
@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
     // const getToken = () => localStorage.getItem('token'); // ❌ Deprecated
 
     const fetchUser = async (tokenOverride) => {
-        const currentToken = tokenOverride || token || localStorage.getItem('token'); 
+        const currentToken = tokenOverride || token || localStorage.getItem('token');
 
         if (!currentToken) {
             // ✅ Fix: Don't auto-clear session here.
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/user/profile/?_=${new Date().getTime()}`, {
+            const response = await fetch(`${API_BASE_URL}/api/profile/?_=${new Date().getTime()}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Token ${currentToken}`,
@@ -72,11 +72,11 @@ export const AuthProvider = ({ children }) => {
     const login = (newToken, userData) => {
         setToken(newToken);
         localStorage.setItem('token', newToken);
-        
+
         if (userData) {
             const userRole = userData.role_code || userData.role;
             if (userRole) userData.role = userRole.toLowerCase();
-            
+
             setUser(userData);
             localStorage.setItem('user', JSON.stringify(userData)); // ✅ Cache user
         } else {
