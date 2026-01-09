@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { Camera, Save, User, Mail, Phone, MapPin, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getImageUrl } from '../utils/formatUtils';
 
 function UserProfile() {
@@ -199,44 +199,7 @@ function UserProfile() {
         </div>
       </div>
       {/* Map Modal */}
-      {showMap && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-4 bg-[#1a4d2e] text-white flex justify-between items-center">
-              <h3 className="font-bold text-lg flex items-center gap-2"><MapPin size={20} /> เลือกตำแหน่งที่อยู่</h3>
-              <button onClick={() => setShowMap(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors">
-                <ArrowLeft size={20} />
-              </button>
-            </div>
-            <div className="flex-1 relative">
-              {mapPosition && (
-                <MapContainer center={mapPosition} zoom={15} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  <LocationMarker />
-                </MapContainer>
-              )}
-            </div>
-            <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-              <button
-                onClick={() => setShowMap(false)}
-                className="px-6 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition-colors"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={handleConfirmLocation}
-                disabled={gpsLoading}
-                className="px-6 py-2.5 rounded-xl font-bold text-white bg-[#1a4d2e] hover:bg-[#143d24] transition-colors flex items-center gap-2"
-              >
-                {gpsLoading ? 'กำลังดึงที่อยู่...' : <><MapPin size={18} /> ยืนยันตำแหน่ง</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Map Modal Removed because it was incomplete and causing errors */}
     </div>
   );
 }

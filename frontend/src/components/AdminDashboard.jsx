@@ -25,10 +25,7 @@ import ProductListAdmin from './ProductListAdmin';
 import UserListAdmin from './UserListAdmin';
 import AdminActivityLogs from './AdminActivityLogs';
 import AdminStockHistory from './AdminStockHistory'; // ✅ Import New Component
-<<<<<<< HEAD
 import AdminMapDashboard from './AdminMapDashboard'; // ✅ Import Map Dashboard
-=======
->>>>>>> origin/main
 
 const COLORS = ['#1a4d2e', '#2d6a4f', '#40916c', '#52b788', '#74c69d'];
 
@@ -47,10 +44,7 @@ function AdminDashboard() {
         low_stock: [],
         pie_data: [],
         bar_data: [],
-<<<<<<< HEAD
         province_data: [],
-=======
->>>>>>> origin/main
         logs: []
     });
     const [loading, setLoading] = useState(false);
@@ -59,10 +53,13 @@ function AdminDashboard() {
     const [viewMode, setViewMode] = useState('daily');
     const [errorMsg, setErrorMsg] = useState(null);
 
+    // ✅ fetchStats: ฟังก์ชันสำหรับดึงข้อมูลสถิติจาก API
+    // จะทำงานเมื่อ selectedDate หรือ viewMode เปลี่ยนแปลง 
     const fetchStats = useCallback(async () => {
         setLoading(true);
         setErrorMsg(null);
         try {
+            // คำนวณช่วงเวลา startStr และ endStr ตาม viewMode (daily/monthly/yearly)
             let startStr, endStr;
             const date = new Date(selectedDate);
 
@@ -87,14 +84,16 @@ function AdminDashboard() {
                  return;
             }
 
-            // Fix Timezone Issue: Send YYYY-MM-DD in Local Time
+            // Fix Timezone Issue: ส่งค่าวันที่ในรูปแบบ YYYY-MM-DD ตามเวลาท้องถิ่น
             const dateParam = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
+            // เรียก API ไปยัง backend
             const response = await axios.get(`http://localhost:8000/api/admin/dashboard-stats/`, {
                 params: { period: viewMode, date: dateParam },
                 headers: { Authorization: `Token ${activeToken}` }
             });
 
+            // อัปเดต state ด้วยข้อมูลที่ได้จาก API
             setStats(response.data);
 
         } catch (error) {
@@ -109,22 +108,21 @@ function AdminDashboard() {
         }
     }, [selectedDate, viewMode, logout, token]);
 
+    // ✅ useEffect: เรียก fetchStats เมื่อเริ่มโหลดหน้า (และเมื่อ activeTab เป็น dashboard)
     useEffect(() => {
         if (activeTab === 'dashboard') {
             fetchStats();
         }
     }, [fetchStats, activeTab]);
 
+    // ✅ renderContent: เลือกแสดงผล Component ตาม Tab ที่เลือก
     const renderContent = () => {
-        if (activeTab === 'products') return <ProductListAdmin />;
-        if (activeTab === 'orders') return <AdminOrders />;
-        if (activeTab === 'users') return <UserListAdmin />;
-        if (activeTab === 'history') return <AdminStockHistory />; // ✅ Stock History Tab
-<<<<<<< HEAD
-        if (activeTab === 'map') return <AdminMapDashboard salesData={stats.sales_data} provinceData={stats.province_data} />; // ✅ Map Dashboard
-=======
->>>>>>> origin/main
-        if (activeTab === 'logs') return <AdminActivityLogs />;
+        if (activeTab === 'products') return <ProductListAdmin />; // จัดการสินค้า
+        if (activeTab === 'orders') return <AdminOrders />; // จัดการคำสั่งซื้อ
+        if (activeTab === 'users') return <UserListAdmin />; // จัดการผู้ใช้งาน
+        if (activeTab === 'history') return <AdminStockHistory />; // ✅ Stock History Tab (ประวัติสต็อก)
+        if (activeTab === 'map') return <AdminMapDashboard salesData={stats.sales_data} provinceData={stats.province_data} />; // ✅ Map Dashboard (แผนที่ยอดขาย)
+        if (activeTab === 'logs') return <AdminActivityLogs />; // บันทึกกิจกรรมแอดมิน
 
         return (
             <div className="space-y-8 animate-fade-in">

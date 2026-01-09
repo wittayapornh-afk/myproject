@@ -4,7 +4,6 @@
 --
 -- Host: db:3306
 -- Generation Time: Jan 07, 2026 at 03:02 AM
->>>>>>> origin/main
 -- Server version: 8.0.44
 -- PHP Version: 8.3.26
 
@@ -66,7 +65,6 @@ INSERT INTO `admin_logs` (`id`, `action`, `timestamp`, `details`, `ip_address`, 
 (22, 'แก้ไขสินค้า: Women\'s Wrist Watch', '2026-01-06 09:57:09.830100', NULL, NULL, 1),
 (23, 'อัปเดตสถานะออเดอร์ #22: Pending -> Paid', '2026-01-06 10:02:37.101311', NULL, NULL, 1),
 (24, 'อัปเดตสถานะออเดอร์ #23: Pending -> Paid', '2026-01-06 10:02:44.578825', NULL, NULL, 1);
->>>>>>> origin/main
 
 -- --------------------------------------------------------
 

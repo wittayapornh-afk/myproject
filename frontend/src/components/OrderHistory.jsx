@@ -4,15 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice, formatDate, getImageUrl } from '../utils/formatUtils';
 // ✅ รวมไอคอนทุกตัวที่ต้องใช้ไว้ที่นี่ที่เดียว ห้าม import ซ้ำด้านล่างอีก
-<<<<<<< HEAD
-import { 
-    Package, 
-    Calendar, 
-    CalendarDays, 
-    Clock, 
-    ChevronRight, 
-    ShoppingBag, 
-=======
 import {
     Package,
     Calendar,
@@ -20,7 +11,6 @@ import {
     Clock,
     ChevronRight,
     ShoppingBag,
->>>>>>> origin/main
     ChevronLeft,
     AlertCircle
 } from 'lucide-react';
@@ -55,7 +45,6 @@ function OrderHistory() {
     };
 
     useEffect(() => {
-<<<<<<< HEAD
         fetchOrders();
     }, [token]);
 
@@ -76,31 +65,6 @@ function OrderHistory() {
         // Refresh orders directly without reload
         fetchOrders(); 
     };
-
-=======
-
-        fetchOrders();
-    }, [token]);
-
-    // ✅ Integration Logic for Payment Modal
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedOrderId, setSelectedOrderId] = useState(null);
-    const [selectedOrderTotal, setSelectedOrderTotal] = useState(0);
-    const [selectedQrPayload, setSelectedQrPayload] = useState(null);
-
-    const handleOpenPayment = (order) => {
-        setSelectedOrderId(order.id);
-        setSelectedOrderTotal(order.total_price);
-        setSelectedQrPayload(order.promptpay_payload);
-        setIsModalOpen(true);
-    };
-
-    const handlePaymentSuccess = () => {
-        // Refresh orders directly without reload
-        fetchOrders();
-    };
-
->>>>>>> origin/main
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#F9F9F7]">
@@ -112,13 +76,8 @@ function OrderHistory() {
     return (
         <div className="min-h-screen bg-[#F9F9F7] py-12 px-4 md:px-8 pt-28 font-sans">
             <div className="max-w-4xl mx-auto">
-<<<<<<< HEAD
                 <button 
-                    onClick={() => navigate('/')} 
-=======
-                <button
                     onClick={() => navigate('/')}
->>>>>>> origin/main
                     className="flex items-center gap-2 text-gray-500 hover:text-[#1a4d2e] transition-colors mb-8 font-bold"
                 >
                     <ChevronLeft size={20} /> กลับสู่หน้าหลัก
@@ -132,13 +91,8 @@ function OrderHistory() {
                     <div className="bg-white p-12 rounded-[2.5rem] text-center shadow-sm border border-gray-100">
                         <Package size={64} className="mx-auto text-gray-200 mb-4" />
                         <h3 className="text-xl font-bold text-gray-400">ยังไม่มีรายการสั่งซื้อ</h3>
-<<<<<<< HEAD
                         <button 
-                            onClick={() => navigate('/shop')} 
-=======
-                        <button
                             onClick={() => navigate('/shop')}
->>>>>>> origin/main
                             className="mt-6 bg-[#1a4d2e] text-white px-8 py-3 rounded-2xl font-bold hover:bg-[#263A33] transition-all"
                         >
                             เริ่มช้อปปิ้งเลย
@@ -160,7 +114,6 @@ function OrderHistory() {
                                                 <CalendarDays size={14} className="text-gray-400" /> {order.date}
                                             </div>
                                         </div>
-<<<<<<< HEAD
                                             <div className="text-right">
                                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">สถานะ</p>
                                                 <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter ${
@@ -175,21 +128,6 @@ function OrderHistory() {
                                                      order.status}
                                                 </span>
                                             </div>
-=======
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">สถานะ</p>
-                                            <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter ${order.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                                                    order.status === 'Shipped' ? 'bg-indigo-100 text-indigo-700' :
-                                                        order.status === 'Processing' ? 'bg-blue-100 text-blue-700' :
-                                                            order.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
-                                                                'bg-amber-100 text-amber-700' // Pending
-                                                }`}>
-                                                {order.status === 'Pending' ? (order.has_slip ? 'รอตรวจสอบยอด' : 'รอชำระเงิน') :
-                                                    order.status === 'Shipped' ? 'จัดส่งแล้ว' :
-                                                        order.status}
-                                            </span>
-                                        </div>
->>>>>>> origin/main
                                     </div>
                                 </div>
 
@@ -212,17 +150,10 @@ function OrderHistory() {
                                         <p className="text-sm font-bold text-gray-500">ยอดสุทธิ</p>
                                         <p className="text-xl font-black text-[#1a4d2e]">{formatPrice(order.total_price)}</p>
                                     </div>
-<<<<<<< HEAD
                                     
                                     {/* ✅ BUTTON ACTION AREA */}
                                     {order.status === 'Pending' && !order.has_slip && (
-                                        <button 
-=======
-
-                                    {/* ✅ BUTTON ACTION AREA */}
-                                    {order.status === 'Pending' && !order.has_slip && (
                                         <button
->>>>>>> origin/main
                                             onClick={() => handleOpenPayment(order)}
                                             className="bg-[#1a4d2e] text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-green-100 hover:-translate-y-1 transition-all"
                                         >
@@ -241,19 +172,11 @@ function OrderHistory() {
                     </div>
                 )}
             </div>
-<<<<<<< HEAD
             
             {/* ✅ Payment Modal */}
             <PaymentModal 
                 isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-=======
-
-            {/* ✅ Payment Modal */}
-            <PaymentModal
-                isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
->>>>>>> origin/main
                 orderId={selectedOrderId}
                 orderTotal={selectedOrderTotal}
                 promptPayPayload={selectedQrPayload}

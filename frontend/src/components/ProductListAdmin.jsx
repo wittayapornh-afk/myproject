@@ -31,10 +31,7 @@ export default function ProductListAdmin() {
   const fetchAllProducts = async () => {
     setLoading(true);
     try {
-<<<<<<< HEAD
       // 🔑 ดึง Token จาก Context หรือ LocalStorage
-=======
->>>>>>> origin/main
       const activeToken = token || localStorage.getItem('token'); 
       const response = await axios.get('http://localhost:8000/api/admin/all_products/', {
           headers: { Authorization: `Token ${activeToken}` }
@@ -69,11 +66,7 @@ export default function ProductListAdmin() {
   };
 
   const handleDelete = async (id) => {
-<<<<<<< HEAD
-    // ⚠️ แจ้งเตือนยืนยันก่อนลบ (SweetAlert2)
-=======
     // ✅ Use SweetAlert2 for Confirmation
->>>>>>> origin/main
     const result = await Swal.fire({
         title: 'ยืนยันการลบสินค้า?',
         text: "คุณจะไม่สามารถกู้คืนสินค้านี้ได้!",

@@ -2,11 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
-<<<<<<< HEAD
-import { ArrowLeft } from 'lucide-react';
-=======
 import { ArrowLeft } from 'lucide-react'; // ✅ Import Icon
->>>>>>> origin/main
 
 function ProductAdd() {
   const navigate = useNavigate();
@@ -160,11 +156,7 @@ function ProductAdd() {
                 {/* รายละเอียด */}
                 <div><label className={styles.label}>รายละเอียด</label><textarea rows="4" className={styles.input} onChange={e => setFormData({...formData, description: e.target.value})}></textarea></div>
                 
-<<<<<<< HEAD
-                {/* ปุ่มดำเนินการ */}
-=======
                 {/* ✅ Button Group */}
->>>>>>> origin/main
                 <div className="flex gap-4 pt-6">
                     <button type="submit" className="flex-[2] bg-[#305949] text-white py-4 rounded-2xl font-bold hover:bg-[#234236] shadow-lg hover:shadow-xl transition-all">
                         บันทึกสินค้า
