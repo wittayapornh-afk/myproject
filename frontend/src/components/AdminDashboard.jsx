@@ -25,7 +25,10 @@ import ProductListAdmin from './ProductListAdmin';
 import UserListAdmin from './UserListAdmin';
 import AdminActivityLogs from './AdminActivityLogs';
 import AdminStockHistory from './AdminStockHistory'; // ✅ Import New Component
+<<<<<<< HEAD
 import AdminMapDashboard from './AdminMapDashboard'; // ✅ Import Map Dashboard
+=======
+>>>>>>> origin/main
 
 const COLORS = ['#1a4d2e', '#2d6a4f', '#40916c', '#52b788', '#74c69d'];
 
@@ -44,7 +47,10 @@ function AdminDashboard() {
         low_stock: [],
         pie_data: [],
         bar_data: [],
+<<<<<<< HEAD
         province_data: [],
+=======
+>>>>>>> origin/main
         logs: []
     });
     const [loading, setLoading] = useState(false);
@@ -114,7 +120,10 @@ function AdminDashboard() {
         if (activeTab === 'orders') return <AdminOrders />;
         if (activeTab === 'users') return <UserListAdmin />;
         if (activeTab === 'history') return <AdminStockHistory />; // ✅ Stock History Tab
+<<<<<<< HEAD
         if (activeTab === 'map') return <AdminMapDashboard salesData={stats.sales_data} provinceData={stats.province_data} />; // ✅ Map Dashboard
+=======
+>>>>>>> origin/main
         if (activeTab === 'logs') return <AdminActivityLogs />;
 
         return (

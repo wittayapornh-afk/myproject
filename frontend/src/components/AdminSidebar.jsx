@@ -47,7 +47,10 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
     { id: 'dashboard', label: 'ภาพรวม (Dashboard)', icon: <LayoutDashboard size={22} /> },
     { id: 'products', label: 'จัดการสินค้า', icon: <Package size={22} /> },
     { id: 'orders', label: 'รายการคำสั่งซื้อ', icon: <ShoppingCart size={22} /> },
+<<<<<<< HEAD
     { id: 'map', label: 'แผนที่ยอดขาย', icon: <div className="text-xl">🗺️</div> }, // ✅ New Map Menu
+=======
+>>>>>>> origin/main
     { id: 'history', label: 'ประวัติสต็อก (History)', icon: <History size={22} /> }, // ✅ New Menu Item
     { id: 'users', label: 'ผู้ใช้งานระบบ', icon: <Users size={22} />, restricted: true },
     { id: 'profile', label: 'โปรไฟล์ส่วนตัว', icon: <User size={22} /> },

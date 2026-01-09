@@ -216,6 +216,16 @@ class Order(models.Model):
     bank_name = models.CharField(max_length=100, null=True, blank=True)
     transfer_account_number = models.CharField(max_length=50, null=True, blank=True) # ✅ เลขบัญชีที่โอนเข้า
     
+    # ✅ New Fields for Payment Slip Verification
+    slip_image = models.ImageField(upload_to='slips/', null=True, blank=True)
+    payment_date = models.DateTimeField(null=True, blank=True)
+    
+    # ✅ Strict Payment Verification
+    transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    transfer_date = models.DateTimeField(null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+    transfer_account_number = models.CharField(max_length=50, null=True, blank=True) # ✅ New Field
+    
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

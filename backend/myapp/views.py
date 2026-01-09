@@ -227,6 +227,7 @@ class DashboardStatsView(APIView):
             "admin": l.admin.username
         } for l in recent_logs]
 
+<<<<<<< HEAD
         # 8. Province Sales Data (Map Analytics) ✅
         province_stats = orders_in_range.filter(status__in=valid_statuses)\
             .values('shipping_province')\
@@ -254,16 +255,26 @@ class DashboardStatsView(APIView):
 
         return Response({
             "total_sales": global_total_sales,
+=======
+        return Response({
+            "total_sales": global_total_sales, # Show ALL time sales on cards
+>>>>>>> origin/main
             "total_orders": global_total_orders,
             "total_products": Product.objects.count(),
             "total_users": User.objects.count(),
             "pending_orders": pending_orders,
             "low_stock": low_stock_data,
             "sales_data": sales_data,
+<<<<<<< HEAD
             "best_sellers": bar_data,
             "pie_data": pie_data,
             "bar_data": bar_data,
             "province_data": province_data, # ✅ Add Province Data
+=======
+            "best_sellers": bar_data, # Reuse bar data for simple best seller list if needed
+            "pie_data": pie_data,
+            "bar_data": bar_data,
+>>>>>>> origin/main
             "logs": logs_data
         })
 
@@ -272,10 +283,16 @@ class DashboardStatsView(APIView):
 @permission_classes([AllowAny])
 def products_api(request):
     try:
+<<<<<<< HEAD
         # ดึงสินค้าที่สถานะ is_active=True (เปิดขาย) เท่านั้น
         products = Product.objects.filter(is_active=True)
         
         # ✅ Sorting Logic (การเรียงลำดับ)
+=======
+        products = Product.objects.filter(is_active=True)
+        
+        # ✅ Sorting Logic
+>>>>>>> origin/main
         sort_option = request.query_params.get('sort')
         if sort_option == 'price_asc':
             products = products.order_by('price')
@@ -288,7 +305,11 @@ def products_api(request):
         search = request.query_params.get('search')
         
         if category and category != "ทั้งหมด":
+<<<<<<< HEAD
             products = products.filter(category__name=category)
+=======
+            products = products.filter(category=category)
+>>>>>>> origin/main
         
         # ✅ Brand Filter
         brand = request.query_params.get('brand')
@@ -333,6 +354,7 @@ def products_api(request):
         logger.error(err_msg)
         return Response({"error": str(e)}, status=500)
 
+<<<<<<< HEAD
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -356,6 +378,29 @@ def get_all_products_admin_api(request):
         })
     return Response(data)
 
+=======
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_products_admin_api(request):
+    if request.user.role not in ['admin', 'super_admin', 'seller']:
+        return Response({"error": "Unauthorized"}, status=403)
+    
+    # ✅ Fix: Show only Active products (Hide Deleted)
+    products = Product.objects.filter(is_active=True).order_by('-id')
+    
+    data = [{
+        "id": p.id,
+        "title": p.title,
+        "price": p.price,
+        "stock": p.stock,
+        "category": p.category,
+        "is_active": p.is_active,
+        "thumbnail": p.thumbnail.url if p.thumbnail else ""
+    } for p in products]
+    return Response(data)
+
+>>>>>>> origin/main
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -517,17 +562,28 @@ def reply_review_api(request, review_id):
 def product_detail_api(request, product_id):
     print(f"DEBUG: product_detail_api called with id={product_id}")
     try:
+<<<<<<< HEAD
         product = Product.objects.get(id=product_id) # Renamed 'p' to 'product'
         gallery = []
         try:
             gallery = [{"id": img.id, "image": img.image_url.url} for img in product.images.all()] # Used image_url field name
+=======
+        p = Product.objects.get(id=product_id)
+        gallery = []
+        try:
+            gallery = [{"id": img.id, "image": img.image_url.url} for img in p.images.all()] # Used image_url field name
+>>>>>>> origin/main
         except Exception as e:
             print(f"Error processing gallery images for product {product_id}: {e}")
             traceback.print_exc()
         
         reviews = []
         try:
+<<<<<<< HEAD
             for r in product.reviews.all():
+=======
+            for r in p.reviews.all():
+>>>>>>> origin/main
                 reviews.append({
                     "id": r.id,
                     "user": r.user.username if r.user else "Anonymous",
@@ -543,6 +599,7 @@ def product_detail_api(request, product_id):
             traceback.print_exc()
 
         # ✅ Next/Prev IDs for navigation
+<<<<<<< HEAD
         next_product = Product.objects.filter(id__gt=product.id, is_active=True).order_by('id').first()
         prev_product = Product.objects.filter(id__lt=product.id, is_active=True).order_by('-id').first()
 
@@ -575,6 +632,21 @@ def product_detail_api(request, product_id):
         "next_id": next_product.id if next_product else None,
         "prev_id": prev_product.id if prev_product else None
     }
+=======
+        next_product = Product.objects.filter(id__gt=p.id, is_active=True).order_by('id').first()
+        prev_product = Product.objects.filter(id__lt=p.id, is_active=True).order_by('-id').first()
+
+        data = {
+            "id": p.id, "title": p.title, "description": p.description, 
+            "category": p.category, "price": p.price, "stock": p.stock, 
+            "brand": getattr(p, 'brand', ''), "rating": p.rating,
+            "thumbnail": p.thumbnail.url if p.thumbnail else "",
+            "images": gallery,
+            "reviews": reviews,
+            "next_id": next_product.id if next_product else None,
+            "prev_id": prev_product.id if prev_product else None
+        }
+>>>>>>> origin/main
         return Response(data)
     except Product.DoesNotExist:
         # Debugging: Print all existing IDs to see what's actually in the DB
@@ -584,9 +656,12 @@ def product_detail_api(request, product_id):
     except Exception as e:
         traceback.print_exc()
         return Response({"error": str(e)}, status=500)
+<<<<<<< HEAD
 
 import json
 from urllib.request import urlopen
+=======
+>>>>>>> origin/main
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -617,6 +692,12 @@ def categories_api(request):
     
     return Response({"categories": list(all_categories)})
 
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def brands_api(request):
+    brands = Product.objects.filter(is_active=True).exclude(brand__isnull=True).exclude(brand="").values_list('brand', flat=True).distinct()
+    return Response({"brands": ["ทั้งหมด"] + list(brands)})
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -764,7 +845,11 @@ def user_profile_api(request):
 def create_order(request):
     # ✅ 1. รับข้อมูล items (รองรับทั้ง key 'items' และ 'cart_items')
     cart_items = request.data.get('items') or request.data.get('cart_items', [])
+<<<<<<< HEAD
     customer_data = request.data.get('customer', {}) # ✅ รับข้อมูลลูกค้า (ชื่อ/ที่อยู่/เบอร์โทร)
+=======
+    customer_data = request.data.get('customer', {}) # ✅ รับข้อมูลลูกค้า (ที่อยู่/เบอร์โทร)
+>>>>>>> origin/main
     
     if not cart_items: 
         return Response({"error": "ไม่พบรายการสินค้า (Empty cart)"}, status=400)
@@ -807,7 +892,10 @@ def create_order(request):
                 customer_tel=customer_data.get('tel', request.user.phone), 
                 customer_email=customer_data.get('email', request.user.email),
                 shipping_address=customer_data.get('address', request.user.address), 
+<<<<<<< HEAD
                 shipping_province=customer_data.get('province'), # ✅ Save Province
+=======
+>>>>>>> origin/main
                 payment_method=request.data.get('paymentMethod', 'Transfer'),
                 total_price=total_price,
                 status='Pending'
@@ -819,7 +907,11 @@ def create_order(request):
                     order=order, 
                     product=item_data['product'], 
                     quantity=item_data['quantity'], 
+<<<<<<< HEAD
                     price_at_purchase=item_data['price'] # บันทึกราคา ณ ตอนสั่งซื้อ (ป้องกันราคาเปลี่ยนภายหลัง)
+=======
+                    price_at_purchase=item_data['price']
+>>>>>>> origin/main
                 )
 
         return Response({"message": "สั่งซื้อสำเร็จ", "order_id": order.id}, status=201)
@@ -1005,6 +1097,7 @@ def get_admin_stats(request):
     except Exception as e:
         print(f"DEBUG: Logs Error: {e}")
 
+<<<<<<< HEAD
     try:
         # 6. Province Sales Data (Map Analytics)
         province_stats = Order.objects.filter(**orders_filter, status__in=VALID_SALES_STATUSES)\
@@ -1035,6 +1128,8 @@ def get_admin_stats(request):
         print(f"DEBUG: Province Data Error: {e}")
         province_data = []
 
+=======
+>>>>>>> origin/main
     return Response({
         "total_sales": total_sales,
         "total_orders": total_orders,
@@ -1044,7 +1139,10 @@ def get_admin_stats(request):
         "best_sellers": best_sellers_data,
         "low_stock": low_stock_data,
         "pie_data": pie_data, 
+<<<<<<< HEAD
         "province_data": province_data, # ✅ Add Province Data
+=======
+>>>>>>> origin/main
         "logs": logs_data,
         "pending_orders": pending_orders
     })
@@ -1545,7 +1643,10 @@ def checkout_api(request):
                 customer_tel=customer_info.get('tel', ''),
                 customer_email=customer_info.get('email', user.email),
                 shipping_address=customer_info.get('address', ''),
+<<<<<<< HEAD
                 shipping_province=customer_info.get('province', ''), # ✅ Save Province
+=======
+>>>>>>> origin/main
                 total_price=total_price,
                 payment_method=payment_method,
                 status='Pending'
