@@ -14,7 +14,7 @@ urlpatterns = [
     path('api/login/', views.login_api),
     path('api/register/', views.register_api),
     path('api/logout/', views.logout_api),
-    path('api/user/profile/', views.user_profile_api),
+    path('api/profile/', views.user_profile_api),
     path('api/auth/reset-password/', views.reset_password_api), # ✅ Password Reset
     path('api/users/', views.get_all_users),           # Admin ดู user ทั้งหมด
 

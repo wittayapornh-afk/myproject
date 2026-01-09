@@ -25,7 +25,7 @@ export default function UserListAdmin() {
     } catch (error) {
       console.error("Error fetching users:", error);
       if (error.response && error.response.status === 401) {
-          logout(); // ✅ Auto logout on 401
+        logout(); // ✅ Auto logout on 401
       }
     } finally {
       setLoading(false);
@@ -171,16 +171,18 @@ export default function UserListAdmin() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
                   <input
                     type="text" name="username"
-                    value={formData.username} onChange={handleInputChange}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.username}
+                    readOnly
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์</label>
                   <input
                     type="text" name="phone"
-                    value={formData.phone} onChange={handleInputChange}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.phone}
+                    readOnly
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none"
                   />
                 </div>
               </div>
@@ -189,8 +191,9 @@ export default function UserListAdmin() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">อีเมล</label>
                 <input
                   type="email" name="email"
-                  value={formData.email} onChange={handleInputChange}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={formData.email}
+                  readOnly
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none"
                 />
               </div>
 
@@ -199,16 +202,18 @@ export default function UserListAdmin() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อจริง</label>
                   <input
                     type="text" name="first_name"
-                    value={formData.first_name} onChange={handleInputChange}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.first_name}
+                    readOnly
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">นามสกุล</label>
                   <input
                     type="text" name="last_name"
-                    value={formData.last_name} onChange={handleInputChange}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.last_name}
+                    readOnly
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none"
                   />
                 </div>
               </div>
@@ -218,9 +223,9 @@ export default function UserListAdmin() {
                 <textarea
                   name="address"
                   value={formData.address}
-                  onChange={handleInputChange}
+                  readOnly
                   rows="3"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none resize-none"
                 />
               </div>
 
