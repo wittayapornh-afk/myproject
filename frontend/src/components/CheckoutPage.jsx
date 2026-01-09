@@ -32,7 +32,7 @@ function CheckoutPage() {
     const navigate = useNavigate();
 
     // Form State
-    const [formData, setFormData] = useState({ name: '', tel: '', email: '', address: '' });
+    const [formData, setFormData] = useState({ first_name: '', last_name: '', tel: '', email: '', address: '' });
     const [loading, setLoading] = useState(false);
 
     // Map State
@@ -68,12 +68,15 @@ function CheckoutPage() {
     // Auto-fill User Data
     useEffect(() => {
         if (user) {
-            setFormData({
-                name: user.username || '',
-                tel: user.phone || '',
-                email: user.email || '',
-                address: user.address || ''
-            });
+            if (user) {
+                setFormData({
+                    first_name: user.first_name || '',
+                    last_name: user.last_name || '',
+                    tel: user.phone || '',
+                    email: user.email || '',
+                    address: user.address || ''
+                });
+            }
         }
     }, [user]);
 
@@ -115,7 +118,10 @@ function CheckoutPage() {
             // 1. Create Order
             const payload = {
                 items: cartItems.map(item => ({ id: item.id, quantity: item.quantity })),
-                customer: formData,
+                customer: {
+                    ...formData,
+                    name: `${formData.first_name} ${formData.last_name}`.trim()
+                },
                 paymentMethod: ['QR', 'Bank'].includes(paymentMethod) ? 'Transfer' : paymentMethod
             };
 
@@ -250,18 +256,21 @@ function CheckoutPage() {
                                     type="button"
                                     onClick={handleOpenMap}
                                     disabled={gpsLoading}
-                                    className="text-xs flex items-center gap-1 text-[#1a4d2e] hover:text-[#143d24] font-bold transition-colors disabled:opacity-50"
+                                    className="px-4 py-2 bg-[#1a4d2e]/10 hover:bg-[#1a4d2e] text-[#1a4d2e] hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 group"
                                 >
-                                    <MapPin size={14} className={gpsLoading ? "animate-spin" : ""} />
-                                    {gpsLoading ? 'Loading...' : 'Select from Map'}
+                                    <MapPin size={16} className={`transition-transform group-hover:scale-110 ${gpsLoading ? "animate-spin" : ""}`} />
+                                    {gpsLoading ? 'กำลังโหลด...' : 'เลือกจากแผนที่'}
                                 </button>
                             </h2>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <input name="name" value={formData.name} onChange={handleChange} required placeholder="ชื่อ-นามสกุล" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
-                                    <input name="tel" value={formData.tel} onChange={handleChange} required placeholder="เบอร์โทรศัพท์" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
+                                    <input name="first_name" value={formData.first_name} onChange={handleChange} required placeholder="ชื่อจริง" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
+                                    <input name="last_name" value={formData.last_name} onChange={handleChange} required placeholder="นามสกุล" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
                                 </div>
-                                <input name="email" value={formData.email} onChange={handleChange} required placeholder="อีเมล" className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input name="tel" value={formData.tel} onChange={handleChange} required placeholder="เบอร์โทรศัพท์" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
+                                    <input name="email" value={formData.email} onChange={handleChange} required placeholder="อีเมล" className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
+                                </div>
                                 <textarea name="address" value={formData.address} onChange={handleChange} required placeholder="ที่อยู่จัดส่ง..." rows="3" className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e] resize-none"></textarea>
                             </div>
                         </div>

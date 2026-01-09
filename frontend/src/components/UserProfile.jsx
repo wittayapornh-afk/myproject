@@ -318,10 +318,10 @@ function UserProfile() {
                     type="button"
                     onClick={handleOpenMap}
                     disabled={gpsLoading}
-                    className="text-xs flex items-center gap-1 text-[#1a4d2e] hover:text-[#143d24] font-bold transition-colors disabled:opacity-50"
+                    className="px-4 py-2 bg-[#1a4d2e]/10 hover:bg-[#1a4d2e] text-[#1a4d2e] hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 group"
                   >
-                    <Locate size={14} className={gpsLoading ? "animate-spin" : ""} />
-                    {gpsLoading ? 'Loading...' : 'Select from Map'}
+                    <MapPin size={16} className={`transition-transform group-hover:scale-110 ${gpsLoading ? "animate-spin" : ""}`} />
+                    {gpsLoading ? 'กำลังโหลด...' : 'เลือกจากแผนที่'}
                   </button>
                 )}
               </div>
