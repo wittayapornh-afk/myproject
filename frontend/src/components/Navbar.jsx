@@ -205,10 +205,14 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
 
         <div className="hidden md:flex items-center gap-6">
           
-          {/* ✅ Notification Center (Ex-hover, now Click) */}
-          <div className="relative" ref={notificationRef}>
+          {/* ✅ Notification Center (Hover + Click Persistence) */}
+          <div 
+              className="relative" 
+              ref={notificationRef}
+              onMouseEnter={() => setShowNotifications(true)}
+              onMouseLeave={() => setShowNotifications(false)}
+          >
               <button 
-                  onClick={() => setShowNotifications(!showNotifications)}
                   className={`relative p-2 rounded-full transition-all duration-300 ${showNotifications ? 'bg-green-50 text-[#1a4d2e]' : 'text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50'}`}
               >
                   <Bell size={22} className={notifications.length > 0 ? 'animate-swing' : ''} />

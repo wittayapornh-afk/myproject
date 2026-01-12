@@ -12,8 +12,17 @@ import "react-datepicker/dist/react-datepicker.css";
 
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
 import { BANKS } from '../data/banks'; // ✅ Shared Bank Data
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
-import thaiData from '../data/ThaiAddressData.json'; // ✅ Full Address Data
+// Fix for Leaflet marker icon issue in React
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 registerLocale("th", th);
 
@@ -23,19 +32,14 @@ function CheckoutPage() {
     const navigate = useNavigate();
 
     // Form State
-    const [formData, setFormData] = useState({
-        name: '', tel: '', email: '',
-        address_details: '', // House No, Street
-        province: '',
-        district: '',
-        subDistrict: '',
-        zipcode: ''
-    });
-
-    // Address Selection State
-    const [availableDistricts, setAvailableDistricts] = useState([]);
-    const [availableSubDistricts, setAvailableSubDistricts] = useState([]);
+    const [formData, setFormData] = useState({ first_name: '', last_name: '', tel: '', email: '', address: '' });
     const [loading, setLoading] = useState(false);
+
+    // Map State
+    const [showMap, setShowMap] = useState(false);
+    const [mapPosition, setMapPosition] = useState(null);
+    const [gpsLoading, setGpsLoading] = useState(false);
+
     // Payment State
     const [paymentMethod, setPaymentMethod] = useState('Transfer');
     const [qrPayload, setQrPayload] = useState('');
@@ -64,13 +68,15 @@ function CheckoutPage() {
     // Auto-fill User Data
     useEffect(() => {
         if (user) {
-            setFormData({
-                name: user.username || '',
-                tel: user.phone || '',
-                email: user.email || '',
-                address: user.address || '',
-                province: '' // Province might not be in user profile initially
-            });
+            if (user) {
+                setFormData({
+                    first_name: user.first_name || '',
+                    last_name: user.last_name || '',
+                    tel: user.phone || '',
+                    email: user.email || '',
+                    address: user.address || ''
+                });
+            }
         }
     }, [user]);
 
@@ -80,73 +86,29 @@ function CheckoutPage() {
         setTransferAmount(total);
         if (total > 0 && token) {
             axios.post('http://localhost:8000/api/payment/promptpay_payload/', { amount: total }, {
-                 headers: { Authorization: `Token ${token}` }
+                headers: { Authorization: `Token ${token}` }
             })
-            .then(res => setQrPayload(res.data.payload))
-            .catch(err => console.error("QR Error", err));
+                .then(res => setQrPayload(res.data.payload))
+                .catch(err => console.error("QR Error", err));
         }
     }, [cartItems, token]);
 
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-    // ✅ Thai Address Handlers
-    const handleProvinceChange = (e) => {
-        const provinceName = e.target.value;
-        const provinceObj = thaiData.find(p => p.name_th === provinceName);
-        
-        setFormData({ 
-            ...formData, 
-            province: provinceName, 
-            district: '', 
-            subDistrict: '', 
-            zipcode: '' 
-        });
-        
-        setAvailableDistricts(provinceObj ? provinceObj.districts : []);
-        setAvailableSubDistricts([]);
-    };
-
-    const handleDistrictChange = (e) => {
-        const districtName = e.target.value;
-        const districtObj = availableDistricts.find(d => d.name_th === districtName);
-        
-        setFormData({ 
-            ...formData, 
-            district: districtName, 
-            subDistrict: '', 
-            zipcode: '' 
-        });
-        
-        setAvailableSubDistricts(districtObj ? districtObj.sub_districts : []);
-    };
-
-    const handleSubDistrictChange = (e) => {
-        const subDistrictName = e.target.value;
-        const subDistrictObj = availableSubDistricts.find(s => s.name_th === subDistrictName);
-        
-        setFormData({ 
-            ...formData, 
-            subDistrict: subDistrictName, 
-            zipcode: subDistrictObj ? subDistrictObj.zip_code : ''
-        });
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        // Validation
-        if (!formData.province) return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกจังหวัด', confirmButtonColor: '#1a4d2e' });
 
         // Validation for Transfer (QR or Bank)
         if (['QR', 'Bank'].includes(paymentMethod)) {
-             if (!file) return Swal.fire({ icon: 'error', title: 'กรุณาแนบสลิปโอนเงิน', confirmButtonColor: '#1a4d2e' });
-             if (!bankName) return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกธนาคาร', confirmButtonColor: '#1a4d2e' });
-             if (!accountNumber || accountNumber.length < 4) return Swal.fire({ icon: 'warning', title: 'ระบุเลขบัญชี 4 ตัวท้าย', confirmButtonColor: '#1a4d2e' });
+            if (!file) return Swal.fire({ parse: 'error', title: 'กรุณาแนบสลิปโอนเงิน', confirmButtonColor: '#1a4d2e' });
+            if (!bankName) return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกธนาคาร', confirmButtonColor: '#1a4d2e' });
+            if (!accountNumber || accountNumber.length < 4) return Swal.fire({ icon: 'warning', title: 'ระบุเลขบัญชี 4 ตัวท้าย', confirmButtonColor: '#1a4d2e' });
         }
 
         setLoading(true);
         try {
             let storedToken = localStorage.getItem('token');
-            if(!storedToken && user?.token) storedToken = user.token;
+            if (!storedToken && user?.token) storedToken = user.token;
 
             if (!storedToken) {
                 Swal.fire('Session Error', 'กรุณา Login ใหม่', 'error');
@@ -158,9 +120,7 @@ function CheckoutPage() {
                 items: cartItems.map(item => ({ id: item.id, quantity: item.quantity })),
                 customer: {
                     ...formData,
-                    // Combine Address Components
-                    address: `${formData.address_details} แขวง/ตำบล ${formData.subDistrict} เขต/อำเภอ ${formData.district} จังหวัด ${formData.province} ${formData.zipcode}`,
-                    province: formData.province
+                    name: `${formData.first_name} ${formData.last_name}`.trim()
                 },
                 paymentMethod: ['QR', 'Bank'].includes(paymentMethod) ? 'Transfer' : paymentMethod
             };
@@ -202,6 +162,70 @@ function CheckoutPage() {
         }
     };
 
+    const handleOpenMap = () => {
+        if (!navigator.geolocation) {
+            Swal.fire('Error', 'เบราว์เซอร์ของคุณไม่รองรับ Geolocation', 'error');
+            return;
+        }
+
+        setGpsLoading(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                setMapPosition({ lat: latitude, lng: longitude });
+                setShowMap(true);
+                setGpsLoading(false);
+            },
+            (error) => {
+                console.error('Geolocation Error:', error);
+                // Default to Bangkok if location denied or error
+                setMapPosition({ lat: 13.7563, lng: 100.5018 });
+                setShowMap(true);
+                setGpsLoading(false);
+            }
+        );
+    };
+
+    const handleConfirmLocation = async () => {
+        if (!mapPosition) return;
+        setGpsLoading(true);
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${mapPosition.lat}&lon=${mapPosition.lng}&zoom=18&addressdetails=1`);
+            const data = await response.json();
+
+            if (data && data.display_name) {
+                setFormData(prev => ({ ...prev, address: data.display_name }));
+                setShowMap(false);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ดึงข้อมูลสำเร็จ',
+                    text: 'อัปเดตที่อยู่เรียบร้อยแล้ว',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            } else {
+                throw new Error('ไม่สามารถหาที่อยู่ได้');
+            }
+        } catch (error) {
+            console.error('GPS Sync Error:', error);
+            Swal.fire('Error', 'ไม่สามารถดึงข้อมูลที่อยู่ได้', 'error');
+        } finally {
+            setGpsLoading(false);
+        }
+    };
+
+    const LocationMarker = () => {
+        const map = useMapEvents({
+            click(e) {
+                setMapPosition(e.latlng);
+                map.flyTo(e.latlng, map.getZoom());
+            },
+        });
+
+        return mapPosition === null ? null : (
+            <Marker position={mapPosition}></Marker>
+        );
+    };
 
     if (cartItems.length === 0) return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#F9F9F7]">
@@ -218,117 +242,45 @@ function CheckoutPage() {
                 </button>
 
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-5 gap-10">
-                    
+
                     {/* Left Column: Details & Payment */}
                     <div className="lg:col-span-3 space-y-8">
-                        
+
                         {/* 1. Shipping Address */}
                         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-                             <h2 className="text-xl font-black text-[#263A33] mb-6 flex items-center gap-3">
-                                <div className="p-2 bg-green-50 text-[#1a4d2e] rounded-xl"><MapPin /></div> ข้อมูลจัดส่ง
+                            <h2 className="text-xl font-black text-[#263A33] mb-6 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-green-50 text-[#1a4d2e] rounded-xl"><MapPin /></div> ข้อมูลจัดส่ง
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleOpenMap}
+                                    disabled={gpsLoading}
+                                    className="px-4 py-2 bg-[#1a4d2e]/10 hover:bg-[#1a4d2e] text-[#1a4d2e] hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 group"
+                                >
+                                    <MapPin size={16} className={`transition-transform group-hover:scale-110 ${gpsLoading ? "animate-spin" : ""}`} />
+                                    {gpsLoading ? 'กำลังโหลด...' : 'เลือกจากแผนที่'}
+                                </button>
                             </h2>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                     <input name="name" value={formData.name} onChange={handleChange} required placeholder="ชื่อ-นามสกุล" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
-                                     <input name="tel" value={formData.tel} onChange={handleChange} required placeholder="เบอร์โทรศัพท์" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
+                                    <input name="first_name" value={formData.first_name} onChange={handleChange} required placeholder="ชื่อจริง" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
+                                    <input name="last_name" value={formData.last_name} onChange={handleChange} required placeholder="นามสกุล" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
                                 </div>
-                                <input name="email" value={formData.email} onChange={handleChange} required placeholder="อีเมล" className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
-                                
-
-                                {/* A: ส่วนกรอกรายละเอียดที่อยู่ (บ้านเลขที่, ถนน) */}
-                                <div className="space-y-4">
-                                    <label className="text-sm font-bold text-gray-700 ml-2">ที่อยู่ (บ้านเลขที่, หมู่, ซอย, ถนน)</label>
-                                    <textarea 
-                                        name="address_details" 
-                                        value={formData.address_details} 
-                                        onChange={handleChange} 
-                                        required 
-                                        placeholder="ตัวอย่าง: 123/4 หมู่ 5 ถนนสุขุมวิท" 
-                                        rows="2" 
-                                        className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e] resize-none transition-all hover:bg-white hover:shadow-md"
-                                    ></textarea>
-                                    
-                                    {/* B: ส่วนเลือกที่อยู่แบบ Dropdown (Address Selection) */}
-                                    <div className="p-6 bg-gray-50 rounded-3xl space-y-4 border border-gray-100">
-                                        <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-2">เลือกพื้นที่จัดส่ง</h3>
-                                        
-                                        {/* แถวที่ 1: จังหวัด และ อำเภอ */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-bold text-gray-500 ml-2">จังหวัด</label>
-                                                <select 
-                                                    name="province" 
-                                                    value={formData.province} 
-                                                    onChange={handleProvinceChange} 
-                                                    required 
-                                                    className="w-full bg-white border border-gray-200 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e] appearance-none cursor-pointer hover:border-[#1a4d2e] transition-all"
-                                                >
-                                                    <option value="">เลือกจังหวัด...</option>
-                                                    {thaiData.map(p => (
-                                                        <option key={p.id} value={p.name_th}>{p.name_th}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-bold text-gray-500 ml-2">อำเภอ/เขต</label>
-                                                <select 
-                                                    name="district" 
-                                                    value={formData.district} 
-                                                    onChange={handleDistrictChange} 
-                                                    disabled={!formData.province} 
-                                                    required 
-                                                    className={`w-full bg-white border border-gray-200 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e] appearance-none cursor-pointer hover:border-[#1a4d2e] transition-all ${!formData.province && 'opacity-50 cursor-not-allowed bg-gray-100'}`}
-                                                >
-                                                    <option value="">เลือกอำเภอ/เขต...</option>
-                                                    {availableDistricts.map(d => (
-                                                        <option key={d.id} value={d.name_th}>{d.name_th}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        {/* แถวที่ 2: ตำบล และ รหัสไปรษณีย์ */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-bold text-gray-500 ml-2">ตำบล/แขวง</label>
-                                                <select 
-                                                    name="subDistrict" 
-                                                    value={formData.subDistrict} 
-                                                    onChange={handleSubDistrictChange} 
-                                                    disabled={!formData.district} 
-                                                    required 
-                                                    className={`w-full bg-white border border-gray-200 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e] appearance-none cursor-pointer hover:border-[#1a4d2e] transition-all ${!formData.district && 'opacity-50 cursor-not-allowed bg-gray-100'}`}
-                                                >
-                                                    <option value="">เลือกตำบล/แขวง...</option>
-                                                    {availableSubDistricts.map(s => (
-                                                        <option key={s.id} value={s.name_th}>{s.name_th}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-bold text-gray-500 ml-2">รหัสไปรษณีย์</label>
-                                                <input 
-                                                    name="zipcode" 
-                                                    value={formData.zipcode} 
-                                                    readOnly 
-                                                    placeholder="รอการเลือกตำบล..." 
-                                                    className="w-full bg-gray-200/50 border-0 rounded-xl p-4 font-black text-gray-600 outline-none cursor-default" 
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input name="tel" value={formData.tel} onChange={handleChange} required placeholder="เบอร์โทรศัพท์" className="bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
+                                    <input name="email" value={formData.email} onChange={handleChange} required placeholder="อีเมล" className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
                                 </div>
+                                <textarea name="address" value={formData.address} onChange={handleChange} required placeholder="ที่อยู่จัดส่ง..." rows="3" className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e] resize-none"></textarea>
                             </div>
                         </div>
 
-
                         {/* 2. Payment Method Selected */}
                         <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-sm border border-gray-100">
-                             <h2 className="text-xl font-black text-[#263A33] mb-6 flex items-center gap-3">
+                            <h2 className="text-xl font-black text-[#263A33] mb-6 flex items-center gap-3">
                                 <div className="p-2 bg-green-50 text-[#1a4d2e] rounded-xl"><CreditCard size={24} /></div> วิธีชำระเงิน
                             </h2>
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                                 {/* Option 1: QR Code */}
                                 <button type="button" onClick={() => setPaymentMethod('QR')}
@@ -372,16 +324,15 @@ function CheckoutPage() {
 
                             {/* Dynamic Content Body */}
                             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                                
+
                                 {/* 🟢 Section 1: Payment Details (QR or Bank) */}
                                 {(paymentMethod === 'QR' || paymentMethod === 'Bank') && (
                                     <div className="space-y-6">
-                                        
+
                                         {/* A: PromptPay QR Display */}
                                         {paymentMethod === 'QR' && (
                                             <div className="flex flex-col md:flex-row gap-6 items-center bg-[#1a4d2e] p-6 rounded-3xl text-white relative overflow-hidden transition-all">
                                                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-                                                
 
                                                 <div className="bg-white p-3 rounded-2xl shadow-lg flex-shrink-0">
                                                     {qrPayload ? <QRCode value={qrPayload} size={140} /> : <div className="w-[140px] h-[140px] bg-gray-100 rounded-xl animate-pulse flex items-center justify-center text-gray-400 text-[10px]">Generating...</div>}
@@ -401,18 +352,18 @@ function CheckoutPage() {
                                         {paymentMethod === 'Bank' && (
                                             <div className="bg-[#1e4598] p-6 rounded-3xl text-white relative overflow-hidden transition-all">
                                                 <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none"></div>
-                                                
+
                                                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2 relative z-10">
-                                                    <img src="https://raw.githubusercontent.com/casperstack/thai-banks-logo/master/icons/KBANK.png" className="w-8 h-8 rounded-full border-2 border-white" alt="KBank"/>
+                                                    <img src="https://raw.githubusercontent.com/casperstack/thai-banks-logo/master/icons/KBANK.png" className="w-8 h-8 rounded-full border-2 border-white" alt="KBank" />
                                                     ธนาคารกสิกรไทย (KBank)
                                                 </h3>
-                                                
+
                                                 <div className="bg-white/10 p-4 rounded-2xl border border-white/20 backdrop-blur-md relative z-10 space-y-3">
                                                     <div>
                                                         <p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">เลขที่บัญชี</p>
                                                         <div className="flex items-center gap-3">
                                                             <p className="text-2xl font-black tracking-widest font-mono">012-3-45678-9</p>
-                                                            <button className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors" title="Copy"><ArrowRight size={14}/></button>
+                                                            <button className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors" title="Copy"><ArrowRight size={14} /></button>
                                                         </div>
                                                     </div>
                                                     <div>
@@ -420,8 +371,8 @@ function CheckoutPage() {
                                                         <p className="text-lg font-bold">บจก. มายโปรเจกต์ สโตร์</p>
                                                     </div>
                                                     <div>
-                                                         <p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">ยอดโอน</p>
-                                                         <p className="text-xl font-black">฿{formatPrice(getTotalPrice()).replace('฿', '')}</p>
+                                                        <p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">ยอดโอน</p>
+                                                        <p className="text-xl font-black">฿{formatPrice(getTotalPrice()).replace('฿', '')}</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -430,9 +381,9 @@ function CheckoutPage() {
                                         {/* 🔴 Section 2: Slip Upload Form (Shared by QR & Bank) */}
                                         <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
                                             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                                <Upload size={18} className="text-[#1a4d2e]"/> แนบหลักฐานการโอน (สำคัญ)
+                                                <Upload size={18} className="text-[#1a4d2e]" /> แนบหลักฐานการโอน (สำคัญ)
                                             </h3>
-                                            
+
                                             {/* Bank Selection (Sender) */}
                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">เลือกธนาคารที่คุณโอน</p>
                                             <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mb-4">
@@ -440,7 +391,7 @@ function CheckoutPage() {
                                                     <button type="button" key={b.code} onClick={() => handleBankSelect(b.code)}
                                                         className={`relative p-2 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${bankName === b.code ? `${b.border} bg-white shadow-md ring-1 ring-inset transform -translate-y-1` : 'border-transparent hover:bg-white'}`}>
                                                         <div className={`w-8 h-8 rounded-full overflow-hidden ${!b.logo && 'bg-gray-200'}`}>
-                                                            {b.logo && <img src={b.logo} alt={b.name} className="w-full h-full object-cover"/>}
+                                                            {b.logo && <img src={b.logo} alt={b.name} className="w-full h-full object-cover" />}
                                                         </div>
                                                         <span className={`text-[9px] font-bold ${bankName === b.code ? 'text-gray-800' : 'text-gray-400'}`}>{b.name}</span>
                                                         {bankName === b.code && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border border-white"></div>}
@@ -450,12 +401,12 @@ function CheckoutPage() {
 
                                             <div className="grid grid-cols-2 gap-3 mb-4">
                                                 <div>
-                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">เลขบัญชี (4 ตัวท้าย)</p>
-                                                     <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} maxLength={4} placeholder="XXXX" className="w-full bg-white border text-center font-bold text-gray-700 p-3 rounded-xl outline-none focus:ring-1 focus:ring-[#1a4d2e]" />
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">เลขบัญชี (4 ตัวท้าย)</p>
+                                                    <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} maxLength={4} placeholder="XXXX" className="w-full bg-white border text-center font-bold text-gray-700 p-3 rounded-xl outline-none focus:ring-1 focus:ring-[#1a4d2e]" />
                                                 </div>
                                                 <div>
-                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">วัน/เวลาโอน</p>
-                                                     <DatePicker selected={transferDate} onChange={(d) => setTransferDate(d)} showTimeSelect timeFormat="HH:mm" dateFormat="dd/MM HH:mm" className="w-full bg-white border text-center font-bold text-gray-700 p-3 rounded-xl outline-none focus:ring-1 focus:ring-[#1a4d2e]" />
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">วัน/เวลาโอน</p>
+                                                    <DatePicker selected={transferDate} onChange={(d) => setTransferDate(d)} showTimeSelect timeFormat="HH:mm" dateFormat="dd/MM HH:mm" className="w-full bg-white border text-center font-bold text-gray-700 p-3 rounded-xl outline-none focus:ring-1 focus:ring-[#1a4d2e]" />
                                                 </div>
                                             </div>
 
@@ -465,12 +416,12 @@ function CheckoutPage() {
                                                 {preview ? (
                                                     <div className="relative w-full h-full p-2 bg-gray-50">
                                                         <img src={preview} className="w-full h-full object-contain rounded-xl" />
-                                                        <button onClick={(e) => { e.preventDefault(); setFile(null); setPreview(null); }} className="absolute top-2 right-2 bg-white rounded-full p-1 text-red-500 shadow-sm z-20 hover:scale-110 transition-transform"><X size={14}/></button>
+                                                        <button onClick={(e) => { e.preventDefault(); setFile(null); setPreview(null); }} className="absolute top-2 right-2 bg-white rounded-full p-1 text-red-500 shadow-sm z-20 hover:scale-110 transition-transform"><X size={14} /></button>
                                                     </div>
                                                 ) : (
                                                     <>
                                                         <div className="p-3 bg-gray-100 rounded-full mb-2 group-hover:scale-110 transition-transform">
-                                                             <ImageIcon className="text-gray-400 group-hover:text-[#1a4d2e]" size={24} />
+                                                            <ImageIcon className="text-gray-400 group-hover:text-[#1a4d2e]" size={24} />
                                                         </div>
                                                         <span className="text-xs text-gray-400 font-bold group-hover:text-[#1a4d2e] transition-colors">คลิกเพื่อแนบสลิป</span>
                                                     </>
@@ -503,19 +454,17 @@ function CheckoutPage() {
                             <div className="space-y-4 mb-8 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
                                 {cartItems.map((item) => (
                                     <div key={item.id} className="flex gap-4 items-center">
-
-                                         <div className="w-12 h-12 rounded-xl bg-white/10 flex-shrink-0 p-1">
-                                             <img src={getImageUrl(item.thumbnail)} className="w-full h-full object-contain" />
-                                         </div>
-                                         <div className="flex-1 min-w-0">
-                                             <p className="text-xs font-bold truncate">{item.title}</p>
-                                             <p className="text-[10px] text-white/50">x{item.quantity}</p>
-                                         </div>
-                                         <p className="font-black text-sm">{formatPrice(item.price * item.quantity)}</p>
+                                        <div className="w-12 h-12 rounded-xl bg-white/10 flex-shrink-0 p-1">
+                                            <img src={getImageUrl(item.thumbnail)} className="w-full h-full object-contain" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold truncate">{item.title}</p>
+                                            <p className="text-[10px] text-white/50">x{item.quantity}</p>
+                                        </div>
+                                        <p className="font-black text-sm">{formatPrice(item.price * item.quantity)}</p>
                                     </div>
                                 ))}
                             </div>
-                            
 
                             <div className="border-t border-white/10 pt-4 space-y-2">
                                 <div className="flex justify-between text-xs font-bold text-white/60">
@@ -532,14 +481,14 @@ function CheckoutPage() {
                                 </div>
                             </div>
 
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 disabled={loading}
                                 className={`w-full mt-8 py-4 rounded-2xl font-black text-lg transition-all shadow-lg flex items-center justify-center gap-2 
                                 ${loading ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-[#1a4d2e] hover:shadow-xl hover:-translate-y-1 active:scale-95'}`}
                             >
                                 {loading ? 'Processing...' : (
-                                    <>ยืนยันสั่งซื้อ & ชำระเงิน <ArrowRight size={20}/></>
+                                    <>ยืนยันสั่งซื้อ & ชำระเงิน <ArrowRight size={20} /></>
                                 )}
                             </button>
                             <p className="text-[10px] text-center mt-4 text-white/40">* 100% Secure Payment</p>
@@ -548,6 +497,48 @@ function CheckoutPage() {
 
                 </form>
             </div>
+
+            {/* Map Modal */}
+            {showMap && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+                        <div className="p-4 bg-[#1a4d2e] text-white flex justify-between items-center">
+                            <h3 className="font-bold text-lg flex items-center gap-2"><MapPin size={20} /> เลือกตำแหน่งที่อยู่</h3>
+                            <button onClick={() => setShowMap(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 relative">
+                            {mapPosition && (
+                                <MapContainer center={mapPosition} zoom={15} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
+                                    <TileLayer
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                    />
+                                    <LocationMarker />
+                                </MapContainer>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                            <button
+                                type="button"
+                                onClick={() => setShowMap(false)}
+                                className="px-6 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmLocation}
+                                disabled={gpsLoading}
+                                className="px-6 py-2.5 rounded-xl font-bold text-white bg-[#1a4d2e] hover:bg-[#143d24] transition-colors flex items-center gap-2"
+                            >
+                                {gpsLoading ? 'กำลังดึงที่อยู่...' : <><MapPin size={18} /> ยืนยันตำแหน่ง</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

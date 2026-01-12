@@ -209,14 +209,26 @@ class DashboardStatsView(APIView):
 
         # 6. Bar Chart & Best Sellers (Top 5 Products by Quantity)
         product_stats = orders_in_range.filter(status__in=valid_statuses)\
-            .values('items__product__title')\
+            .values('items__product__id', 'items__product__title', 'items__product__price', 'items__product__thumbnail')\
             .annotate(sales=Sum('items__quantity'))\
             .order_by('-sales')[:5]
             
         bar_data = []
         for p in product_stats:
             p_name = p['items__product__title'] or "Unknown Product"
-            bar_data.append({"name": p_name[:15], "sales": p['sales']}) # Truncate name for bar chart
+            # Encode Thumbnail URL safely
+            thumb_url = ""
+            if p['items__product__thumbnail']:
+                 thumb_url = "/media/" + p['items__product__thumbnail'] # Explicit path construction for values query
+            
+            bar_data.append({
+                "id": p['items__product__id'],
+                "name": p_name, # Full name for list
+                "short_name": p_name[:15], # Truncated for bar chart
+                "price": p['items__product__price'] or 0,
+                "sales": p['sales'],
+                "thumbnail": thumb_url
+            })
 
         # 7. Activity Logs (Recent 5)
         recent_logs = AdminLog.objects.all().order_by('-timestamp')[:5]
@@ -246,10 +258,17 @@ class DashboardStatsView(APIView):
             top_product_name = top_prod['items__product__title'] if top_prod else "-"
             top_product_qty = top_prod['qty'] if top_prod else 0
 
+            # ✅ ดึงรายชื่อลูกค้าล่าสุด 5 คนในจังหวัดนี้
+            recent_buyers_qs = orders_in_range.filter(shipping_province=prov_name, status__in=valid_statuses)\
+                .values_list('user__username', flat=True).distinct()[:5]
+            
+            recent_buyers_list = list(recent_buyers_qs)
+
             province_data.append({
                 "name": prov_name,
                 "value": p['total_sales'],
-                "top_product": f"{top_product_name} ({top_product_qty})"
+                "top_product": f"{top_product_name} ({top_product_qty})",
+                "recent_buyers": recent_buyers_list # ✅ เพิ่มรายชื่อคนซื้อ
             })
 
         return Response({
