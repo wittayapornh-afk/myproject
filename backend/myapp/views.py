@@ -593,6 +593,16 @@ def register_api(request):
         traceback.print_exc() # 🖨️ Print Error to Terminal for debugging
         return Response({"error": f"เกิดข้อผิดพลาด: {str(e)}"}, status=400)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def check_username_api(request):
+    username = request.query_params.get('username', None)
+    if not username:
+        return Response({"error": "No username provided"}, status=400)
+    
+    is_taken = User.objects.filter(username=username).exists()
+    return Response({"available": not is_taken})
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_api(request):
