@@ -13,6 +13,7 @@ urlpatterns = [
     # ==============================
     path('api/login/', views.login_api),
     path('api/register/', views.register_api),
+    path('api/check-username/', views.check_username_api), # ✅ Check Username
     path('api/logout/', views.logout_api),
     path('api/profile/', views.user_profile_api),
     path('api/auth/reset-password/', views.reset_password_api), # ✅ Password Reset
