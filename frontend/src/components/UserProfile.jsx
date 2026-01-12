@@ -162,7 +162,7 @@ function UserProfile() {
     if (!mapPosition) return;
     setGpsLoading(true);
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${mapPosition.lat}&lon=${mapPosition.lng}&zoom=18&addressdetails=1`);
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${mapPosition.lat}&lon=${mapPosition.lng}&zoom=18&addressdetails=1&accept-language=th`);
       const data = await response.json();
 
       if (data && data.display_name) {
