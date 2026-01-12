@@ -17,7 +17,7 @@ function RegisterPage() {
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState(null);
-  const [passwordCriteria, setPasswordCriteria] = useState({ length: false, number: false });
+  const [passwordCriteria, setPasswordCriteria] = useState({ length: false, number: false, special: false });
 
   const navigate = useNavigate();
 
@@ -53,19 +53,27 @@ function RegisterPage() {
       return;
     }
 
+    if (name === 'password' || name === 'confirmPassword') {
+      // Block Thai characters
+      const sanitizedValue = value.replace(/[\u0E00-\u0E7F]/g, '');
+      setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
+
+      if (name === 'password') {
+        setPasswordCriteria({
+          length: sanitizedValue.length >= 6,
+          number: /\d/.test(sanitizedValue),
+          special: /[^A-Za-z0-9]/.test(sanitizedValue)
+        });
+      }
+      return;
+    }
+
     // Default update for other fields
     setFormData(prev => ({ ...prev, [name]: value }));
 
     if (name === 'username') {
       const timeoutId = setTimeout(() => checkUsername(value), 500);
       return () => clearTimeout(timeoutId);
-    }
-
-    if (name === 'password') {
-      setPasswordCriteria({
-        length: value.length >= 6,
-        number: /\d/.test(value)
-      });
     }
   };
 
@@ -293,17 +301,27 @@ function RegisterPage() {
           <div className="group">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">รหัสผ่าน</label>
             <div className="relative">
-              <Lock className="absolute left-5 top-1/2 -track-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
+              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
               <input type="password" name="password" value={formData.password} onChange={handleChange} className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-black shadow-sm placeholder-gray-300" placeholder="••••••••" required autoComplete="new-password" />
             </div>
             {/* Password Feedback */}
-            <div className="flex gap-4 mt-2 ml-2">
-              <div className={`text-xs font-bold flex items-center gap-1 ${passwordCriteria.length ? 'text-green-500' : 'text-gray-400'}`}>
-                {passwordCriteria.length ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-gray-400"></div>} รหัสผ่านต้องมีอย่างน้อย 6 ตัว
+            <div className="space-y-2 mt-2 ml-2">
+              <div className="flex gap-4">
+                <div className={`text-xs font-bold flex items-center gap-1 ${passwordCriteria.length ? 'text-green-500' : 'text-gray-400'}`}>
+                  {passwordCriteria.length ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-gray-400"></div>} รหัสผ่านต้องมีอย่างน้อย 6 ตัว
+                </div>
+                <div className={`text-xs font-bold flex items-center gap-1 ${passwordCriteria.number ? 'text-green-500' : 'text-gray-400'}`}>
+                  {passwordCriteria.number ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-gray-400"></div>} ตัวเลข
+                </div>
               </div>
-              <div className={`text-xs font-bold flex items-center gap-1 ${passwordCriteria.number ? 'text-green-500' : 'text-gray-400'}`}>
-                {passwordCriteria.number ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-gray-400"></div>} ตัวเลข
-              </div>
+
+              {/* Special Character Warning */}
+              {passwordCriteria.special && (
+                <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-200 animate-in fade-in slide-in-from-top-1">
+                  <div className="bg-yellow-100 p-1 rounded-full"><div className="text-[10px] font-black w-3 h-3 flex items-center justify-center">!</div></div>
+                  <span className="text-xs font-bold">มีการใช้อักษรพิเศษ หรือ เว้นวรรค</span>
+                </div>
+              )}
             </div>
           </div>
 
