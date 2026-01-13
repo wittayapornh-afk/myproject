@@ -604,6 +604,53 @@ def check_username_api(request):
     return Response({"available": not is_taken})
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_system_user(request):
+    """
+    API สำหรับ Admin/SuperUser สร้าง System User ใหม่
+    """
+    # ตรวจสอบสิทธิ์: ต้องเป็น Admin, SuperAdmin หรือ Seller
+    if request.user.role not in ['admin', 'super_admin', 'seller']:
+        return Response({"error": "Unauthorized: คุณไม่มีสิทธิ์สร้างผู้ใช้งาน"}, status=403)
+    
+    data = request.data
+    username = data.get('username')
+    password = data.get('password')
+    email = data.get('email')
+    role = data.get('role')
+    
+    if not all([username, password, email, role]):
+        return Response({"error": "กรุณากรอกข้อมูลให้ครบถ้วน (Username, Password, Email, Role)"}, status=400)
+        
+    if User.objects.filter(username=username).exists():
+        return Response({"error": "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว"}, status=400)
+        
+    if User.objects.filter(email=email).exists():
+        return Response({"error": "อีเมลนี้ถูกใช้งานแล้ว"}, status=400)
+        
+    try:
+        user = User.objects.create_user(username=username, password=password, email=email)
+        user.role = role
+        user.first_name = data.get('first_name', '')
+        user.last_name = data.get('last_name', '')
+        user.phone = data.get('phone', '')
+        user.address = data.get('address', '')
+        user.is_active = True
+        
+        if 'avatar' in request.FILES:
+            user.image = request.FILES['avatar']
+            
+        user.save()
+        
+        AdminLog.objects.create(admin=request.user, action=f"Created new user: {username} (Role: {role})")
+        
+        return Response({"message": f"สร้างผู้ใช้งาน {username} สำเร็จ", "id": user.id}, status=201)
+        
+    except Exception as e:
+        return Response({"error": f"เกิดข้อผิดพลาด: {str(e)}"}, status=500)
+
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def login_api(request):
     username = request.data.get('username')
@@ -661,34 +708,73 @@ def user_profile_api(request):
     # 🟠 กรณีบันทึกแก้ไข (PUT)
     elif request.method == 'PUT':
         data = request.data
-
-        # 1. อัปเดตข้อมูล User หลัก (username, email)
-        if 'username' in data: user.username = data['username']
-        if 'email' in data: user.email = data['email']
-        if 'first_name' in data: user.first_name = data['first_name']
-        if 'last_name' in data: user.last_name = data['last_name']
-
-        # 2. อัปเดตข้อมูล Profile fields (phone, address, image)
-        if 'phone' in data: user.phone = data['phone']
-        if 'address' in data: user.address = data['address']
-        if 'avatar' in request.FILES: user.image = request.FILES['avatar']
         
-        user.save()
+        try:
+            # 1. อัปเดตข้อมูล User หลัก (username, email)
+            # ✅ Validations for Duplicates
+            if 'username' in data and data['username'] != user.username:
+                if User.objects.filter(username=data['username']).exists():
+                    return Response({"error": "ชื่อผู้ใช้นี้มีผู้ใช้งานแล้ว (Username unavailable)"}, status=400)
+                user.username = data['username']
 
-        # Return full user object to update frontend immediately
-        return Response({
-            "message": "Profile updated successfully",
-            "id": user.id,
-            "username": user.username,
-            "role": user.get_role_display(),
-            "role_code": user.role,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "phone": user.phone,
-            "address": user.address,
-            "avatar": user.image.url if user.image else ""
-        })
+            if 'email' in data and data['email'] != user.email:
+                if User.objects.filter(email=data['email']).exists():
+                    return Response({"error": "อีเมลนี้มีผู้ใช้งานแล้ว (Email unavailable)"}, status=400)
+                user.email = data['email']
+
+            if 'first_name' in data: user.first_name = data['first_name']
+            if 'last_name' in data: user.last_name = data['last_name']
+
+            # 2. อัปเดตข้อมูล Profile fields (phone, address, image)
+            if 'phone' in data: user.phone = data['phone']
+            if 'address' in data: user.address = data['address']
+            if 'avatar' in request.FILES: user.image = request.FILES['avatar']
+            
+            user.save()
+
+            # Return full user object to update frontend immediately
+            return Response({
+                "message": "บันทึกข้อมูลสำเร็จ",
+                "id": user.id,
+                "username": user.username,
+                "role": user.get_role_display(),
+                "role_code": user.role,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "phone": user.phone,
+                "address": user.address,
+                "avatar": user.image.url if user.image else ""
+            })
+        except Exception as e:
+            return Response({"error": f"เกิดข้อผิดพลาด: {str(e)}"}, status=400)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password_api(request):
+    try:
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        
+        if not old_password or not new_password:
+            return Response({"error": "กรุณากรอกรหัสผ่านเดิมและรหัสผ่านใหม่"}, status=400)
+        
+        if not user.check_password(old_password):
+            return Response({"error": "รหัสผ่านเดิมไม่ถูกต้อง"}, status=400)
+        
+        if len(new_password) < 6:
+            return Response({"error": "รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร"}, status=400)
+
+        user.set_password(new_password)
+        user.save()
+        
+        # Keep user logged in
+        # update_session_auth_hash(request, user)  
+        
+        return Response({"message": "เปลี่ยนรหัสผ่านสำเร็จ"})
+    except Exception as e:
+        return Response({"error": f"เกิดข้อผิดพลาด: {str(e)}"}, status=400)
 
 # ==========================================
 # 📦 Order & Stats

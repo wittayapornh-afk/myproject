@@ -75,8 +75,8 @@ function AdminDashboard() {
 
             const activeToken = token || localStorage.getItem('token');
             if (!activeToken) {
-                 setErrorMsg("No Token Found");
-                 return;
+                setErrorMsg("No Token Found");
+                return;
             }
 
             // Fix Timezone Issue: Send YYYY-MM-DD in Local Time
@@ -92,7 +92,7 @@ function AdminDashboard() {
         } catch (error) {
             console.error("Dashboard Stats Fail:", error);
             setErrorMsg(error.message + (error.response ? ` (Status: ${error.response.status})` : ""));
-            
+
             if (error.response && error.response.status === 401) {
                 logout();
             }
@@ -194,7 +194,7 @@ function AdminDashboard() {
                             {stats.logs?.map((log, i) => (
                                 <div key={i} className="flex gap-3 items-start p-3 hover:bg-gray-50 rounded-2xl transition-all">
                                     <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${log.action?.includes('ลบ') ? 'bg-red-500' :
-                                            log.action?.includes('เพิ่ม') ? 'bg-green-500' : 'bg-[#1a4d2e]'
+                                        log.action?.includes('เพิ่ม') ? 'bg-green-500' : 'bg-[#1a4d2e]'
                                         }`} />
                                     <div>
                                         <p className="text-xs text-gray-700 font-bold leading-tight">
@@ -235,94 +235,96 @@ function AdminDashboard() {
     return (
         <div className="flex min-h-screen bg-[#F2F0E4]">
             {/* ✅ Removed AdminSidebar - Global Sidebar is in App.jsx */}
-            
+
             {/* Main Content - No margins here, handled by App.jsx wrapper */}
             {/* Actually, App.jsx wrapper has the margin transition. So here we just need generic padding */}
             <div className="flex-1 w-full p-6 md:p-10 transition-all">
                 {/* Top Header */}
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white/80 backdrop-blur-md p-6 rounded-[2rem] shadow-sm border border-gray-100 sticky top-24 z-[30]">
-                    <div>
-                        <h1 className="text-2xl font-black text-[#1a4d2e] tracking-tight uppercase">
-                            {activeTab} Management
-                        </h1>
-                        <p className="text-xs text-gray-400 font-bold">
-                             {viewMode === 'daily' && `ข้อมูลวันที่: ${formatDate(selectedDate)}`}
-                             {viewMode === 'monthly' && `ข้อมูลประจำเดือน: ${selectedDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}`}
-                             {viewMode === 'yearly' && `ข้อมูลประจำปี: ${selectedDate.getFullYear() + 543}`}
-                        </p>
-                    </div>
-
-                    {activeTab === 'dashboard' && (
-                        <div className="flex gap-4 items-center">
-                            <div className="flex bg-gray-100 p-1.5 rounded-2xl">
-                                {['daily', 'monthly', 'yearly'].map(mode => (
-                                    <button key={mode} onClick={() => setViewMode(mode)} className={`px-4 py-1.5 text-[10px] font-black rounded-xl transition-all uppercase ${viewMode === mode ? 'bg-white text-[#1a4d2e] shadow-sm' : 'text-gray-400'}`}>
-                                        {mode}
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="flex items-center gap-2 bg-white border px-4 py-2 rounded-2xl shadow-sm border-gray-100">
-                                <Calendar size={14} className="text-[#1a4d2e]" />
-                                <DatePicker
-                                    selected={selectedDate}
-                                    onChange={(date) => setSelectedDate(date)}
-                                    dateFormat={viewMode === 'yearly' ? "yyyy" : viewMode === 'monthly' ? "MM/yyyy" : "dd/MM/yyyy"}
-                                    showMonthYearPicker={viewMode === 'monthly'}
-                                    showYearPicker={viewMode === 'yearly'}
-                                    locale="th" // ✅ Set Locale to Thai
-                                    className="text-xs font-black outline-none w-20 text-center text-gray-600 bg-transparent cursor-pointer"
-                                />
-                            </div>
-                            
-                            {/* ✅ Export CSV Button */}
-                            <button 
-                                onClick={async () => {
-                                    try {
-                                        const authToken = token || localStorage.getItem('token');
-                                        
-                                        // Fix Timezone for Export
-                                        const dateParam = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-                                        
-                                        console.log("Export:", viewMode, dateParam); 
-                                        
-                                        const response = await axios.get('http://localhost:8000/api/admin/export_orders/', {
-                                            params: { period: viewMode, date: dateParam },
-                                            headers: { Authorization: `Token ${authToken}` },
-                                            responseType: 'blob', // Important for file download
-                                        });
-                                        const url = window.URL.createObjectURL(new Blob([response.data]));
-                                        const link = document.createElement('a');
-                                        link.href = url;
-                                        link.setAttribute('download', 'orders_export.xlsx');
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        link.remove();
-                                        // alert("Export successful! Check your downloads.");
-                                    } catch (e) {
-                                        console.error("Export Failed", e);
-                                        if (e.response && e.response.data instanceof Blob) {
-                                            const reader = new FileReader();
-                                            reader.onload = () => {
-                                                try {
-                                                    const errMsg = JSON.parse(reader.result).error || reader.result;
-                                                    alert("Export Error: " + errMsg);
-                                                } catch {
-                                                    alert("Export Error: " + reader.result);
-                                                }
-                                            };
-                                            reader.readAsText(e.response.data);
-                                        } else {
-                                            alert("Export Failed: " + (e.response?.data?.error || e.message));
-                                        }
-                                    }
-                                }}
-                                className="flex items-center gap-2 bg-[#1a4d2e] text-white px-4 py-2 rounded-2xl shadow-lg shadow-green-200 hover:bg-[#143d24] transition-all text-xs font-bold"
-                            >
-                                <Download size={14} /> Export Excel
-                            </button>
+                {activeTab !== 'users' && (
+                    <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white/80 backdrop-blur-md p-6 rounded-[2rem] shadow-sm border border-gray-100 sticky top-24 z-[30]">
+                        <div>
+                            <h1 className="text-2xl font-black text-[#1a4d2e] tracking-tight uppercase">
+                                {activeTab} Management
+                            </h1>
+                            <p className="text-xs text-gray-400 font-bold">
+                                {viewMode === 'daily' && `ข้อมูลวันที่: ${formatDate(selectedDate)}`}
+                                {viewMode === 'monthly' && `ข้อมูลประจำเดือน: ${selectedDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}`}
+                                {viewMode === 'yearly' && `ข้อมูลประจำปี: ${selectedDate.getFullYear() + 543}`}
+                            </p>
                         </div>
-                    )}
-                </div>
+
+                        {activeTab === 'dashboard' && (
+                            <div className="flex gap-4 items-center">
+                                <div className="flex bg-gray-100 p-1.5 rounded-2xl">
+                                    {['daily', 'monthly', 'yearly'].map(mode => (
+                                        <button key={mode} onClick={() => setViewMode(mode)} className={`px-4 py-1.5 text-[10px] font-black rounded-xl transition-all uppercase ${viewMode === mode ? 'bg-white text-[#1a4d2e] shadow-sm' : 'text-gray-400'}`}>
+                                            {mode}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-2 bg-white border px-4 py-2 rounded-2xl shadow-sm border-gray-100">
+                                    <Calendar size={14} className="text-[#1a4d2e]" />
+                                    <DatePicker
+                                        selected={selectedDate}
+                                        onChange={(date) => setSelectedDate(date)}
+                                        dateFormat={viewMode === 'yearly' ? "yyyy" : viewMode === 'monthly' ? "MM/yyyy" : "dd/MM/yyyy"}
+                                        showMonthYearPicker={viewMode === 'monthly'}
+                                        showYearPicker={viewMode === 'yearly'}
+                                        locale="th" // ✅ Set Locale to Thai
+                                        className="text-xs font-black outline-none w-20 text-center text-gray-600 bg-transparent cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* ✅ Export CSV Button */}
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const authToken = token || localStorage.getItem('token');
+
+                                            // Fix Timezone for Export
+                                            const dateParam = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
+                                            console.log("Export:", viewMode, dateParam);
+
+                                            const response = await axios.get('http://localhost:8000/api/admin/export_orders/', {
+                                                params: { period: viewMode, date: dateParam },
+                                                headers: { Authorization: `Token ${authToken}` },
+                                                responseType: 'blob', // Important for file download
+                                            });
+                                            const url = window.URL.createObjectURL(new Blob([response.data]));
+                                            const link = document.createElement('a');
+                                            link.href = url;
+                                            link.setAttribute('download', 'orders_export.xlsx');
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            link.remove();
+                                            // alert("Export successful! Check your downloads.");
+                                        } catch (e) {
+                                            console.error("Export Failed", e);
+                                            if (e.response && e.response.data instanceof Blob) {
+                                                const reader = new FileReader();
+                                                reader.onload = () => {
+                                                    try {
+                                                        const errMsg = JSON.parse(reader.result).error || reader.result;
+                                                        alert("Export Error: " + errMsg);
+                                                    } catch {
+                                                        alert("Export Error: " + reader.result);
+                                                    }
+                                                };
+                                                reader.readAsText(e.response.data);
+                                            } else {
+                                                alert("Export Failed: " + (e.response?.data?.error || e.message));
+                                            }
+                                        }
+                                    }}
+                                    className="flex items-center gap-2 bg-[#1a4d2e] text-white px-4 py-2 rounded-2xl shadow-lg shadow-green-200 hover:bg-[#143d24] transition-all text-xs font-bold"
+                                >
+                                    <Download size={14} /> Export Excel
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="h-[60vh] flex flex-col items-center justify-center">
