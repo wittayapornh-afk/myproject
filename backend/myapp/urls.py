@@ -11,9 +11,11 @@ urlpatterns = [
     path('api/register/', views.register_api, name='register_api'),
     path('api/logout/', views.logout_api, name='logout_api'),
     path('api/profile/', views.user_profile_api, name='user_profile'),
+    path('api/change-password/', views.change_password_api, name='change_password_api'),
 
     # --- Admin Users & Role ---
     path('api/admin/users/', views.get_all_users, name='get_all_users'),
+    path('api/admin/users/create/', views.create_system_user, name='create_system_user'), # ✅ New API
     path('api/admin/users/role/', views.manage_user_role, name='manage_user_role'),
     path('api/admin/users/<int:user_id>/delete/', views.delete_user_api, name='delete_user'),
     path('api/update-user/<int:user_id>/', views.admin_update_user_api, name='admin_update_user'), # ✅ Simplified

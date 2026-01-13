@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
-import { Camera, Save, User, Mail, Phone, MapPin, ArrowLeft, Locate } from 'lucide-react';
+import { Camera, Save, User, Mail, Phone, MapPin, ArrowLeft, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
@@ -21,10 +21,20 @@ function UserProfile() {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // GPS & Map
   const [gpsLoading, setGpsLoading] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [mapPosition, setMapPosition] = useState(null); // { lat, lng }
 
+  // Change Password State
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [passwordData, setPasswordData] = useState({ old_password: '', new_password: '', confirm_password: '' });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  // ✅ Password Criteria State (Matches RegisterPage)
+  const [passwordCriteria, setPasswordCriteria] = useState({ length: false, number: false, special: false });
+
+  // Form Data
   const [formData, setFormData] = useState({
     username: '',
     first_name: '',
@@ -33,28 +43,14 @@ function UserProfile() {
     phone: '',
     address: ''
   });
+
+  // Validation State
+  const [usernameStatus, setUsernameStatus] = useState(null); // null, 'checking', 'available', 'taken'
+
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
   const API_BASE_URL = "http://localhost:8000";
-
-  // Helper to format validation errors
-  const formatErrorMessages = (errorData) => {
-    if (typeof errorData === 'string') return errorData;
-    if (Array.isArray(errorData)) return errorData.join(', ');
-    if (typeof errorData === 'object' && errorData !== null) {
-      return Object.entries(errorData)
-        .map(([key, value]) => {
-          // Flatten array of errors for a field
-          const msg = Array.isArray(value) ? value.join(' ') : String(value);
-          // Capitalize key
-          const field = key.charAt(0).toUpperCase() + key.slice(1);
-          return `${field}: ${msg}`;
-        })
-        .join('\n');
-    }
-    return 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
-  };
 
   useEffect(() => {
     if (user) {
@@ -69,9 +65,57 @@ function UserProfile() {
     }
   }, [user]);
 
+  // ✅ Check Username Availability
+  const checkUsername = async (username) => {
+    if (!username || username === user.username) {
+      setUsernameStatus(null);
+      return;
+    }
+    if (username.length < 3) return;
+
+    setUsernameStatus('checking');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/check-username/?username=${username}`);
+      const data = await res.json();
+      if (data.available) {
+        setUsernameStatus('available');
+      } else {
+        setUsernameStatus('taken');
+      }
+    } catch (error) {
+      console.error("Error checking username:", error);
+      setUsernameStatus(null);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === 'phone') {
+      const numericValue = value.replace(/\D/g, '');
+      if (numericValue.length <= 10) {
+        setFormData(prev => ({ ...prev, [name]: numericValue }));
+      }
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'username' && isEditing) {
+      // Debounce check
+      const timeoutId = setTimeout(() => checkUsername(value), 500);
+      return () => clearTimeout(timeoutId);
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
-    setLoading(true); // ✅ Rule: เริ่ม Loading
+    if (usernameStatus === 'taken') {
+      Swal.fire({ icon: 'error', title: 'ชื่อผู้ใช้ซ้ำ', text: 'กรุณาเลือกชื่อผู้ใช้อื่น', confirmButtonColor: '#d33' });
+      return;
+    }
+
+    setLoading(true);
     try {
       const data = new FormData();
       data.append('username', formData.username);
@@ -79,6 +123,7 @@ function UserProfile() {
       data.append('last_name', formData.last_name);
       data.append('phone', formData.phone);
       data.append('address', formData.address);
+      // Email is read-only in this form logic, but if needed: data.append('email', formData.email);
       if (selectedFile) data.append('avatar', selectedFile);
 
       const res = await fetch(`${API_BASE_URL}/api/profile/`, {
@@ -87,14 +132,11 @@ function UserProfile() {
         body: data
       });
 
+      const responseData = await res.json();
+
       if (res.ok) {
-        const responseData = await res.json();
-
         if (login) {
-          // Use authoritative data from backend to update state
           login(token, responseData);
-
-          // 2. Call fetchUser to sync with backend (with cache busting)
           await fetchUser();
         }
         setIsEditing(false);
@@ -104,33 +146,101 @@ function UserProfile() {
           text: 'ข้อมูลได้รับการอัปเดตแล้ว',
           confirmButtonColor: '#1a4d2e',
           timer: 1500
-        }).then(() => {
-          // Optional: Reload page to ensure everything is fresh if state sync fails
-          // window.location.reload(); 
         });
       } else {
-        let errorMessage = 'บันทึกไม่สำเร็จ';
-        try {
-          const errorData = await res.json();
-          console.error('Server Validation Error:', errorData);
-          errorMessage = formatErrorMessages(errorData);
-        } catch (e) {
-          console.error('Non-JSON Error Response:', e);
-          errorMessage = `Server Error (${res.status}): ${res.statusText}`;
-        }
-        throw new Error(errorMessage);
+        throw new Error(responseData.error || 'บันทึกไม่สำเร็จ');
       }
     } catch (error) {
       console.error('Save Error:', error);
-      // Use "html" property for multiline formatting if needed, or stick to "text" with newlines
       Swal.fire({
         icon: 'error',
         title: 'บันทึกไม่สำเร็จ',
-        html: `<pre style="text-align: left; font-family: sans-serif; white-space: pre-wrap;">${error.message}</pre>`,
+        text: error.message,
         confirmButtonColor: '#d33'
       });
     } finally {
-      setLoading(false); // ✅ Rule: จบ Loading
+      setLoading(false);
+    }
+  };
+
+  // ✅ Password Input Handler
+  const handlePasswordChangeInput = (e) => {
+    const { name, value } = e.target;
+
+    // Block Thai characters
+    const sanitizedValue = value.replace(/[\u0E00-\u0E7F]/g, '');
+
+    setPasswordData(prev => ({ ...prev, [name]: sanitizedValue }));
+
+    if (name === 'new_password') {
+      setPasswordCriteria({
+        length: sanitizedValue.length >= 6,
+        number: /\d/.test(sanitizedValue),
+        special: /[^A-Za-z0-9]/.test(sanitizedValue)
+      });
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+
+    // Validate Criteria
+    if (!passwordCriteria.length || !passwordCriteria.number) {
+      Swal.fire({
+        icon: 'error',
+        title: 'รหัสผ่านไม่ปลอดภัย',
+        text: 'กรุณาตั้งรหัสผ่านให้ตรงตามเงื่อนไข (6 ตัวอักษร + ตัวเลข)',
+        confirmButtonColor: '#d33'
+      });
+      return;
+    }
+
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      Swal.fire('ข้อผิดพลาด', 'รหัสผ่านใหม่ไม่ตรงกัน', 'error');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/change-password/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          old_password: passwordData.old_password,
+          new_password: passwordData.new_password
+        })
+      });
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        console.error("Non-JSON Response:", text);
+        throw new Error(text.includes("<html") ? `Server Error (${res.status}): Please contact admin` : text);
+      }
+
+      const data = await res.json();
+
+      if (res.ok) {
+        Swal.fire('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว', 'success');
+        setShowPasswordChange(false);
+        setPasswordData({ old_password: '', new_password: '', confirm_password: '' });
+        setPasswordCriteria({ length: false, number: false, special: false });
+      } else {
+        throw new Error(data.error || 'เปลี่ยนรหัสผ่านไม่สำเร็จ');
+      }
+    } catch (error) {
+      console.error("Change Password Error:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'เกิดข้อผิดพลาด',
+        text: error.message,
+        confirmButtonColor: '#d33'
+      });
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -199,10 +309,10 @@ function UserProfile() {
     );
   };
 
-  if (!user) return <div className="p-20 text-center font-bold text-gray-500">Loading profile...</div>;
+  if (!user) return <div className="p-20 text-center font-bold text-gray-500 font-sans">กำลังโหลดข้อมูล...</div>;
 
   return (
-    <div className="min-h-screen bg-[#F9F9F7] py-10 px-4 flex justify-center pt-28 pb-20 relative overflow-hidden">
+    <div className="min-h-screen bg-[#F9F9F7] py-10 px-4 flex justify-center pt-28 pb-20 relative overflow-hidden font-sans">
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-[#1a4d2e] to-transparent -z-0"></div>
 
@@ -213,7 +323,6 @@ function UserProfile() {
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
           <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
 
-          {/* Back Button */}
           {/* Back Button */}
           <button
             onClick={() => navigate(-1)}
@@ -236,31 +345,30 @@ function UserProfile() {
                     onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
                   />
                   {isEditing && (
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <Camera size={32} className="text-white drop-shadow-md" />
-                    </div>
+                    <>
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <Camera size={32} className="text-white drop-shadow-md" />
+                      </div>
+                      <label className="absolute bottom-2 right-2 bg-[#1a4d2e] text-white p-3 rounded-full cursor-pointer hover:bg-[#256640] border-4 border-white shadow-lg transition-transform hover:scale-110 active:scale-95">
+                        <Camera size={20} />
+                        <input type="file" className="hidden" onChange={(e) => {
+                          if (e.target.files[0]) {
+                            setSelectedFile(e.target.files[0]);
+                            setPreviewImage(URL.createObjectURL(e.target.files[0]));
+                          }
+                        }} />
+                      </label>
+                    </>
                   )}
                 </div>
               </div>
-
-              {isEditing && (
-                <label className="absolute bottom-2 right-2 bg-[#1a4d2e] text-white p-3 rounded-full cursor-pointer hover:bg-[#256640] border-4 border-white shadow-lg transition-transform hover:scale-110 active:scale-95">
-                  <Camera size={20} />
-                  <input type="file" className="hidden" onChange={(e) => {
-                    if (e.target.files[0]) {
-                      setSelectedFile(e.target.files[0]);
-                      setPreviewImage(URL.createObjectURL(e.target.files[0]));
-                    }
-                  }} />
-                </label>
-              )}
             </div>
 
             <div className="text-center mt-4">
               <h2 className="text-3xl font-black text-[#263A33] tracking-tight">{user.username}</h2>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 rounded-full border border-green-100 mt-2">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="text-xs font-bold text-[#1a4d2e] uppercase tracking-wider">{user.role}</span>
+                <span className="text-xs font-bold text-[#1a4d2e] uppercase tracking-wider">{user.role === 'new_user' ? 'สมาชิกใหม่' : user.role === 'admin' ? 'ผู้ดูแลระบบ' : user.role}</span>
               </div>
             </div>
           </div>
@@ -270,49 +378,58 @@ function UserProfile() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Username */}
               <div className="group">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">Username</label>
-                <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
-                  <User size={20} className="text-gray-400 group-focus-within:text-[#1a4d2e]" />
-                  <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300 disabled:text-gray-500" />
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">ชื่อผู้ใช้งาน (Username)</label>
+                <div className="relative">
+                  <div className={`flex items-center gap-3 bg-gray-50/50 hover:bg-white border group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e] ${usernameStatus === 'taken' ? 'border-red-500' : 'border-gray-200'}`}>
+                    <User size={20} className="text-gray-400 group-focus-within:text-[#1a4d2e]" />
+                    <input type="text" name="username" value={formData.username} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300 disabled:text-gray-500" />
+                  </div>
+                  {/* Status Icon */}
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    {usernameStatus === 'checking' && <Loader2 className="animate-spin text-gray-400" size={16} />}
+                    {usernameStatus === 'available' && <CheckCircle className="text-green-500" size={16} />}
+                    {usernameStatus === 'taken' && <XCircle className="text-red-500" size={16} />}
+                  </div>
                 </div>
+                {usernameStatus === 'taken' && <p className="text-red-500 text-[10px] mt-1 font-bold ml-1">* ชื่อนี้ถูกใช้แล้ว</p>}
               </div>
 
               {/* Email (Read Only) */}
               <div className="group opacity-75">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">Email Address</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">อีเมล (Email)</label>
                 <div className="flex items-center gap-3 bg-gray-100 border border-transparent rounded-2xl px-4 py-3.5 cursor-not-allowed">
                   <Mail size={20} className="text-gray-400" />
-                  <input type="email" value={formData.email} disabled className="bg-transparent w-full outline-none text-sm font-bold text-gray-500 cursor-not-allowed" />
+                  <input type="email" name="email" value={formData.email} disabled className="bg-transparent w-full outline-none text-sm font-bold text-gray-500 cursor-not-allowed" />
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
               <div className="group">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">First Name</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">ชื่อจริง</label>
                 <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
-                  <input type="text" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" placeholder="ชื่อจริง" />
+                  <input type="text" name="first_name" value={formData.first_name} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" placeholder="ชื่อจริง" />
                 </div>
               </div>
               <div className="group">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">Last Name</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">นามสกุล</label>
                 <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
-                  <input type="text" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" placeholder="นามสกุล" />
+                  <input type="text" name="last_name" value={formData.last_name} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" placeholder="นามสกุล" />
                 </div>
               </div>
             </div>
 
             <div className="group">
-              <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">Phone Number</label>
+              <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">เบอร์โทรศัพท์</label>
               <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
                 <Phone size={20} className="text-gray-400 group-focus-within:text-[#1a4d2e]" />
-                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" placeholder="เบอร์โทรศัพท์" />
+                <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" placeholder="0xxxxxxxxx" />
               </div>
             </div>
 
             <div className="group">
               <div className="flex justify-between items-center mb-1.5 ml-1">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Address</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">ที่อยู่จัดส่งสินค้า</label>
                 {isEditing && (
                   <button
                     type="button"
@@ -327,8 +444,76 @@ function UserProfile() {
               </div>
               <div className="flex gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
                 <MapPin size={20} className="text-gray-400 mt-1 group-focus-within:text-[#1a4d2e]" />
-                <textarea rows="2" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none placeholder-gray-300" placeholder="ที่อยู่จัดส่งสินค้า..."></textarea>
+                <textarea rows="2" name="address" value={formData.address} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none placeholder-gray-300" placeholder="ที่อยู่จัดส่งสินค้า..."></textarea>
               </div>
+            </div>
+
+            {/* Change Password Toggle */}
+            <div className="pt-4">
+              <button type="button" onClick={() => setShowPasswordChange(!showPasswordChange)} className="text-[#1a4d2e] text-sm font-black flex items-center gap-2 hover:underline">
+                <Lock size={16} /> เปลี่ยนรหัสผ่าน
+              </button>
+
+              {showPasswordChange && (
+                <div className="mt-4 p-6 bg-gray-50 border border-gray-200 rounded-3xl animate-in fade-in slide-in-from-top-4">
+                  <h4 className="font-bold text-[#263A33] mb-4">เปลี่ยนรหัสผ่าน</h4>
+                  <div className="space-y-4">
+                    <input
+                      type="password"
+                      name="old_password"
+                      value={passwordData.old_password}
+                      onChange={handlePasswordChangeInput}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#1a4d2e] outline-none text-sm"
+                      placeholder="รหัสผ่านเดิม"
+                    />
+
+                    {/* New Password Group */}
+                    <div>
+                      <input
+                        type="password"
+                        name="new_password"
+                        value={passwordData.new_password}
+                        onChange={handlePasswordChangeInput}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#1a4d2e] outline-none text-sm"
+                        placeholder="รหัสผ่านใหม่"
+                      />
+                      {/* Password Validation Feedback (Matches RegisterPage) */}
+                      <div className="space-y-2 mt-2 ml-1">
+                        <div className="flex gap-4">
+                          <div className={`text-[10px] font-bold flex items-center gap-1 ${passwordCriteria.length ? 'text-green-500' : 'text-gray-400'}`}>
+                            {passwordCriteria.length ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-gray-400"></div>} อย่างน้อย 6 ตัว
+                          </div>
+                          <div className={`text-[10px] font-bold flex items-center gap-1 ${passwordCriteria.number ? 'text-green-500' : 'text-gray-400'}`}>
+                            {passwordCriteria.number ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-gray-400"></div>} มีตัวเลข
+                          </div>
+                        </div>
+                        {passwordCriteria.special && (
+                          <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-2 py-1.5 rounded-lg border border-yellow-200 animate-in fade-in">
+                            <div className="bg-yellow-100 p-0.5 rounded-full"><div className="text-[8px] font-black w-3 h-3 flex items-center justify-center">!</div></div>
+                            <span className="text-[10px] font-bold">มีการใช้อักษรพิเศษ หรือ เว้นวรรค</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <input
+                      type="password"
+                      name="confirm_password"
+                      value={passwordData.confirm_password}
+                      onChange={handlePasswordChangeInput}
+                      className={`w-full px-4 py-3 rounded-xl border outline-none text-sm ${passwordData.confirm_password && passwordData.new_password === passwordData.confirm_password ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-200 focus:border-[#1a4d2e]'}`}
+                      placeholder="ยืนยันรหัสผ่านใหม่"
+                    />
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button type="button" onClick={() => setShowPasswordChange(false)} className="px-4 py-2 text-sm text-gray-500 font-bold hover:bg-gray-200 rounded-lg">ยกเลิก</button>
+                      <button type="button" onClick={handleChangePassword} disabled={passwordLoading} className="px-6 py-2 bg-[#1a4d2e] text-white text-sm font-bold rounded-xl hover:bg-[#143d24]">
+                        {passwordLoading ? 'กำลังบันทึก...' : 'เปลี่ยนรหัสผ่าน'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="pt-8 flex justify-center gap-4">

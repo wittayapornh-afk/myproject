@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/check-username/', views.check_username_api), # ✅ Check Username
     path('api/logout/', views.logout_api),
     path('api/profile/', views.user_profile_api),
+    path('api/change-password/', views.change_password_api, name='change_password_api'), # ✅ Change Password
     path('api/auth/reset-password/', views.reset_password_api), # ✅ Password Reset
     path('api/users/', views.get_all_users),           # Admin ดู user ทั้งหมด
 
@@ -64,6 +65,9 @@ urlpatterns = [
     path('api/admin/order_status/<int:order_id>/', views.update_order_status_api),
 
     # 4. จัดการผู้ใช้งาน (Admin)
+    path('api/admin/users/', views.get_all_users),  # ✅ Fix 404
+    path('api/admin/users/create/', views.create_system_user), # ✅ Create User
+    path('api/admin/users/role/', views.manage_user_role), # ✅ Manage Role
     path('api/admin/user/<int:user_id>/update/', views.admin_update_user_api),
     path('api/admin/user/<int:user_id>/delete/', views.delete_user_api),
 

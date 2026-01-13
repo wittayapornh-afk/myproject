@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
-import { LogIn, User, Lock, ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { LogIn, User, Lock, ArrowRight, Eye, EyeOff, ShieldCheck, ArrowLeft } from 'lucide-react';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // ✅ Rule 17: ระบบซ่อน/แสดงรหัส
-  const [rememberMe, setRememberMe] = useState(true); // ✅ Rule 19: Remember Me
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const { login } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,6 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      // ✅ Rule 21: บังคับใช้พอร์ต 8000
       const res = await fetch('http://localhost:8000/api/login/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -28,8 +27,6 @@ function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // ✅ Rule 12: Normalize ข้อมูลก่อนเข้า Context
-        // Backend now returns full profile data
         const userData = { ...data };
         login(data.token, userData);
 
@@ -39,12 +36,15 @@ function LoginPage() {
           text: `ยินดีต้อนรับกลับมา,คุณ ${userData.username}`,
           timer: 1500,
           showConfirmButton: false,
-          background: '#1a4d2e',
-          color: '#fff',
-          iconColor: '#fff'
+          background: '#fff',
+          customClass: {
+            title: 'font-black text-[#1a4d2e]',
+            popup: 'rounded-[2rem]'
+          },
+          color: '#263A33',
+          iconColor: '#1a4d2e'
         });
 
-        // ✅ Rule 20: Redirect ตามสิทธิ์ (Admin ไป Dashboard)
         const userRole = (userData.role || '').toLowerCase();
         if (userRole === 'admin' || userRole === 'super_admin') {
           navigate('/admin/dashboard');
@@ -56,43 +56,64 @@ function LoginPage() {
           icon: 'error',
           title: 'เข้าสู่ระบบไม่สำเร็จ',
           text: data.error || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง',
-          confirmButtonColor: '#1a4d2e'
+          confirmButtonColor: '#d33',
+          background: '#fff',
+          customClass: {
+            title: 'font-black text-red-600',
+            popup: 'rounded-[2rem]'
+          }
         });
       }
     } catch (error) {
       console.error("Login Error:", error);
-      Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ (8000) ได้', 'error');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ (8000) ได้',
+        confirmButtonColor: '#d33',
+        background: '#fff',
+        customClass: {
+          title: 'font-black text-red-600',
+          popup: 'rounded-[2rem]'
+        }
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F9F9F7] px-4 font-sans">
-      <div className="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl shadow-gray-200/50 w-full max-w-md border border-gray-100 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-[#F9F9F7] py-12 px-4 font-sans relative overflow-hidden">
 
-        {/* ตกแต่งพื้นหลังเล็กน้อย */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#1a4d2e]/5 rounded-full blur-[100px] translate-x-1/3 -translate-y-1/3"></div>
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[80px] -translate-x-1/3 translate-y-1/3"></div>
 
-        <div className="text-center mb-10 relative z-10">
-          <div className="w-20 h-20 bg-[#1a4d2e] rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-100 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
+      <div className="w-full max-w-md bg-white/80 backdrop-blur-2xl p-8 md:p-12 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.08)] border border-white/60 relative z-10 animate-in fade-in zoom-in-95 duration-500">
+
+        <Link to="/" className="absolute top-8 left-8 text-gray-400 hover:text-[#1a4d2e] transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+          <ArrowLeft size={16} /> กลับหน้าหลัก
+        </Link>
+
+        <div className="text-center mb-10 mt-6 relative z-10">
+          <div className="w-20 h-20 bg-[#1a4d2e] rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-900/10 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
             <LogIn className="text-white" size={36} />
           </div>
-          <h2 className="text-4xl font-black text-[#263A33] tracking-tighter">Welcome Back</h2>
+          <h2 className="text-4xl font-black text-[#263A33] tracking-tighter">ยินดีต้อนรับ</h2>
           <p className="text-gray-400 mt-2 font-bold uppercase text-[10px] tracking-[0.2em]">กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6 relative z-10">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Username</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">ชื่อผู้ใช้งาน</label>
             <div className="relative group">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
+              <User className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
               <input
                 type="text"
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#1a4d2e] focus:bg-white transition-all text-[#263A33] font-black shadow-inner"
+                className="w-full pl-14 pr-4 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-black shadow-sm placeholder-gray-300"
                 placeholder="ชื่อผู้ใช้งานของคุณ"
                 required
               />
@@ -100,30 +121,28 @@ function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">รหัสผ่าน</label>
             <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
+              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
               <input
-                type={showPassword ? "text" : "password"} // ✅ Rule 17
+                type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-transparent rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#1a4d2e] focus:bg-white transition-all text-[#263A33] font-black shadow-inner"
+                className="w-full pl-14 pr-12 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-black shadow-sm placeholder-gray-300"
                 placeholder="••••••••"
                 required
               />
-              {/* ✅ Rule 17: ปุ่มเปิด/ปิดตา */}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-[#1a4d2e]"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-[#1a4d2e] transition-colors"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
           </div>
 
-          {/* ✅ Rule 19: Remember Me & Forgot Password */}
           <div className="flex items-center justify-between px-1">
             <label className="flex items-center gap-2 cursor-pointer group">
               <input
@@ -140,12 +159,12 @@ function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#1a4d2e] text-white py-5 rounded-2xl font-black text-lg hover:bg-[#143d24] transition-all shadow-xl shadow-green-100 flex items-center justify-center gap-3 group active:scale-95 disabled:bg-gray-300 disabled:shadow-none"
+            className="w-full bg-[#1a4d2e] text-white py-5 rounded-2xl font-black text-lg hover:bg-[#143d24] transition-all shadow-xl shadow-green-900/10 flex items-center justify-center gap-3 group hover:scale-[1.02] active:scale-95 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed"
           >
             {loading ? (
               <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
             ) : (
-              <>LOGIN NOW <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" /></>
+              <>เข้าสู่ระบบ <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" /></>
             )}
           </button>
         </form>
