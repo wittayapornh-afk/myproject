@@ -344,24 +344,21 @@ function UserProfile() {
                     alt="Profile"
                     onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
                   />
-                  {isEditing && (
-                    <>
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <Camera size={32} className="text-white drop-shadow-md" />
-                      </div>
-                      <label className="absolute bottom-2 right-2 bg-[#1a4d2e] text-white p-3 rounded-full cursor-pointer hover:bg-[#256640] border-4 border-white shadow-lg transition-transform hover:scale-110 active:scale-95">
-                        <Camera size={20} />
-                        <input type="file" className="hidden" onChange={(e) => {
-                          if (e.target.files[0]) {
-                            setSelectedFile(e.target.files[0]);
-                            setPreviewImage(URL.createObjectURL(e.target.files[0]));
-                          }
-                        }} />
-                      </label>
-                    </>
-                  )}
+
                 </div>
               </div>
+
+              {isEditing && (
+                <label className="absolute bottom-1 right-1 bg-[#1a4d2e] text-white p-3 rounded-full cursor-pointer hover:bg-[#256640] border-4 border-white shadow-lg transition-transform hover:scale-110 active:scale-95 z-20">
+                  <Camera size={20} />
+                  <input type="file" className="hidden" onChange={(e) => {
+                    if (e.target.files[0]) {
+                      setSelectedFile(e.target.files[0]);
+                      setPreviewImage(URL.createObjectURL(e.target.files[0]));
+                    }
+                  }} />
+                </label>
+              )}
             </div>
 
             <div className="text-center mt-4">
@@ -394,12 +391,12 @@ function UserProfile() {
                 {usernameStatus === 'taken' && <p className="text-red-500 text-[10px] mt-1 font-bold ml-1">* ชื่อนี้ถูกใช้แล้ว</p>}
               </div>
 
-              {/* Email (Read Only) */}
-              <div className="group opacity-75">
+              {/* Email */}
+              <div className="group">
                 <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">อีเมล (Email)</label>
-                <div className="flex items-center gap-3 bg-gray-100 border border-transparent rounded-2xl px-4 py-3.5 cursor-not-allowed">
-                  <Mail size={20} className="text-gray-400" />
-                  <input type="email" name="email" value={formData.email} disabled className="bg-transparent w-full outline-none text-sm font-bold text-gray-500 cursor-not-allowed" />
+                <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
+                  <Mail size={20} className="text-gray-400 group-focus-within:text-[#1a4d2e]" />
+                  <input type="email" name="email" value={formData.email} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" />
                 </div>
               </div>
             </div>
