@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { User, Lock, Mail, Phone, UserPlus, Camera, ArrowLeft, CheckCircle, XCircle, Loader2 } from 'lucide-react';
@@ -18,6 +18,8 @@ function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState(null);
   const [passwordCriteria, setPasswordCriteria] = useState({ length: false, number: false, special: false });
+
+  const timeoutRef = useRef(null);
 
   const navigate = useNavigate();
 
@@ -72,8 +74,24 @@ function RegisterPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
 
     if (name === 'username') {
-      const timeoutId = setTimeout(() => checkUsername(value), 500);
-      return () => clearTimeout(timeoutId);
+      const sanitizedValue = value.replace(/[^A-Za-z0-9]/g, '');
+      setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
+
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+      if (sanitizedValue.length >= 3) {
+        timeoutRef.current = setTimeout(() => checkUsername(sanitizedValue), 500);
+      } else {
+        setUsernameStatus(null);
+      }
+      return;
+    }
+
+    if (name === 'first_name' || name === 'last_name') {
+      // Allow Thai, English, and Spaces only
+      const sanitizedValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F\s]/g, '');
+      setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
+      return;
     }
   };
 
@@ -246,11 +264,7 @@ function RegisterPage() {
                   type="text"
                   name="username"
                   value={formData.username}
-                  onChange={(e) => {
-                    setFormData({ ...formData, username: e.target.value });
-                    if (e.target.value.length >= 3) checkUsername(e.target.value);
-                    else setUsernameStatus(null);
-                  }}
+                  onChange={handleChange}
                   className={`w-full pl-14 pr-12 py-4 bg-white border-2 hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-bold shadow-sm placeholder-gray-300 ${usernameStatus === 'taken' ? 'border-red-500 focus:border-red-500' : 'border-transparent'}`}
                   placeholder="ชื่อผู้ใช้งาน"
                   required

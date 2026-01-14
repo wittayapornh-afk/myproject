@@ -99,13 +99,27 @@ function UserProfile() {
       return;
     }
 
-    setFormData(prev => ({ ...prev, [name]: value }));
-
-    if (name === 'username' && isEditing) {
-      // Debounce check
-      const timeoutId = setTimeout(() => checkUsername(value), 500);
-      return () => clearTimeout(timeoutId);
+    // Restriction for Name (No special chars, allow letters & spaces)
+    if (name === 'first_name' || name === 'last_name') {
+      // Regex: Allow Thai/English letters, spaces. Disallow special chars like !@#$%^&*()
+      const restrictedValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F\s]/g, '');
+      setFormData(prev => ({ ...prev, [name]: restrictedValue }));
+      return;
     }
+
+    // Restriction for Username (Allow alphanumeric only)
+    if (name === 'username') {
+      const restrictedValue = value.replace(/[^a-zA-Z0-9]/g, '');
+      setFormData(prev => ({ ...prev, [name]: restrictedValue }));
+
+      if (restrictedValue && isEditing) {
+        const timeoutId = setTimeout(() => checkUsername(restrictedValue), 500);
+        return () => clearTimeout(timeoutId);
+      }
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async (e) => {
