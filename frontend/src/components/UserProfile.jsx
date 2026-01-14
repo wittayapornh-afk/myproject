@@ -119,6 +119,13 @@ function UserProfile() {
       return;
     }
 
+    // Restriction for Address (Letters, Numbers, Spaces, and specific symbols: - _ / . , () [])
+    if (name === 'address') {
+      const restrictedValue = value.replace(/[^a-zA-Z0-9\u0E00-\u0E7F\s\-\_\/\.\,\(\)\[\]]/g, '');
+      setFormData(prev => ({ ...prev, [name]: restrictedValue }));
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
