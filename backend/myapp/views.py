@@ -4,7 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status  # ✅ ใช้ตัวนี้จัดการ HTTP Status ทั้งหมด
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
-from django.db.models import Sum, Q, Count
+from django.db.models import Sum, Q, Count, F
 from django.db import transaction  # ✅ สำหรับระบบ Checkout
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework.authtoken.models import Token
@@ -884,12 +884,26 @@ def my_orders_api(request):
                 "id": o.id, "date": date_str, 
                 "total_price": o.total_price, "status": o.status, "items": items,
                 "has_slip": bool(o.slip_image),
-                "promptpay_payload": qr_payload # ✅ For Frontend QR
+                "promptpay_payload": qr_payload, # ✅ For Frontend QR
+                "province": o.shipping_province # ✅ Return Province
             })
         except Exception as e:
             print(f"Error processing order {o.id}: {e}")
             continue
     return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def confirm_received_api(request, order_id):
+    try:
+        order = Order.objects.get(id=order_id, user=request.user)
+        if order.status == 'Shipped':
+            order.status = 'Completed'
+            order.save()
+            return Response({"message": "Confirmed received"})
+        return Response({"error": "Invalid status"}, status=400)
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found"}, status=404)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -940,7 +954,30 @@ def get_admin_stats(request):
     # 1. Basic Stats (Filtered)
     # ...
     
-    total_sales = Order.objects.filter(**sales_filter).aggregate(Sum('total_price'))['total_price__sum'] or 0
+    # 1. Basic Stats (Filtered by Date/Period)
+    # Note: If category_id is needed globally, it should be applied here too.
+    cat_id = request.GET.get('category_id')
+    
+    # Apply Category Filter if present
+    if cat_id and cat_id != 'all':
+        sales_filter['items__product__category_id'] = cat_id
+        orders_filter['items__product__category_id'] = cat_id
+        
+        # When filtering by category, total_sales should be sum of ITEM sales, not Order total
+        # But for simplicity/performance in this view, we might filter Orders that contain the category
+        # For accurate revenue:
+        total_sales = OrderItem.objects.filter(
+            order__status__in=VALID_SALES_STATUSES,
+            product__category_id=cat_id,
+            **{f"order__{k}": v for k, v in sales_filter.items() if k != 'items__product__category_id' and k != 'status__in'}
+        ).aggregate(
+            total=Sum(F('price_at_purchase') * F('quantity'))
+        )['total'] or 0
+        
+        total_orders = Order.objects.filter(**orders_filter).distinct().count()
+    else:
+        total_sales = Order.objects.filter(**sales_filter).aggregate(Sum('total_price'))['total_price__sum'] or 0
+        total_orders = Order.objects.filter(**orders_filter).count()
 
     # ...
 
@@ -985,19 +1022,38 @@ def get_admin_stats(request):
 
     try:
         # 2. Best Sellers (Top 5 Products) - Filtered
-        best_sellers = OrderItem.objects.filter(order__in=Order.objects.filter(**orders_filter))\
-            .values('product__title')\
+        # Group by Product ID first to match specific products
+        best_sellers_query = OrderItem.objects.filter(order__in=Order.objects.filter(**orders_filter))\
+            .values('product__id')\
             .annotate(total_qty=Sum('quantity'))\
             .order_by('-total_qty')[:5]
         
-        best_sellers_data = [{"name": item['product__title'], "sales": item['total_qty']} for item in best_sellers]
+        # Fetch actual Product objects for details
+        product_ids = [item['product__id'] for item in best_sellers_query]
+        products = Product.objects.filter(id__in=product_ids).in_bulk()
+
+        for item in best_sellers_query:
+            product = products.get(item['product__id'])
+            if product:
+                best_sellers_data.append({
+                    "name": product.title,
+                    "sales": item['total_qty'],
+                    "price": float(product.price), # Ensure float
+                    "thumbnail": product.thumbnail.url if product.thumbnail else None
+                })
+
     except Exception as e:
         print(f"DEBUG: Best Sellers Error: {e}")
 
     try:
         # 3. Low Stock
-        low_stock_products = Product.objects.filter(stock__lte=10, is_active=True).values('id', 'title', 'stock')
-        low_stock_data = list(low_stock_products) # Convert to list
+        low_stock_products = Product.objects.filter(stock__lte=10, is_active=True) # Fetch objects
+        low_stock_data = [{
+            "id": p.id,
+            "title": p.title,
+            "stock": p.stock,
+            "thumbnail": p.thumbnail.url if p.thumbnail else None
+        } for p in low_stock_products]
     except Exception as e:
         print(f"DEBUG: Low Stock Error: {e}")
 
@@ -1039,30 +1095,64 @@ def get_admin_stats(request):
 
     try:
         # 6. Province Sales Data (Map Analytics)
-        province_stats = Order.objects.filter(**orders_filter, status__in=VALID_SALES_STATUSES)\
-            .values('shipping_province')\
-            .annotate(total_sales=Sum('total_price'))\
-            .order_by('-total_sales')
+        # 6. Province Sales Data (Map Analytics)
+        # 6. Province Sales Data (Map Analytics)
+        province_qs = Order.objects.filter(**orders_filter, status__in=VALID_SALES_STATUSES)\
+            .exclude(Q(shipping_province__isnull=True) | Q(shipping_province__exact=''))
+
+        cat_id = request.query_params.get('category_id') # Fetch here inline
+        
+        if cat_id and cat_id != 'all':
+             province_stats = province_qs.filter(items__product__category_id=cat_id)\
+                .values('shipping_province')\
+                .annotate(
+                    total_sales=Sum(F('items__price_at_purchase') * F('items__quantity')), 
+                    total_orders=Count('id', distinct=True)
+                )\
+                .order_by('-total_sales')
+        else:
+            province_stats = province_qs\
+                .values('shipping_province')\
+                .annotate(total_sales=Sum('total_price'), total_orders=Count('id'))\
+                .order_by('-total_sales')
 
         province_data = []
         for p in province_stats:
             prov_name = p['shipping_province'] or "Unknown"
             
-            # Find Top Product for this province
-            # Note: Complex query inside loop might be slow for huge data, but fine for now
-            top_prod = OrderItem.objects.filter(
+        province_data = []
+        for p in province_stats:
+            prov_name = p['shipping_province'] or "Unknown"
+
+            # Find Top 5 Products for this province
+            top_products_qs = OrderItem.objects.filter(
                 order__shipping_province=prov_name, 
                 order__status__in=VALID_SALES_STATUSES
-            ).values('product__title').annotate(qty=Sum('quantity')).order_by('-qty').first()
+            ).values('product__title').annotate(
+                qty=Sum('quantity'),
+                sales=Sum(F('price_at_purchase') * F('quantity'))
+            ).order_by('-qty')[:5]
+
+            # Convert to list
+            top_products_list = []
+            for tp in top_products_qs:
+                top_products_list.append({
+                    "name": tp['product__title'],
+                    "qty": tp['qty'], 
+                    "sales": tp['sales'] or 0
+                })
             
-            top_product_name = top_prod['product__title'] if top_prod else "-"
-            top_product_qty = top_prod['qty'] if top_prod else 0
+            # Use top 1 for legacy support in tooltip
+            top_prod_name = top_products_list[0]['name'] if top_products_list else "-"
 
             province_data.append({
                 "name": prov_name,
                 "value": p['total_sales'],
-                "top_product": f"{top_product_name} ({top_product_qty})"
-            })
+                "order_count": p['total_orders'],
+                "top_product": top_prod_name,
+                "top_products_list": top_products_list
+            }) 
+
     except Exception as e:
         print(f"DEBUG: Province Data Error: {e}")
         province_data = []
@@ -1205,6 +1295,11 @@ def get_admin_orders(request):
     if end_date:
         orders = orders.filter(created_at__date__lte=end_date)
 
+    # ✅ 4. Province Filter
+    province = request.GET.get('province')
+    if province and province != 'ทั้งหมด':
+        orders = orders.filter(shipping_province=province)
+
     data = [{
         "id": o.id, "customer": o.customer_name, "total_price": o.total_price,
         "status": o.status, "date": o.created_at.strftime("%d/%m/%Y %H:%M"),
@@ -1216,6 +1311,7 @@ def get_admin_orders(request):
         "bank_name": o.bank_name,
         "transfer_account_number": o.transfer_account_number,
         "tel": o.customer_tel,
+        "province": o.shipping_province, # ✅ Add Province
         "items": [{
             "product": i.product.title if i.product else "Deleted Product",
             "quantity": i.quantity,
@@ -1309,10 +1405,42 @@ def upload_slip(request, order_id):
         return Response({"message": "Slip uploaded successfully", "slip_url": order.slip_image.url})
         
     except Order.DoesNotExist:
-        return Response({"error": "Order not found or not authorized"}, status=404)
+        # Debugging Response for Frontend
+        if Order.objects.filter(id=order_id).exists():
+             o = Order.objects.get(id=order_id)
+             owner_id = o.user.id if o.user else "None"
+             req_user_id = request.user.id
+             return Response({"error": f"DEBUG: Order found but user mismatch. Owner={owner_id}, You={req_user_id}"}, status=403)
+        else:
+             return Response({"error": f"DEBUG: Order {order_id} not found in DB"}, status=404)
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def bulk_update_orders_api(request):
+    """
+    Bulk update order statuses
+    Payload: { "order_ids": [1, 2, 3], "status": "Shipped" }
+    """
+    if request.user.role not in ['admin', 'super_admin', 'seller']: 
+        return Response(status=403)
+
+    order_ids = request.data.get('order_ids', [])
+    new_status = request.data.get('status')
+    
+    if not order_ids or not new_status:
+        return Response({"error": "Missing parameters"}, status=400)
+
+    try:
+        with transaction.atomic():
+            updated_count = Order.objects.filter(id__in=order_ids).update(status=new_status)
+    
+        return Response({"message": f"Updated {updated_count} orders", "count": updated_count})
+    except Exception as e:
         return Response({"error": str(e)}, status=500)
 
 
@@ -1904,3 +2032,15 @@ def get_all_stock_history(request):
         })
     
     return Response(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_categories(request):
+    """
+    API to fetch all categories for dropdown filter
+    """
+    try:
+        categories = Category.objects.all().values('id', 'name').order_by('name')
+        return Response(list(categories), status=200)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

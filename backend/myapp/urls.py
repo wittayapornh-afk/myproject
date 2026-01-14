@@ -34,6 +34,7 @@ urlpatterns = [
     path('api/products/<int:product_id>/delete/', views.delete_product_api, name='delete_product'),
     
     path('api/categories/', views.categories_api, name='categories_api'),
+    path('api/admin/categories-list/', views.get_categories, name='get_categories_list'), # ✅ New Endpoint for Dropdown
     path('api/brands/', views.brands_api, name='brands_api'),
     path('api/submit-review/', views.submit_review, name='submit_review'),
 
@@ -43,6 +44,7 @@ urlpatterns = [
     
     path('api/orders/create/', views.create_order, name='create_order'),
     path('api/orders/<int:order_id>/update/', views.update_order_status, name='update_order'),
+    path('api/orders/<int:order_id>/confirm-received/', views.confirm_received_api, name='confirm_received'), # ✅ New Endpoint
     
     # ✅ แก้ไข 3: ใช้ path นี้อันเดียวสำหรับประวัติการสั่งซื้อ
     path('api/my-orders/', views.my_orders_api, name='my_orders'),

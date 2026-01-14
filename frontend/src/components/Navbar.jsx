@@ -8,8 +8,23 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
 
+// ✅ Reusable Tooltip Component
+const NavTooltip = ({ text, children }) => (
+    <div className="group/tooltip relative flex items-center">
+        {children}
+        <div className="absolute top-full mt-4 left-1/2 -translate-x-1/2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none z-[1100] transform translate-y-2 group-hover/tooltip:translate-y-0">
+            <div className="bg-white/90 backdrop-blur-md text-gray-800 text-[10px] font-black uppercase tracking-wider px-4 py-2 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-white/50 whitespace-nowrap flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1a4d2e] animate-pulse"></span>
+                {text}
+            </div>
+             {/* Arrow */}
+            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white/90 rotate-45 border-l border-t border-white/50"></div>
+        </div>
+    </div>
+);
+
 export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
-  const { user, logout, loading } = useAuth();
+  const { user, token, logout, loading } = useAuth();
   const { cartItems } = useCart();
   const { wishlistItems } = useWishlist();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -27,7 +42,29 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
 
-  // ✅ Handle Notification Click
+  // ... (Keep existing code for handleNotificationClick and useEffects) ...
+  // Re-implementing handleNotificationClick and useEffects to ensure continuity if replacing large block, 
+  // but better to target specific lines if possible. 
+  // Since I need to define NavTooltip outside or inside, I'll place it outside.
+  
+  // NOTE: I will only replace the top of the file to add NavTooltip and then use it in specific blocks via multiple ReplaceFileContent calls or one big one if I replace the whole Return.
+  // Actually, replacing specific blocks is safer. I'll split this task.
+
+  // 1. Add NavTooltip Component at the top (after imports)
+  // 2. Wrap Items in Return.
+
+  // Let's do step 1 first: Add NavTooltip
+  // I'll add it before `export default function Navbar`
+  
+  // Wait, I can't use `replace_file_content` to "insert" easily without matching context.
+  // I'll replace the `export default function Navbar` line with `const NavTooltip ... export default function ...`
+  
+  // And then I'll create a separate tool call for the JSX wrapping.
+  
+  // ... (Skipping thinking process to Action)
+  
+  // Just replacing the export line to include the component.
+  
   const handleNotificationClick = (noti) => {
       Swal.fire({
           title: `<h3 class="text-xl font-bold text-[#1a4d2e]">${noti.title}</h3>`,
@@ -74,7 +111,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
       const fetchNotifications = async () => {
           try {
               const res = await axios.get(`${API_BASE_URL}/api/notifications/`, {
-                  headers: { Authorization: `Token ${user?.token || localStorage.getItem('token')}` }
+                  headers: { Authorization: `Token ${token || localStorage.getItem('token')}` }
               });
               setNotifications(res.data);
           } catch (error) {
@@ -138,22 +175,25 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
             
             {/* ✅ Burger Menu with << >> Animation */}
             {user && (
-                <button 
-                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                    className="group p-2 text-gray-500 hover:bg-[#1a4d2e] hover:text-white rounded-xl transition-all duration-300 ease-in-out transform active:scale-90 hidden md:flex items-center justify-center w-10 h-10 shadow-sm hover:shadow-green-200"
-                    title={isSidebarOpen ? "Close Menu" : "Open Menu"}
-                >
-                    <div className={`transition-transform duration-300 ${isSidebarOpen ? 'rotate-180' : 'rotate-0'}`}>
-                        {isSidebarOpen ? <ChevronsLeft size={24} /> : <Menu size={24} />}
-                    </div>
-                </button>
+                <NavTooltip text="เมนูหลัก">
+                    <button 
+                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        className="group p-2 text-gray-500 hover:bg-[#1a4d2e] hover:text-white rounded-xl transition-all duration-300 ease-in-out transform active:scale-90 hidden md:flex items-center justify-center w-10 h-10 shadow-sm hover:shadow-green-200"
+                    >
+                        <div className={`transition-transform duration-300 ${isSidebarOpen ? 'rotate-180' : 'rotate-0'}`}>
+                            {isSidebarOpen ? <ChevronsLeft size={24} /> : <Menu size={24} />}
+                        </div>
+                    </button>
+                </NavTooltip>
             )}
 
             {/* ✅ Rule 1, 9: Logo พร้อม Hover Animation */}
             <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 bg-[#1a4d2e] rounded-xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform duration-300">
-                <Sparkles size={20} className="group-hover:animate-pulse" />
-            </div>
+            <NavTooltip text="หน้าแรก">
+                <div className="w-10 h-10 bg-[#1a4d2e] rounded-xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform duration-300">
+                    <Sparkles size={20} className="group-hover:animate-pulse" />
+                </div>
+            </NavTooltip>
             <span className="text-2xl font-black text-[#1a4d2e] tracking-tighter uppercase">Shop.</span>
             </Link>
         </div>
@@ -272,22 +312,27 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
           {/* ✅ Rule 16: ซ่อนปุ่มตะกร้า/Wishlist สำหรับ Admin & Seller */}
           {!isRestricted && (
             <div className="flex items-center gap-3 border-r border-gray-100 pr-6 mr-2">
-              <Link to="/wishlist" className="relative p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all duration-300">
-                <Heart size={22} />
-                {wishlistItems.length > 0 && (
-                  <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white animate-bounce">
-                    {wishlistItems.length}
-                  </span>
-                )}
-              </Link>
-              <Link to="/cart" className="relative p-2.5 text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50 rounded-2xl transition-all duration-300">
-                <ShoppingCart size={22} />
-                {cartItems.length > 0 && (
-                  <span className="absolute top-1 right-1 w-5 h-5 bg-[#1a4d2e] text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white animate-bounce">
-                    {cartItems.length}
-                  </span>
-                )}
-              </Link>
+              <NavTooltip text="รายการโปรด">
+                <Link to="/wishlist" className="relative p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all duration-300">
+                    <Heart size={22} />
+                    {wishlistItems.length > 0 && (
+                    <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                        {wishlistItems.length}
+                    </span>
+                    )}
+                </Link>
+              </NavTooltip>
+
+              <NavTooltip text="ตะกร้าสินค้า">
+                <Link to="/cart" className="relative p-2.5 text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50 rounded-2xl transition-all duration-300">
+                    <ShoppingCart size={22} />
+                    {cartItems.length > 0 && (
+                    <span className="absolute top-1 right-1 w-5 h-5 bg-[#1a4d2e] text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                        {cartItems.length}
+                    </span>
+                    )}
+                </Link>
+              </NavTooltip>
             </div>
           )}
 
@@ -298,35 +343,40 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                
                {/* 1. Order History & Cart (Hidden for Admin/Seller) */}
                {!hasAdminPanelAccess && (
-                 <Link to="/order-history" title="ประวัติการสั่งซื้อ" className="hidden md:flex p-2.5 text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50 rounded-2xl transition-all duration-300">
-                    <ClipboardList size={22} />
-                 </Link>
+                 <NavTooltip text="ติดตามสถานะคำสั่งซื้อ"> {/* ✅ เปลี่ยน Tooltip ให้สื่อความหมาย */}
+                    <Link to="/tracking" className="hidden md:flex p-2.5 text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50 rounded-2xl transition-all duration-300">
+                        <ClipboardList size={22} />
+                    </Link>
+                 </NavTooltip>
                )}
 
                {/* 2. Profile Link (Show for ALL Users including Admin) */}
-               <Link to="/profile" title="โปรไฟล์ของฉัน" className="group flex items-center gap-3 pl-1.5 pr-2 py-1.5 rounded-full border border-gray-100 hover:border-[#1a4d2e]/30 hover:bg-white transition-all duration-300">
-                  <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-50 border border-gray-100 relative shadow-sm group-hover:shadow-md transition-all">
-                    <img
-                      src={getUserAvatar(user.avatar)}
-                      alt={user.username}
-                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      onError={(e) => { e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" }}
-                    />
-                  </div>
-                  <div className="hidden lg:block text-left pr-2">
-                    <p className="text-xs font-black text-gray-800 leading-tight uppercase tracking-tighter">{user.username}</p>
-                    <p className="text-[9px] text-[#1a4d2e] font-black uppercase tracking-widest opacity-70">{user.role}</p>
-                  </div>
-               </Link>
+               <NavTooltip text="โปรไฟล์ของฉัน">
+                    <Link to="/profile" className="group flex items-center gap-3 pl-1.5 pr-2 py-1.5 rounded-full border border-gray-100 hover:border-[#1a4d2e]/30 hover:bg-white transition-all duration-300">
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-50 border border-gray-100 relative shadow-sm group-hover:shadow-md transition-all">
+                            <img
+                            src={getUserAvatar(user.avatar)}
+                            alt={user.username}
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            onError={(e) => { e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" }}
+                            />
+                        </div>
+                        <div className="hidden lg:block text-left pr-2">
+                            <p className="text-xs font-black text-gray-800 leading-tight uppercase tracking-tighter">{user.username}</p>
+                            <p className="text-[9px] text-[#1a4d2e] font-black uppercase tracking-widest opacity-70">{user.role}</p>
+                        </div>
+                    </Link>
+               </NavTooltip>
 
                {/* 3. Logout Button */}
-               <button 
-                  onClick={handleLogout} 
-                  title="ออกจากระบบ"
-                  className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-300"
-               >
-                  <LogOut size={22} />
-               </button>
+               <NavTooltip text="ออกจากระบบ">
+                    <button 
+                        onClick={handleLogout} 
+                        className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-300"
+                    >
+                        <LogOut size={22} />
+                    </button>
+               </NavTooltip>
             </div>
           ) : (
             // ✅ Only show Login if definitely not loading and no token

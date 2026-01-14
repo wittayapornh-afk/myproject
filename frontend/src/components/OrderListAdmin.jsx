@@ -7,6 +7,8 @@ import DatePicker, { registerLocale } from "react-datepicker";
 import th from "date-fns/locale/th";
 import "react-datepicker/dist/react-datepicker.css";
 
+import { thai_provinces } from '../data/thai_provinces'; // ✅ Import Provinces
+
 // ✅ Register Thai Locale
 registerLocale("th", th);
 
@@ -15,7 +17,41 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [displaySearch, setDisplaySearch] = useState(''); // ✅ UI State
+  const [displaySearch, setDisplaySearch] = useState('');
+  const [selectedOrders, setSelectedOrders] = useState([]); // ✅ Selection State
+
+  // ✅ Bulk Update Function
+  const handleBulkUpdate = async (status) => {
+    if (selectedOrders.length === 0) return;
+
+    const result = await Swal.fire({
+        title: 'ยืนยันอัปเดตหลายรายการ?',
+        text: `ต้องการเปลี่ยนสถานะ ${selectedOrders.length} ออเดอร์เป็น "${status}" ใช่หรือไม่`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#1a4d2e',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'ใช่, เปลี่ยนเลย',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            const activeToken = token || localStorage.getItem('token');
+            await axios.post('http://localhost:8000/api/admin/orders/bulk-update/', 
+                { order_ids: selectedOrders, status: status }, 
+                { headers: { Authorization: `Token ${activeToken}` } }
+            );
+            
+            Swal.fire('สำเร็จ!', 'อัปเดตสถานะเรียบร้อยแล้ว', 'success');
+            setSelectedOrders([]); // Clear selection
+            fetchOrders(); // Refresh
+        } catch (error) {
+            console.error(error);
+            Swal.fire('Error', 'เกิดข้อผิดพลาดในการอัปเดต', 'error');
+        }
+    }
+  };
 
   // ✅ Debounce Search
   useEffect(() => {
@@ -30,10 +66,11 @@ export default function AdminOrders() {
   const [endDate, setEndDate] = useState(null);
   
   const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
+  const [provinceFilter, setProvinceFilter] = useState('ทั้งหมด'); // ✅ Province Filter
 
   useEffect(() => {
     fetchOrders();
-  }, [searchTerm, startDate, endDate, statusFilter]);
+  }, [searchTerm, startDate, endDate, statusFilter, provinceFilter]);
 
   const fetchOrders = async () => {
     try {
@@ -46,6 +83,7 @@ export default function AdminOrders() {
       if (endDate) params.append('end_date', endDate.toISOString().split('T')[0]);
       
       if (statusFilter !== 'ทั้งหมด') params.append('status', statusFilter);
+      if (provinceFilter !== 'ทั้งหมด') params.append('province', provinceFilter); // ✅ Add param
 
       const response = await axios.get(`http://localhost:8000/api/admin/orders_v2/?${params.toString()}`, {
         headers: { Authorization: `Token ${activeToken}` }
@@ -228,8 +266,10 @@ export default function AdminOrders() {
   const handleReset = () => {
       setSearchTerm('');
       setStartDate(null);
+      setStartDate(null);
       setEndDate(null);
       setStatusFilter('ทั้งหมด');
+      setProvinceFilter('ทั้งหมด');
   };
 
   const getStatusColor = (status) => {
@@ -295,7 +335,7 @@ export default function AdminOrders() {
         <div className="w-full xl:w-48">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block ml-1">สถานะ</label>
             <div className="relative">
-                <select className="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-[#1a4d2e] appearance-none bg-white cursor-pointer text-sm font-bold" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <select className="w-full pl-3 pr-8 py-2 border border-gray-200 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-[#1a4d2e] appearance-none cursor-pointer text-sm font-bold text-gray-700 hover:bg-white transition-colors" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                     <option value="ทั้งหมด">ทั้งหมด</option>
                     <option value="Pending">รอตรวจสอบ</option>
                     <option value="Paid">ชำระแล้ว</option>
@@ -305,35 +345,104 @@ export default function AdminOrders() {
                 <Filter className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" size={16}/>
             </div>
         </div>
-        <button onClick={handleReset} className="w-full xl:w-auto h-[42px] px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl flex items-center justify-center gap-2 transition-colors mt-auto font-bold text-sm"><RefreshCw size={18}/> ล้างค่า</button>
+
+        {/* ✅ Province Filter */}
+        <div className="w-full xl:w-48">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block ml-1">จังหวัด</label>
+            <div className="relative">
+                <select className="w-full pl-3 pr-8 py-2 border border-gray-200 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-[#1a4d2e] appearance-none cursor-pointer text-sm font-bold text-gray-700 hover:bg-white transition-colors" value={provinceFilter} onChange={(e) => setProvinceFilter(e.target.value)}>
+                    <option value="ทั้งหมด">ทั้งหมด</option>
+                    {thai_provinces.map((p, i) => (
+                        <option key={i} value={p}>{p}</option>
+                    ))}
+                </select>
+                <Filter className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" size={16}/>
+            </div>
+        </div>
+        <button onClick={handleReset} className="w-full xl:w-auto h-[42px] px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl flex items-center justify-center gap-2 transition-colors mt-auto font-bold text-sm shadow-sm hover:shadow-md"><RefreshCw size={18}/> ล้างค่า</button>
       </div>
 
+      {/* ✅ Bulk Action Bar (Shows when items selected) */}
+      {selectedOrders.length > 0 && (
+        <div className="bg-[#1a4d2e] text-white p-4 rounded-xl shadow-lg flex justify-between items-center animate-fade-in mb-4">
+            <span className="font-bold text-sm">เลือกอยู่ {selectedOrders.length} รายการ</span>
+            <div className="flex gap-2">
+                <button onClick={() => handleBulkUpdate('Paid')} className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-all border border-white/10">
+                    ยืนยันชำระเงิน
+                </button>
+                <button onClick={() => handleBulkUpdate('Shipped')} className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-all border border-white/10">
+                    ยืนยันจัดส่ง
+                </button>
+                <button onClick={() => handleBulkUpdate('Completed')} className="px-4 py-2 bg-white text-[#1a4d2e] hover:bg-gray-100 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-2">
+                    <CheckCircle size={14} /> ออเดอร์สำเร็จ
+                </button>
+            </div>
+        </div>
+      )}
+
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+      <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-gray-100">
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-50 text-gray-700 font-bold border-b border-gray-200 text-sm">
+                <thead className="bg-[#F8F9FA] text-gray-400 font-black uppercase text-[10px] tracking-wider border-b border-gray-100">
                     <tr>
-                        <th className="p-4 w-20">#ID</th>
-                        <th className="p-4 w-32">วันที่</th>
-                        <th className="p-4">ลูกค้า</th>
-                        <th className="p-4">รายการสินค้า</th>
-                        <th className="p-4 text-right">ยอดรวม</th>
-                        <th className="p-4 text-center w-48">จัดการสถานะ</th>
+                        {/* ✅ Checkbox Column */}
+                        <th className="p-6 w-10 pl-8">
+                            <input 
+                                type="checkbox" 
+                                className="w-4 h-4 rounded text-[#1a4d2e] focus:ring-[#1a4d2e] cursor-pointer"
+                                onChange={(e) => {
+                                    if (e.target.checked) {
+                                        setSelectedOrders(orders.map(o => o.id));
+                                    } else {
+                                        setSelectedOrders([]);
+                                    }
+                                }}
+                                checked={orders.length > 0 && selectedOrders.length === orders.length}
+                            />
+                        </th>
+                        <th className="p-6 w-20">#ID</th>
+                        <th className="p-6 w-32">วันที่</th>
+                        <th className="p-6">จังหวัด</th> {/* ✅ New Header */}
+                        <th className="p-6">ลูกค้า</th>
+                        <th className="p-6">รายการสินค้า</th>
+                        <th className="p-6 text-right">ยอดรวม</th>
+                        <th className="p-6 text-center w-48">จัดการสถานะ</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {loading ? (
-                        <tr><td colSpan="6" className="p-12 text-center text-gray-500">กำลังโหลด...</td></tr>
+                        <tr><td colSpan="7" className="p-12 text-center text-gray-500">กำลังโหลด...</td></tr>
                     ) : orders.length === 0 ? (
-                        <tr><td colSpan="6" className="p-12 text-center text-gray-400">ไม่พบออเดอร์</td></tr>
+                        <tr><td colSpan="7" className="p-12 text-center text-gray-400">ไม่พบออเดอร์</td></tr>
                     ) : (
                         orders.map((order) => (
-                        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                        <tr key={order.id} className={`hover:bg-gray-50 transition-colors ${selectedOrders.includes(order.id) ? 'bg-green-50' : ''}`}>
+                            {/* ✅ Row Checkbox */}
+                            <td className="p-4">
+                                <input 
+                                    type="checkbox" 
+                                    className="w-4 h-4 rounded text-[#1a4d2e] focus:ring-[#1a4d2e] cursor-pointer border-gray-300"
+                                    checked={selectedOrders.includes(order.id)}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setSelectedOrders([...selectedOrders, order.id]);
+                                        } else {
+                                            setSelectedOrders(selectedOrders.filter(id => id !== order.id));
+                                        }
+                                    }}
+                                />
+                            </td>
                             <td className="p-4 font-mono text-sm font-bold text-[#1a4d2e]">#{order.id}</td>
                             <td className="p-4 text-sm text-gray-600">
                                 <div className="text-xs">{order.date.split(' ')[0]}</div>
                                 <div className="text-[10px] text-gray-400">{order.date.split(' ')[1]}</div>
+                            </td>
+                            {/* ✅ Province Column */}
+                            <td className="p-4">
+                                <span className="inline-block px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs font-bold border border-gray-200">
+                                    {order.province || '-'}
+                                </span>
                             </td>
                             <td className="p-4">
                                 <div className="font-bold text-gray-800 text-sm">{order.customer}</div>
@@ -359,57 +468,76 @@ export default function AdminOrders() {
                                     <div className="flex justify-center items-center gap-1 mb-1">
                                         {/* Step 1: Pending */}
                                         <div className={`h-1.5 w-8 rounded-full transition-all ${
-                                            ['Pending', 'Paid', 'Shipped'].includes(order.status) ? 'bg-amber-400' : 'bg-gray-200'
+                                            ['Pending', 'Paid', 'Shipped', 'Completed'].includes(order.status) ? 'bg-amber-400' : 'bg-gray-200'
                                         } ${order.status === 'Cancelled' && 'bg-gray-200'}`}></div>
                                         
                                         {/* Step 2: Paid */}
                                         <div className={`h-1.5 w-8 rounded-full transition-all ${
-                                            ['Paid', 'Shipped'].includes(order.status) ? 'bg-emerald-500' : 'bg-gray-200'
+                                            ['Paid', 'Shipped', 'Completed'].includes(order.status) ? 'bg-emerald-500' : 'bg-gray-200'
                                         } ${order.status === 'Cancelled' && 'bg-gray-200'}`}></div>
                                         
                                         {/* Step 3: Shipped */}
                                         <div className={`h-1.5 w-8 rounded-full transition-all ${
-                                            order.status === 'Shipped' ? 'bg-blue-500' : 'bg-gray-200'
+                                            ['Shipped', 'Completed'].includes(order.status) ? 'bg-blue-500' : 'bg-gray-200'
                                         } ${order.status === 'Cancelled' && 'bg-gray-200'}`}></div>
-                                    </div>
 
-                                    {/* Status Control Panel */}
-                                    <div className="relative">
-                                        <div className={`absolute top-1/2 left-3 -translate-y-1/2 w-2 h-2 rounded-full ${
-                                            order.status === 'Paid' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' :
-                                            order.status === 'Shipped' ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' :
-                                            order.status === 'Cancelled' ? 'bg-red-500' :
-                                            'bg-amber-400 animate-pulse'
+                                        {/* Step 4: Completed */}
+                                        <div className={`h-1.5 w-8 rounded-full transition-all ${
+                                            order.status === 'Completed' ? 'bg-green-500' : 'bg-gray-200'
                                         }`}></div>
-                                        <select 
-                                            value={order.status}
-                                            onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                                            className={`w-full pl-7 pr-8 py-2 text-xs font-bold rounded-lg border-2 cursor-pointer outline-none transition-all ${
-                                                order.status === 'Paid' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 
-                                                order.status === 'Shipped' ? 'border-blue-100 bg-blue-50 text-blue-700' :
-                                                order.status === 'Cancelled' ? 'border-red-100 bg-red-50 text-red-700' :
-                                                'border-amber-100 bg-amber-50 text-amber-700'
-                                            } hover:border-gray-300 focus:ring-2 focus:ring-gray-200`}
-                                        >
-                                            <option value="Pending">1. รอตรวจสอบ</option>
-                                            <option value="Paid">2. ชำระแล้ว</option>
-                                            <option value="Shipped">3. จัดส่งแล้ว</option>
-                                            <option className="text-red-500" value="Cancelled">❌ ยกเลิก</option>
-                                        </select>
-                                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-400">
-                                            <Edit size={12} />
-                                        </div>
                                     </div>
 
-                                    {/* Check Slip Button (Compact) */}
-                                    {order.slip_image && (
-                                        <button 
-                                            onClick={() => handleViewSlip(order)}
-                                            className="w-full py-1.5 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all shadow-sm"
-                                        >
-                                            <Search size={12} className="text-indigo-500"/> ตรวจสอบสลิป
-                                        </button>
-                                    )}
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-col gap-2">
+                                        {order.status === 'Pending' && (
+                                            <button 
+                                                onClick={() => handleViewSlip(order)}
+                                                className="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:shadow-sm transition-all border border-emerald-200"
+                                            >
+                                                ยืนยันชำระเงิน
+                                            </button>
+                                        )}
+                                        
+                                        {order.status === 'Paid' && (
+                                            <button 
+                                                onClick={() => handleStatusChange(order.id, 'Shipped')}
+                                                className="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200 hover:shadow-sm transition-all border border-blue-200 flex items-center justify-center gap-1"
+                                            >
+                                                <Truck size={12} /> ยืนยันจัดส่ง
+                                            </button>
+                                        )}
+
+                                        {order.status === 'Shipped' && (
+                                            <button 
+                                                onClick={() => handleStatusChange(order.id, 'Completed')}
+                                                className="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 hover:shadow-sm transition-all border border-green-200 flex items-center justify-center gap-1"
+                                            >
+                                                <CheckCircle size={12} /> ออเดอร์สำเร็จ
+                                            </button>
+                                        )}
+
+                                        {/* ❌ Cancel Button (Available for Pending/Paid) */}
+                                        {['Pending', 'Paid'].includes(order.status) && (
+                                            <button 
+                                                onClick={() => handleStatusChange(order.id, 'Cancelled')}
+                                                className="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 hover:shadow-sm transition-all border border-rose-200"
+                                            >
+                                                ยกเลิก
+                                            </button>
+                                        )}
+
+                                        {/* Status Layout for Final States */}
+                                        {order.status === 'Completed' && (
+                                            <span className="block w-full py-1.5 text-xs font-bold text-green-600 bg-green-50 rounded-lg border border-green-100 shadow-sm text-center">
+                                                ✅ สำเร็จ
+                                            </span>
+                                        )}
+                                        {order.status === 'Cancelled' && (
+                                            <span className="block w-full py-1.5 text-xs font-bold text-gray-500 bg-gray-100 rounded-lg border border-gray-200 text-center">
+                                                ❌ ยกเลิกแล้ว
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </td>
                         </tr>

@@ -67,7 +67,7 @@ function PaymentPage() {
                 confirmButtonColor: '#305949' 
             }).then(() => { 
                 clearCart(); 
-                navigate('/order-history'); 
+                navigate('/tracking');  // ✅ ไปที่หน้ารออเดอร์ 
             });
         } else { 
             throw new Error(result.error || 'เกิดข้อผิดพลาดในการสั่งซื้อ'); 

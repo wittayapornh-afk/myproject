@@ -124,34 +124,38 @@ export default function ProductListAdmin() {
   return (
     <div className="space-y-6 relative">
       {/* Toolbar */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm">
-        <div className="flex-1 relative">
-            <Search className="absolute left-3 top-2.5 text-gray-400" size={18}/>
-            <input type="text" placeholder="ค้นหา..." className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#1a4d2e]"
+      {/* Toolbar */}
+      <div className="flex flex-col md:flex-row gap-4 bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+        <div className="flex-1 relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-[#1a4d2e] transition-colors" size={20}/>
+            <input type="text" placeholder="ค้นหาตามชื่อสินค้า..." className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 transition-all font-bold text-sm"
                 value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
         </div>
-        <select className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-[#1a4d2e]"
-            value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}>
-            {categories.map((c,i)=><option key={i} value={c}>{c}</option>)}
-        </select>
-        <button onClick={handleAddClick} className="bg-[#1a4d2e] text-white px-4 py-2 rounded-lg flex gap-2 items-center hover:bg-[#143d24]">
+        <div className="relative min-w-[200px]">
+            <select className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 appearance-none cursor-pointer font-bold text-sm text-gray-700"
+                value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}>
+                {categories.map((c,i)=><option key={i} value={c}>{c}</option>)}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">▼</div>
+        </div>
+        <button onClick={handleAddClick} className="bg-[#1a4d2e] text-white px-6 py-3 rounded-2xl flex gap-2 items-center hover:bg-[#143d24] shadow-lg shadow-green-900/20 active:scale-95 transition-all font-bold text-sm">
             <Plus size={20}/> เพิ่มสินค้า
         </button>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+      <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-gray-100">
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-50 text-gray-700 font-semibold border-b text-sm">
+                <thead className="bg-[#F8F9FA] text-gray-400 font-black uppercase text-[10px] tracking-wider border-b border-gray-100">
                     <tr>
-                        <th className="p-4 w-20">รูปภาพ</th>
-                        <th className="p-4">ชื่อสินค้า</th>
-                        <th className="p-4">หมวดหมู่</th>
-                        <th className="p-4 text-right">ราคา</th>
-                        <th className="p-4 text-center">คงเหลือ</th>
-                        <th className="p-4 text-center">สถานะ</th>
-                        <th className="p-4 text-center w-32">จัดการ</th>
+                        <th className="p-6 pl-8 w-24">รูปภาพ</th>
+                        <th className="p-6">ชื่อสินค้า</th>
+                        <th className="p-6">หมวดหมู่</th>
+                        <th className="p-6 text-right">ราคา</th>
+                        <th className="p-6 text-center">คงเหลือ</th>
+                        <th className="p-6 text-center">สถานะ</th>
+                        <th className="p-6 text-center w-32">จัดการ</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">

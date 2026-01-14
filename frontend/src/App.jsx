@@ -19,8 +19,9 @@ import ResetPassword from './components/ResetPassword'; // ✅ Import ResetPassw
 import SuccessModal from './components/SuccessModal';
 import CategoryRow from './components/CategoryRow';
 import PageTransition from './components/PageTransition'; // ✅ Import PageTransition
+import TrackingPage from './components/TrackingPage'; // ✅ Import TrackingPage
 // Admin Components
-import AdminDashboard from './components/AdminDashboard';
+import AdminDashboard from './components/AdminDashboard'; // ✅ Admin Dashboard
 import ProductAdd from './components/ProductAdd';
 import ProductEdit from './components/ProductEdit';
 import OrderListAdmin from './components/OrderListAdmin';
@@ -118,6 +119,12 @@ const AppContent = () => {
               <Route path="/order-history" element={
                 <ProtectedRoute allowedRoles={['user', 'new_user', 'customer', 'admin', 'super_admin', 'seller']}>
                   <OrderHistory />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/tracking" element={
+                <ProtectedRoute allowedRoles={['user', 'new_user', 'customer', 'admin', 'super_admin', 'seller']}>
+                  <TrackingPage />
                 </ProtectedRoute>
               } />
 

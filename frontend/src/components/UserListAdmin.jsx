@@ -10,6 +10,11 @@ export default function UserListAdmin() {
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState(null); // เก็บ user ที่กำลังแก้ไข
   const [formData, setFormData] = useState({}); // เก็บข้อมูลฟอร์ม
+  
+  // ✅ Filter States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   useEffect(() => {
     fetchUsers();
@@ -95,57 +100,176 @@ export default function UserListAdmin() {
     }
   };
 
+  const handleToggleBlock = async (user) => {
+      const isBlocked = !user.is_active;
+      const actionText = isBlocked ? 'ปลดบล็อก' : 'ระงับการใช้งาน';
+      
+      const result = await Swal.fire({
+          title: `ยืนยัน${actionText}?`,
+          text: `คุณต้องการ${actionText}ผู้ใช้ "${user.username}" ใช่หรือไม่?`,
+          icon: isBlocked ? 'success' : 'warning',
+          showCancelButton: true,
+          confirmButtonText: `ใช่, ${actionText}`,
+          cancelButtonText: 'ยกเลิก',
+          confirmButtonColor: isBlocked ? '#10B981' : '#EF4444',
+          cancelButtonColor: '#94A3B8'
+      });
+
+      if (result.isConfirmed) {
+          try {
+              const token = localStorage.getItem('token');
+              await axios.put(`http://localhost:8000/api/admin/user/${user.id}/update/`, {
+                  is_active: isBlocked // True = Active (Unblock), False = Inactive (Block)
+              }, {
+                  headers: { Authorization: `Token ${token}` }
+              });
+
+              Swal.fire({
+                  icon: 'success',
+                  title: 'สำเร็จ!',
+                  text: `${actionText}เรียบร้อยแล้ว`,
+                  timer: 1500,
+                  showConfirmButton: false
+              });
+
+              fetchUsers();
+          } catch (error) {
+              console.error(error);
+              Swal.fire('Error', 'ไม่สามารถทำรายการได้', 'error');
+          }
+      }
+  };
+
+  // ✅ Filtering Logic
+  const filteredUsers = users.filter(user => {
+      const matchSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchRole = filterRole === 'all' || user.role_code === filterRole;
+      
+      const matchStatus = filterStatus === 'all' || 
+                          (filterStatus === 'active' && user.is_active) || 
+                          (filterStatus === 'inactive' && !user.is_active);
+      
+      return matchSearch && matchRole && matchStatus;
+  });
+
   return (
     <div className="animate-fade-in space-y-6">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
-        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-          <User className="text-[#305949]" /> รายชื่อผู้ใช้งานในระบบ
-        </h2>
-        <span className="text-sm bg-gray-100 px-3 py-1 rounded-full text-gray-600">
-          ทั้งหมด: {users.length} คน
-        </span>
+      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm gap-4">
+        <div>
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <User className="text-[#305949]" /> รายชื่อผู้ใช้งานในระบบ
+            </h2>
+            <span className="text-xs text-gray-500 font-medium ml-8">ทั้งหมด {users.length} คน</span>
+        </div>
+        
+        {/* ✅ Filters Toolbar */}
+        <div className="flex flex-wrap gap-3 w-full md:w-auto items-center">
+             <div className="relative">
+                <input 
+                    type="text" 
+                    placeholder="ค้นหาชื่อ / อีเมล..." 
+                    className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#305949] w-64 shadow-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <div className="absolute left-3 top-2.5 text-gray-400 pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+             </div>
+             
+             <div className="relative">
+                <select 
+                    className="pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#305949] appearance-none bg-white font-medium text-gray-600 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                >
+                    <option value="all">ทุกบทบาท</option>
+                    <option value="customer">ลูกค้า</option>
+                    <option value="seller">ผู้ขาย</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <div className="absolute right-3 top-2.5 text-gray-400 pointer-events-none">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+             </div>
+
+             <div className="relative">
+                <select 
+                    className="pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#305949] appearance-none bg-white font-medium text-gray-600 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                    <option value="all">ทุกสถานะ</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Blocked</option>
+                </select>
+                <div className="absolute right-3 top-2.5 text-gray-400 pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+             </div>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+      <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-gray-100">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50 text-gray-700 uppercase text-xs font-bold">
+          <thead className="bg-[#F8F9FA] text-gray-400 font-black uppercase text-[10px] tracking-wider border-b border-gray-100">
             <tr>
-              <th className="px-6 py-4">ผู้ใช้งาน</th>
-              <th className="px-6 py-4">อีเมล</th>
-              <th className="px-6 py-4">สถานะ</th>
-              <th className="px-6 py-4 text-center">บทบาท</th>
-              <th className="px-6 py-4 text-right">จัดการ</th>
+              <th className="p-6 pl-8">ผู้ใช้งาน</th>
+              <th className="p-6">อีเมล</th>
+              <th className="p-6">สถานะ</th>
+              <th className="p-6 text-center">บทบาท</th>
+              <th className="p-6 text-right">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm">
             {loading ? (
               <tr><td colSpan="5" className="text-center py-8">กำลังโหลด...</td></tr>
-            ) : users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50/50">
-                <td className="px-6 py-4 font-medium text-gray-900">{user.username}</td>
-                <td className="px-6 py-4 text-gray-500 flex items-center gap-2">
-                  <Mail size={14} /> {user.email}
+            ) : filteredUsers.length === 0 ? (
+                <tr><td colSpan="5" className="text-center py-8 text-gray-400">ไม่พบข้อมูล</td></tr>
+            ) : filteredUsers.map((user) => (
+              <tr key={user.id} className={`hover:bg-gray-50/50 transition-colors ${!user.is_active ? 'bg-red-50/30' : ''}`}>
+                <td className="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
+                        {user.avatar ? <img src={`http://localhost:8000${user.avatar}`} className="w-full h-full object-cover" /> : <User className="p-1 w-full h-full text-gray-500"/>}
+                    </div>
+                    {user.username}
+                </td>
+                <td className="px-6 py-4 text-gray-500">
+                  <div className="flex items-center gap-2"><Mail size={14} /> {user.email}</div>
                 </td>
                 <td className="px-6 py-4">
                   {user.is_active ? (
-                    <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs"><CheckCircle size={12} /> Active</span>
+                    <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2.5 py-1 rounded-lg text-xs font-bold border border-green-100"><CheckCircle size={12} /> Active</span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-1 rounded-full text-xs"><XCircle size={12} /> Inactive</span>
+                    <span className="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2.5 py-1 rounded-lg text-xs font-bold border border-red-100"><Shield size={12} /> Blocked</span>
                   )}
                 </td>
                 <td className="px-6 py-4 text-center">
-                  <span className={`px-2 py-1 rounded text-xs ${user.role_code === 'admin' || user.role_code === 'super_admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${user.role_code === 'admin' || user.role_code === 'super_admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
                     {user.role}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => handleEditClick(user)}
-                    className="text-blue-600 hover:bg-blue-50 p-2 rounded-full transition-colors"
-                    title="แก้ไขข้อมูล"
-                  >
-                    <Edit size={16} />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    {/* ✅ Block Button */}
+                    <button
+                        onClick={() => handleToggleBlock(user)}
+                        className={`p-2 rounded-lg transition-colors ${user.is_active ? 'text-red-400 hover:bg-red-50 hover:text-red-600' : 'text-green-500 hover:bg-green-50 hover:text-green-600'}`}
+                        title={user.is_active ? "ระงับการใช้งาน (Block)" : "ปลดบล็อก (Unblock)"}
+                    >
+                        {user.is_active ? <Shield size={16} /> : <CheckCircle size={16} />}
+                    </button>
+                    
+                    <button
+                        onClick={() => handleEditClick(user)}
+                        className="text-blue-500 hover:bg-blue-50 hover:text-blue-600 p-2 rounded-lg transition-colors"
+                        title="แก้ไขข้อมูล"
+                    >
+                        <Edit size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -171,16 +295,16 @@ export default function UserListAdmin() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
                   <input
                     type="text" name="username"
-                    value={formData.username} onChange={handleInputChange}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.username} readOnly
+                    className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500 cursor-not-allowed outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์</label>
                   <input
                     type="text" name="phone"
-                    value={formData.phone} onChange={handleInputChange}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.phone} readOnly
+                    className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500 cursor-not-allowed outline-none"
                   />
                 </div>
               </div>
@@ -189,8 +313,8 @@ export default function UserListAdmin() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">อีเมล</label>
                 <input
                   type="email" name="email"
-                  value={formData.email} onChange={handleInputChange}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={formData.email} readOnly
+                  className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500 cursor-not-allowed outline-none"
                 />
               </div>
 
@@ -199,16 +323,16 @@ export default function UserListAdmin() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อจริง</label>
                   <input
                     type="text" name="first_name"
-                    value={formData.first_name} onChange={handleInputChange}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.first_name} readOnly
+                    className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500 cursor-not-allowed outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">นามสกุล</label>
                   <input
                     type="text" name="last_name"
-                    value={formData.last_name} onChange={handleInputChange}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.last_name} readOnly
+                    className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500 cursor-not-allowed outline-none"
                   />
                 </div>
               </div>
@@ -218,9 +342,9 @@ export default function UserListAdmin() {
                 <textarea
                   name="address"
                   value={formData.address}
-                  onChange={handleInputChange}
+                  readOnly
                   rows="3"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                  className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500 cursor-not-allowed outline-none resize-none"
                 />
               </div>
 

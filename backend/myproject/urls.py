@@ -36,6 +36,8 @@ urlpatterns = [
     # ==============================
     path('api/checkout/', views.checkout_api),     # ✅ เพิ่มให้ใน views แล้ว
     path('api/orders/', views.my_orders_api),      # ✅ เพิ่มให้ใน views แล้ว
+    path('api/orders/<int:order_id>/confirm-received/', views.confirm_received_api), # ✅ Confirm Received
+    path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
     path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
     path('api/payment/promptpay_payload/', views.get_promptpay_payload), # ✅ Helper for Checkout UI
     
@@ -48,7 +50,8 @@ urlpatterns = [
     # 🛡️ Admin Dashboard & Management APIs
     # ==============================
     # 1. Dashboard Stats
-    path('api/admin/dashboard-stats/', views.get_admin_stats), # ✅ Use function view directly
+    path('api/admin-stats/', views.get_admin_stats), # ✅ Corrected Path
+    path('api/admin/categories-list/', views.get_categories), # ✅ New Categories Dropdown
     path('api/admin/export_orders/', views.export_orders_csv), # ✅ New Export CSV
 
     # 2. จัดการสินค้า (Admin)
@@ -60,7 +63,8 @@ urlpatterns = [
 
 
     # 3. จัดการออเดอร์ (Admin)
-    path('api/admin/orders_v2/', views.get_admin_orders), # ✅ Changed URL to fix 405 error
+    path('api/admin/orders_v2/', views.get_admin_orders), 
+    path('api/admin/orders/bulk-update/', views.bulk_update_orders_api), # ✅ Bulk Update
     path('api/admin/order_status/<int:order_id>/', views.update_order_status_api),
 
     # 4. จัดการผู้ใช้งาน (Admin)

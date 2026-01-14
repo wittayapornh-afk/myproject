@@ -128,18 +128,18 @@ function AdminStockHistory() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-gray-100">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-[#f8f9fa] text-gray-500 font-black uppercase text-xs tracking-wider">
+                        <thead className="bg-[#F8F9FA] text-gray-400 font-black uppercase text-[10px] tracking-wider border-b border-gray-100">
                             <tr>
-                                <th className="p-4 w-16 text-center">Date</th>
-                                <th className="p-4">Product</th>
-                                <th className="p-4 text-center">Type</th>
-                                <th className="p-4 text-right">Change</th>
-                                <th className="p-4 text-right">Remaining</th>
-                                <th className="p-4">User</th>
-                                <th className="p-4 w-1/4">Note</th>
+                                <th className="p-6 pl-8 w-24 text-center">Date</th>
+                                <th className="p-6">Product</th>
+                                <th className="p-6 text-center">Type</th>
+                                <th className="p-6 text-right">Change</th>
+                                <th className="p-6 text-right">Remaining</th>
+                                <th className="p-6">User</th>
+                                <th className="p-6 w-1/4">Note</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">

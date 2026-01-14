@@ -12,6 +12,7 @@ import "react-datepicker/dist/react-datepicker.css";
 
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
 import { BANKS } from '../data/banks'; // ✅ Shared Bank Data
+import { THAI_PROVINCES } from '../data/ThaiProvinces'; // ✅ Import Provinces
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -33,7 +34,16 @@ function CheckoutPage() {
 
     // Form State
     const [formData, setFormData] = useState({ first_name: '', last_name: '', tel: '', email: '', address: '' });
+    const [province, setProvince] = useState(''); // ✅ Province State
     const [loading, setLoading] = useState(false);
+
+    // ✅ Auto-detect Province from Address
+    useEffect(() => {
+        if (formData.address) {
+            const found = THAI_PROVINCES.find(p => formData.address.includes(p));
+            if (found) setProvince(found);
+        }
+    }, [formData.address]);
 
     // Map State
     const [showMap, setShowMap] = useState(false);
@@ -100,9 +110,15 @@ function CheckoutPage() {
 
         // Validation for Transfer (QR or Bank)
         if (['QR', 'Bank'].includes(paymentMethod)) {
-            if (!file) return Swal.fire({ parse: 'error', title: 'กรุณาแนบสลิปโอนเงิน', confirmButtonColor: '#1a4d2e' });
-            if (!bankName) return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกธนาคาร', confirmButtonColor: '#1a4d2e' });
-            if (!accountNumber || accountNumber.length < 4) return Swal.fire({ icon: 'warning', title: 'ระบุเลขบัญชี 4 ตัวท้าย', confirmButtonColor: '#1a4d2e' });
+            if (!file) return Swal.fire({ icon: 'error', title: 'กรุณาแนบสลิปโอนเงิน', confirmButtonColor: '#1a4d2e' });
+            if (!bankName) return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกธนาคารที่โอน', confirmButtonColor: '#1a4d2e' });
+            
+            // ✅ Rule: Bank Transfer requires 10-digit Account Number
+            if (paymentMethod === 'Bank') {
+                if (!accountNumber || !/^\d{10}$/.test(accountNumber)) {
+                    return Swal.fire({ icon: 'warning', title: 'กรุณาระบุเลขบัญชี 10 หลัก (ตัวเลขเท่านั้น)', confirmButtonColor: '#1a4d2e' });
+                }
+            }
         }
 
         setLoading(true);
@@ -120,7 +136,8 @@ function CheckoutPage() {
                 items: cartItems.map(item => ({ id: item.id, quantity: item.quantity })),
                 customer: {
                     ...formData,
-                    name: `${formData.first_name} ${formData.last_name}`.trim()
+                    name: `${formData.first_name} ${formData.last_name}`.trim(),
+                    province: province // ✅ Send Province to Backend
                 },
                 paymentMethod: ['QR', 'Bank'].includes(paymentMethod) ? 'Transfer' : paymentMethod
             };
@@ -152,7 +169,7 @@ function CheckoutPage() {
                 text: ['QR', 'Bank'].includes(paymentMethod) ? 'เราได้รับหลักฐานการโอนเงินแล้ว' : 'ขอบคุณที่ใช้บริการ',
                 confirmButtonColor: '#1a4d2e'
             });
-            navigate('/order-history');
+            navigate('/tracking'); // ✅ ไปที่หน้ารออเดอร์ (Tracking Page) แทน
 
         } catch (error) {
             console.error(error);
@@ -195,6 +212,16 @@ function CheckoutPage() {
 
             if (data && data.display_name) {
                 setFormData(prev => ({ ...prev, address: data.display_name }));
+                
+                // ✅ Try to extract province from Nominatim data
+                if (data.address) {
+                   const state = data.address.state || data.address.province || data.address.city; // City for Bangkok
+                   if (state) {
+                       const found = THAI_PROVINCES.find(p => state.includes(p));
+                       if (found) setProvince(found);
+                   }
+                }
+
                 setShowMap(false);
                 Swal.fire({
                     icon: 'success',
@@ -272,6 +299,23 @@ function CheckoutPage() {
                                     <input name="email" value={formData.email} onChange={handleChange} required placeholder="อีเมล" className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e]" />
                                 </div>
                                 <textarea name="address" value={formData.address} onChange={handleChange} required placeholder="ที่อยู่จัดส่ง..." rows="3" className="w-full bg-gray-50 border-0 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#1a4d2e] resize-none"></textarea>
+                                
+                                {/* ✅ Province Selector (Auto-filled but editable) */}
+                                <div className="relative">
+                                    <select 
+                                        value={province} 
+                                        onChange={(e) => setProvince(e.target.value)}
+                                        className={`w-full p-4 rounded-xl font-bold outline-none appearance-none border-0 ${province ? 'bg-green-50 text-[#1a4d2e]' : 'bg-gray-50 text-gray-400'}`}
+                                    >
+                                        <option value="" disabled>-- จังหวัด (ระบุอัตโนมัติจากที่อยู่) --</option>
+                                        {THAI_PROVINCES.map(p => (
+                                            <option key={p} value={p}>{p}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                        ▼
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -399,14 +443,24 @@ function CheckoutPage() {
                                                 ))}
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-3 mb-4">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">เลขบัญชี (4 ตัวท้าย)</p>
-                                                    <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} maxLength={4} placeholder="XXXX" className="w-full bg-white border text-center font-bold text-gray-700 p-3 rounded-xl outline-none focus:ring-1 focus:ring-[#1a4d2e]" />
-                                                </div>
-                                                <div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                                {/* Account Number - Only for Bank Transfer */}
+                                                {paymentMethod === 'Bank' && (
+                                                    <div className="animate-in fade-in slide-in-from-left-2">
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">เลขบัญชี (10 หลัก)</p>
+                                                        <input 
+                                                            value={accountNumber} 
+                                                            onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))} 
+                                                            maxLength={10} 
+                                                            placeholder="XXXXXXXXXX" 
+                                                            className="w-full bg-white border text-center font-bold text-gray-700 p-3 rounded-xl outline-none focus:ring-1 focus:ring-[#1a4d2e] tracking-widest" 
+                                                        />
+                                                    </div>
+                                                )}
+                                                
+                                                <div className={paymentMethod === 'Bank' ? '' : 'sm:col-span-2'}>
                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">วัน/เวลาโอน</p>
-                                                    <DatePicker selected={transferDate} onChange={(d) => setTransferDate(d)} showTimeSelect timeFormat="HH:mm" dateFormat="dd/MM HH:mm" className="w-full bg-white border text-center font-bold text-gray-700 p-3 rounded-xl outline-none focus:ring-1 focus:ring-[#1a4d2e]" />
+                                                    <DatePicker selected={transferDate} onChange={(d) => setTransferDate(d)} showTimeSelect timeFormat="HH:mm" dateFormat="dd/MM/yyyy HH:mm" className="w-full bg-white border text-center font-bold text-gray-700 p-3 rounded-xl outline-none focus:ring-1 focus:ring-[#1a4d2e]" />
                                                 </div>
                                             </div>
 

@@ -180,6 +180,39 @@ class StockHistory(models.Model):
         return f"{self.product.title} - {self.change_quantity} ({self.action})"
 
 # ==========================================
+# 🎟️ Coupon System (New)
+# ==========================================
+class Coupon(models.Model):
+    DISCOUNT_TYPES = [
+        ('percent', 'Percentage (%)'),
+        ('fixed', 'Fixed Amount (THB)')
+    ]
+
+    code = models.CharField(max_length=50, unique=True, help_text="รหัสคูปอง (e.g. SALE50)")
+    discount_type = models.CharField(max_length=10, choices=DISCOUNT_TYPES, default='fixed')
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="มูลค่าส่วนลด")
+    min_spend = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="ยอดซื้อขั้นต่ำ")
+    
+    usage_limit = models.IntegerField(default=100, help_text="จำนวนสิทธิ์ทั้งหมด")
+    used_count = models.IntegerField(default=0, help_text="ใช้ไปแล้ว")
+    
+    start_date = models.DateTimeField(default=timezone.now)
+    end_date = models.DateTimeField()
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'coupons'
+        ordering = ['-end_date']
+
+    def __str__(self):
+        return f"{self.code} - {self.discount_value} ({self.discount_type})"
+
+    def is_valid(self):
+        now = timezone.now()
+        return self.active and self.start_date <= now <= self.end_date and self.used_count < self.usage_limit
+
+
+# ==========================================
 # 📦 Order System
 # ==========================================
 
@@ -216,15 +249,9 @@ class Order(models.Model):
     bank_name = models.CharField(max_length=100, null=True, blank=True)
     transfer_account_number = models.CharField(max_length=50, null=True, blank=True) # ✅ เลขบัญชีที่โอนเข้า
     
-    # ✅ New Fields for Payment Slip Verification
-    slip_image = models.ImageField(upload_to='slips/', null=True, blank=True)
-    payment_date = models.DateTimeField(null=True, blank=True)
-    
-    # ✅ Strict Payment Verification
-    transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    transfer_date = models.DateTimeField(null=True, blank=True)
-    bank_name = models.CharField(max_length=100, null=True, blank=True)
-    transfer_account_number = models.CharField(max_length=50, null=True, blank=True) # ✅ New Field
+    # ✅ Coupon Usage
+    coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
