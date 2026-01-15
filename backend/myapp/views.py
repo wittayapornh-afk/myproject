@@ -757,7 +757,12 @@ def login_api(request):
     password = request.data.get('password')
     
     user = authenticate(username=username, password=password)
+    
     if user:
+        # ✅ Strict Case-Sensitive Check
+        if user.username != username:
+            return Response({"error": "ชื่อผู้ใช้งานหรือรหัสผ่าน ไม่ถูกต้อง"}, status=400)
+
         if not user.is_active:
              return Response({"error": "Account disabled"}, status=403)
              
@@ -775,7 +780,7 @@ def login_api(request):
             "address": user.address,
             "avatar": user.image.url if user.image else ""
         })
-    return Response({"error": "Invalid credentials"}, status=400)
+    return Response({"error": "ชื่อผู้ใช้งานหรือรหัสผ่าน ไม่ถูกต้อง"}, status=400)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

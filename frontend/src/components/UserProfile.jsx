@@ -99,13 +99,41 @@ function UserProfile() {
       return;
     }
 
-    setFormData(prev => ({ ...prev, [name]: value }));
-
-    if (name === 'username' && isEditing) {
-      // Debounce check
-      const timeoutId = setTimeout(() => checkUsername(value), 500);
-      return () => clearTimeout(timeoutId);
+    // Restriction for Name (No special chars, allow letters & spaces)
+    if (name === 'first_name' || name === 'last_name') {
+      // Regex: Allow Thai/English letters, spaces. Disallow special chars like !@#$%^&*()
+      const restrictedValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F\s]/g, '');
+      setFormData(prev => ({ ...prev, [name]: restrictedValue }));
+      return;
     }
+
+    // Restriction for Username (Allow alphanumeric only)
+    if (name === 'username') {
+      const restrictedValue = value.replace(/[^a-zA-Z0-9]/g, '');
+      setFormData(prev => ({ ...prev, [name]: restrictedValue }));
+
+      if (restrictedValue && isEditing) {
+        const timeoutId = setTimeout(() => checkUsername(restrictedValue), 500);
+        return () => clearTimeout(timeoutId);
+      }
+      return;
+    }
+
+    // Restriction for Address (Letters, Numbers, Spaces, and specific symbols: - _ / . , () [])
+    if (name === 'address') {
+      const restrictedValue = value.replace(/[^a-zA-Z0-9\u0E00-\u0E7F\s\-\_\/\.\,\(\)\[\]]/g, '');
+      setFormData(prev => ({ ...prev, [name]: restrictedValue }));
+      return;
+    }
+
+    // Restriction for Email (a-z, 0-9, ., @)
+    if (name === 'email') {
+      const restrictedValue = value.replace(/[^a-zA-Z0-9.@]/g, '');
+      setFormData(prev => ({ ...prev, [name]: restrictedValue }));
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async (e) => {
@@ -396,7 +424,7 @@ function UserProfile() {
                 <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">อีเมล (Email)</label>
                 <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
                   <Mail size={20} className="text-gray-400 group-focus-within:text-[#1a4d2e]" />
-                  <input type="email" name="email" value={formData.email} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" />
+                  <input type="text" name="email" value={formData.email} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 placeholder-gray-300" />
                 </div>
               </div>
             </div>
@@ -520,7 +548,19 @@ function UserProfile() {
                 </button>
               ) : (
                 <>
-                  <button type="button" onClick={() => { setIsEditing(false); setPreviewImage(null); }} className="px-8 py-4 bg-white text-gray-600 border border-gray-200 rounded-2xl font-bold hover:bg-gray-50 transition-colors">
+                  <button type="button" onClick={() => {
+                    setIsEditing(false);
+                    setPreviewImage(null);
+                    // Reset form data to original user values
+                    setFormData({
+                      username: user.username || '',
+                      first_name: user.first_name || '',
+                      last_name: user.last_name || '',
+                      email: user.email || '',
+                      phone: user.phone || '',
+                      address: user.address || ''
+                    });
+                  }} className="px-8 py-4 bg-white text-gray-600 border border-gray-200 rounded-2xl font-bold hover:bg-gray-50 transition-colors">
                     ยกเลิก
                   </button>
                   <button type="submit" disabled={loading} className={`px-10 py-4 rounded-2xl font-black tracking-wide transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 active:scale-95 flex items-center gap-2 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1a4d2e] text-white hover:bg-[#143d24]'}`}>
