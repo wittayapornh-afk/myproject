@@ -205,7 +205,7 @@ export default function UserListAdmin() {
     if (result.isConfirmed) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`http://localhost:8000/api/admin/users/${user.id}/delete/`, {
+        await axios.delete(`http://localhost:8000/api/admin/user/${user.id}/delete/`, {
           headers: { Authorization: `Token ${token}` }
         });
         Swal.fire('ลบสำเร็จ!', 'ผู้ใช้งานถูกลบออกจากระบบแล้ว', 'success');

@@ -93,6 +93,13 @@ function RegisterPage() {
       setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
       return;
     }
+
+    if (name === 'email') {
+      // Allow only a-z, 0-9, ., @
+      const sanitizedValue = value.toLowerCase().replace(/[^a-z0-9.@]/g, '');
+      setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
+      return;
+    }
   };
 
   const handleFileChange = (e) => {
