@@ -12,12 +12,19 @@ import axios from 'axios';
 axios.interceptors.response.use(
   response => response,
   error => {
-    // แสดงรายละเอียด Error ลงใน Console ของ Browser
-    console.group('%c🚨 API ERROR DETECTED', 'color: red; font-size: 14px; font-weight: bold;');
-    console.log(`❌ URL: ${error.config?.url}`);
-    console.log(`❌ Method: ${error.config?.method?.toUpperCase()}`);
-    console.log(`❌ Status: ${error.response?.status || 'Unknown'}`);
-    console.log(`❌ Message:`, error.response?.data || error.message);
+    // 🧹 Clean Error Logging (Concise)
+    const url = error.config?.url;
+    const status = error.response?.status || 'Unknown';
+    let message = error.response?.data || error.message;
+
+    // Fix: Avoid dumping large HTML
+    if (typeof message === 'string' && message.includes('<!DOCTYPE html>')) {
+        message = 'Server returned HTML Page (likely 500/404 Error)';
+    }
+
+    console.groupCollapsed(`%c🚨 API Error: ${status} @ ${url}`, 'color: red; font-weight: bold;');
+    console.log(`Method: ${error.config?.method?.toUpperCase()}`);
+    console.log(`Message:`, message);
     console.groupEnd();
     
     return Promise.reject(error);

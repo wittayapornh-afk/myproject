@@ -22,6 +22,60 @@ const BANKS = [
     { code: 'BAY', name: 'กรุงศรี', color: '#fec43b', border: 'border-[#fec43b]', logo: 'https://raw.githubusercontent.com/casperstack/thai-banks-logo/master/icons/BAY.png' },
 ];
 
+const DatePickerStyles = () => (
+    <style>{`
+        .react-datepicker {
+            font-family: 'Inter', sans-serif;
+            border-radius: 2rem;
+            border: none;
+            box-shadow: 0 25px 50px -12px rgba(22, 101, 52, 0.2);
+            background: white;
+            overflow: hidden;
+            border: 1px solid rgba(22, 101, 52, 0.1);
+        }
+        .react-datepicker__header {
+            background: linear-gradient(135deg, #1a4d2e 0%, #143d24 100%);
+            border-bottom: none;
+            padding: 1rem 0;
+        }
+        .react-datepicker__current-month, .react-datepicker__day-name {
+            color: white;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 0.75rem;
+        }
+        .react-datepicker__day {
+            color: #374151;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .react-datepicker__day:hover {
+            background-color: #f0fdf4 !important;
+            color: #166534 !important;
+            border-radius: 0.5rem;
+        }
+        .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
+            background: #1a4d2e !important;
+            color: white !important;
+            border-radius: 0.5rem;
+        }
+        .react-datepicker__time-container {
+            border-left: 1px solid #f0fdf4 !important;
+        }
+        .react-datepicker__time-header {
+            color: #1a4d2e !important;
+            font-weight: 800 !important;
+        }
+        .react-datepicker__time-list-item--selected {
+            background: #1a4d2e !important;
+        }
+        .react-datepicker__day--outside-month {
+            color: #e5e7eb !important;
+        }
+    `}</style>
+);
+
 export default function PaymentModal({ isOpen, onClose, orderId, onSuccess, orderTotal, promptPayPayload }) {
     const { token } = useAuth();
     const [file, setFile] = useState(null);
@@ -119,6 +173,7 @@ export default function PaymentModal({ isOpen, onClose, orderId, onSuccess, orde
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <DatePickerStyles />
             <div className="bg-white p-0 rounded-3xl shadow-2xl w-full max-w-5xl relative mx-4 flex flex-col md:flex-row overflow-hidden animate-in zoom-in-95 duration-200 h-[90vh] md:h-auto">
                 
                 {/* ❌ Close Button */}

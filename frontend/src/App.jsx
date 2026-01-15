@@ -11,8 +11,7 @@ import CheckoutPage from './components/CheckoutPage';
 import PaymentPage from './components/PaymentPage';
 import OrderHistory from './components/OrderHistory';
 import UserProfile from './components/UserProfile';
-import WishlistPage from './components/WishlistPage';
-import LoginPage from './components/LoginPage';
+import LoginPage from './components/LoginPage'; // ✅ Import LoginPage
 import RegisterPage from './components/RegisterPage';
 import ForgotPassword from './components/ForgotPassword'; // ✅ Import ForgotPassword
 import ResetPassword from './components/ResetPassword'; // ✅ Import ResetPassword
@@ -28,11 +27,12 @@ import OrderListAdmin from './components/OrderListAdmin';
 import UserListAdmin from './components/UserListAdmin';
 import AdminLayout from './components/AdminLayout'; // ✅ Layout Wrapper
 import AdminSidebar from './components/AdminSidebar'; // ✅ Global Sidebar
+import CouponManagement from './components/CouponManagement'; // ✅ Coupon Management
+import FlashSaleManagement from './components/FlashSaleManagement'; // ✅ Flash Sale Management
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { SearchProvider } from './context/SearchContext';
-import { WishlistProvider } from './context/WishlistContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 
@@ -60,26 +60,18 @@ const AppContent = () => {
         <AdminSidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
       )}
 
-      {/* ✅ Rule 2, 5: Navbar ต้องอยู่บนสุดและ Fixed */}
-      {/* ✅ Fix: Navbar อยู่นอก Wrapper เพื่อไม่ให้ขยับตาม Sidebar */}
+      {/* ✅ Navbar: Show Always (z-index managed via CSS) */}
       <Navbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
-      {/* Content Wrapper */}
-      <div className={`flex flex-col min-h-screen transition-all duration-300 ${showSidebar && isSidebarOpen ? 'md:ml-64' : ''}`}>
 
-        {/* ✅ Toggle Button for Global Sidebar (When Closed) - Backup Button */}
-        {showSidebar && !isSidebarOpen && (
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="fixed top-24 left-4 z-[90] p-2 bg-white rounded-xl shadow-md text-[#1a4d2e] hover:bg-green-50 transition-all border border-gray-100 md:hidden"
-          >
-            <Menu size={24} />
-          </button>
-        )}
+      {/* Content Wrapper */}
+      <div className={`flex flex-col min-h-screen transition-all duration-300 ease-in-out ${showSidebar && isSidebarOpen ? 'md:ml-[300px]' : 'md:ml-[100px]'}`}>
+
+        {/* ✅ Toggle Button handled in Sidebar/Navbar now */}
 
 
         {/* เนื้อหาหลัก - pt-20 เพื่อให้พ้นระยะความสูงของ Navbar */}
-        <main className="flex-grow pt-20 md:pt-24">
+        <main className="flex-grow pt-20 md:pt-24 h-full">
           <PageTransition>
             <Routes>
 
@@ -92,7 +84,7 @@ const AppContent = () => {
               <Route path="/product/:id" element={<ProductDetail />} />
 
               <Route path="/cart" element={<CartPage />} />
-              <Route path="/wishlist" element={<WishlistPage />} />
+              <Route path="/cart" element={<CartPage />} />
 
               {/* --- 🔐 Auth Routes (ยังไม่ Login เท่านั้น) --- */}
               <Route path="/login" element={
@@ -156,6 +148,8 @@ const AppContent = () => {
                 <Route path="/admin/product/edit/:id" element={<ProductEdit />} />
                 <Route path="/admin/orders" element={<OrderListAdmin />} />
                 <Route path="/admin/users" element={<UserListAdmin />} />
+                <Route path="/admin/coupons" element={<CouponManagement />} />
+                <Route path="/admin/flash-sales" element={<FlashSaleManagement />} />
               </Route>
 
               {/* --- 🏜️ 404 Route (Rule 29) --- */}
@@ -184,11 +178,9 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <WishlistProvider>
-          <SearchProvider>
-            <AppContent />
-          </SearchProvider>
-        </WishlistProvider>
+        <SearchProvider>
+          <AppContent />
+        </SearchProvider>
       </CartProvider>
     </AuthProvider>
   );

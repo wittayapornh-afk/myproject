@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from myapp import views # Import views ตัวเดียวพอ
+from myapp import views
 from myapp.views import DashboardStatsView
 
 urlpatterns = [
@@ -35,12 +35,22 @@ urlpatterns = [
     # ==============================
     # 📦 Order APIs (ลูกค้าสั่งซื้อ)
     # ==============================
-    path('api/checkout/', views.checkout_api),     # ✅ เพิ่มให้ใน views แล้ว
+    path('api/checkout/', views.create_order),     # ✅ Updated to use create_order
     path('api/orders/', views.my_orders_api),      # ✅ เพิ่มให้ใน views แล้ว
+
+    # ==============================
+    # 🎟️ Coupon & Flash Sale APIs
+    # ==============================
+    path('api/coupons/validate/', views.validate_coupon_api),
+    path('api/flash-sales/active/', views.get_active_flash_sales_api),
+    path('api/admin/coupons/', views.admin_coupon_api),
+    path('api/admin/coupons/<int:coupon_id>/', views.admin_coupon_api),
+    path('api/admin/flash-sales/', views.admin_flash_sale_api),
+    path('api/admin/flash-sales/<int:fs_id>/', views.admin_flash_sale_api),
     path('api/orders/<int:order_id>/confirm-received/', views.confirm_received_api), # ✅ Confirm Received
     path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
     path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
-    path('api/payment/promptpay_payload/', views.get_promptpay_payload), # ✅ Helper for Checkout UI
+    path('api/payment/promptpay_payload/', views.generate_promptpay_qr_api), # ✅ Helper for Checkout UI
     
     # ==============================
     # 🔔 Notification API
@@ -64,9 +74,14 @@ urlpatterns = [
 
 
     # 3. จัดการออเดอร์ (Admin)
-    path('api/admin/orders_v2/', views.get_admin_orders), 
-    path('api/admin/orders/bulk-update/', views.bulk_update_orders_api), # ✅ Bulk Update
+    path('api/admin/orders_v2/', views.admin_orders_api_v4), # ✅ Point to V4 (Fixed View)
+    path('api/admin/orders/bulk-update/', views.bulk_update_orders_api),
     path('api/admin/order_status/<int:order_id>/', views.update_order_status_api),
+    path('api/admin/order/<int:order_id>/delete/', views.delete_order_api),
+    
+    # ✅ Missing Paths from User Reports
+    path('api/coupons-public/', views.get_public_coupons),
+    path('api/orders/create/', views.create_order), # Alternate path for Checkout
 
     # 4. จัดการผู้ใช้งาน (Admin)
     path('api/admin/users/', views.get_all_users),  # ✅ Fix 404

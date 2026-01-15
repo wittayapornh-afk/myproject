@@ -22,9 +22,15 @@ urlpatterns = [
 
     # --- Admin Dashboard Lists ---
     path('api/admin/products/', views.admin_products_list, name='admin_products_list'),
+    path('api/public/products-dropdown/', views.get_all_products_simple, name='get_all_products_simple'), # ✅ Renamed to Public
     
     # ✅ แก้ไข 1: เพิ่ม api/ ให้ลิงก์นี้
-    path('api/admin/orders/', views.admin_orders_list, name='admin_orders'), 
+    # --- Admin Orders ---
+
+    path('api/admin/orders/', views.get_admin_orders, name='admin_orders'), 
+    path('api/admin/orders_v2/', views.admin_orders_api_v4, name='admin_orders_v2'), # ✅ Added v2
+    path('api/admin/orders/bulk-update/', views.bulk_update_orders_api, name='bulk_update_orders'),
+    path('api/admin/order/<int:order_id>/delete/', views.delete_order_api, name='delete_order'), 
 
     # --- Products (สินค้า) ---
     path('api/products/', views.products_api, name='products_api'),
@@ -43,6 +49,8 @@ urlpatterns = [
     # --- Orders & Checkout (สั่งซื้อ) ---
     # ✅ แก้ไข 2: เพิ่ม api/ ให้ลิงก์ checkout (สำคัญมาก!)
     path('api/checkout/', views.checkout_api, name='checkout'), 
+    path('api/upload_slip/<int:order_id>/', views.upload_slip_api, name='upload_slip'), 
+    path('api/payment/promptpay_payload/', views.generate_promptpay_qr_api, name='promptpay_payload'), # ✅ Renamed to avoid alias conflict
     
     path('api/orders/create/', views.create_order, name='create_order'),
     path('api/orders/<int:order_id>/update/', views.update_order_status, name='update_order'),
@@ -53,7 +61,18 @@ urlpatterns = [
 
     # --- Admin Stats & Logs ---
     path('api/admin-stats/', views.get_admin_stats, name='admin_stats_api'),
-    path('api/admin-logs/', views.get_admin_logs, name='get_admin_logs'),
+    path('api/admin/logs/', views.get_admin_logs, name='get_admin_logs'),
+
+    # --- Flash Sales ---
+    path('api/admin/flash-sales/', views.admin_flash_sale_api, name='admin_flash_sale'),
+    path('api/admin/flash-sales/<int:fs_id>/', views.admin_flash_sale_api, name='admin_flash_sale_detail'),
+    path('api/flash-sales/active/', views.get_active_flash_sales_api, name='active_flash_sales'),
+
+    # --- Coupons ---
+    path('api/admin/coupons/', views.admin_coupon_api, name='admin_coupon'),
+    path('api/admin/coupons/<int:coupon_id>/', views.admin_coupon_api, name='admin_coupon_detail'),
+    path('api/coupons/validate/', views.validate_coupon_api, name='validate_coupon'),
+    path('api/coupons-public/', views.get_public_coupons, name='public_coupons'),
     
     # --- Django Admin ---
     path('admin/', admin.site.urls),

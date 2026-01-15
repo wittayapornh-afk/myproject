@@ -39,6 +39,16 @@ function OrderHistory() {
             setOrders(response.data);
         } catch (error) {
             console.error("Fetch Orders Error:", error);
+            if (error.response && error.response.status === 401) {
+                 Swal.fire({
+                    title: 'Session หมดอายุ',
+                    text: 'กรุณาเข้าสู่ระบบใหม่เพื่อดูประวัติคำสั่งซื้อ',
+                    icon: 'warning',
+                    confirmButtonText: 'ไปหน้า Login'
+                }).then(() => {
+                    window.location.href = '/login';
+                });
+            }
         } finally {
             setLoading(false);
         }

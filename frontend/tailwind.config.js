@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Poppins"', 'sans-serif'],
+        sans: ['"Prompt"', '"Sarabun"', 'sans-serif'],
       },
       colors: {
         // ชุดสีจากรูปภาพ Nature Green

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Prompt:wght@300;400;500;600;700;800;900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Prompt:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -7,8 +7,16 @@
 body {
   background-color: #f2f0e4; /* สีครีม */
   color: #2c3e50;
-  font-family: "Prompt", "Outfit", sans-serif; /* ✅ Primary Font: Prompt (Thai), Secondary: Outfit (Eng) */
+  font-family: "Sarabun", "Prompt", sans-serif; /* ✅ Body: Sarabun (Readable) */
+  font-weight: 400; /* ✅ Regular Weight by default */
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ✅ Titles: Prompt (Modern) - Reduced boldness */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Prompt", sans-serif;
+  font-weight: 600; /* Max bold */
 }
 
 /* Custom Scrollbar */
@@ -104,7 +112,9 @@ body {
   float: none !important;
 }
 
-.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box {
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box {
   @apply w-full rounded-br-[1.5rem] !important;
 }
 
@@ -113,11 +123,19 @@ body {
 }
 
 /* Selected Time */
-.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--selected {
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box
+  ul.react-datepicker__time-list
+  li.react-datepicker__time-list-item--selected {
   @apply bg-[#1a4d2e] text-white font-black !important;
 }
 
-.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--selected:hover {
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box
+  ul.react-datepicker__time-list
+  li.react-datepicker__time-list-item--selected:hover {
   @apply bg-[#143d24] !important;
 }
 

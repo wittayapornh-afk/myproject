@@ -103,8 +103,10 @@ class Tag(models.Model):
     def __str__(self):
         return self.name
 
+from .validators import validate_product_name
+
 class Product(models.Model):
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, validators=[validate_product_name])
     description = models.TextField()
     
     # ✅ Change from CharField to ForeignKey
@@ -200,6 +202,8 @@ class Coupon(models.Model):
     end_date = models.DateTimeField()
     active = models.BooleanField(default=True)
 
+    max_use_per_user = models.IntegerField(default=1, help_text="จำกัดสิทธิ์ต่อคน")
+    
     class Meta:
         db_table = 'coupons'
         ordering = ['-end_date']
@@ -207,9 +211,63 @@ class Coupon(models.Model):
     def __str__(self):
         return f"{self.code} - {self.discount_value} ({self.discount_type})"
 
-    def is_valid(self):
+    def is_valid(self, user=None):
         now = timezone.now()
-        return self.active and self.start_date <= now <= self.end_date and self.used_count < self.usage_limit
+        is_active = self.active and self.start_date <= now <= self.end_date and self.used_count < self.usage_limit
+        if not is_active:
+            return False
+            
+        if user:
+            # Check user usage history
+            user_usage = Order.objects.filter(user=user, coupon=self).count()
+            if user_usage >= self.max_use_per_user:
+                return False
+        return True
+
+# ==========================================
+# ⚡ Flash Sale System (New)
+# ==========================================
+class FlashSale(models.Model):
+    name = models.CharField(max_length=100)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        db_table = 'flash_sales'
+        ordering = ['-start_time']
+
+    def __str__(self):
+        return f"{self.name} ({self.start_time} - {self.end_time})"
+
+    @property
+    def status(self):
+        now = timezone.now()
+        if not self.is_active:
+            return 'Inactive'
+        if now < self.start_time:
+            return 'Upcoming'
+        elif self.start_time <= now <= self.end_time:
+            return 'Live'
+        else:
+            return 'Ended'
+
+class FlashSaleProduct(models.Model):
+    flash_sale = models.ForeignKey(FlashSale, on_delete=models.CASCADE, related_name='products')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='flash_sales') # Allows reverse check
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity_limit = models.IntegerField(default=10, help_text="จำนวนสินค้าที่จัดโปร")
+    sold_count = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'flash_sale_products'
+        unique_together = ('flash_sale', 'product')
+
+    def __str__(self):
+        return f"{self.product.title} @ {self.sale_price}"
+
+    def is_available(self):
+        return self.sold_count < self.quantity_limit and self.flash_sale.status == 'Live'
 
 
 # ==========================================

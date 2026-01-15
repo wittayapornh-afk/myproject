@@ -2,14 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import HeroBanner from './HeroBanner';
 import CategoryRow from './CategoryRow';
-import { ArrowRight, Star, Truck, ShieldCheck, RefreshCw, CreditCard } from 'lucide-react'; // ✅ Import Icons
+import { ArrowRight, Star, Truck, ShieldCheck, RefreshCw, CreditCard, Rocket, RotateCcw, Headphones } from 'lucide-react'; // ✅ Import Icons
 import Swal from 'sweetalert2';
 import { Link } from 'react-router-dom';
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
+import MarketingPopup from './MarketingPopup'; // ✅ Import Popup
+import FlashSaleSection from './FlashSaleSection'; // ✅ Import Flash Sale
+import axios from 'axios';
+import { API_BASE_URL } from '../config';
 
 const HomePage = () => {
     const [newArrivals, setNewArrivals] = useState([]);
     const [recentlyViewed, setRecentlyViewed] = useState([]);
+    const [activeFlashSale, setActiveFlashSale] = useState(null); // ✅ Flash Sale State
 
     // Load Recently Viewed from localStorage
     useEffect(() => {
@@ -23,18 +28,60 @@ const HomePage = () => {
         }
     }, []);
 
-    // Fetch New Arrivals (Latest 4 products)
+    // ✅ Fetch New Arrivals & Flash Sales
     useEffect(() => {
-        fetch('/api/products/?page_size=8') 
-            .then(res => res.json())
-            .then(data => {
+        const fetchData = async () => {
+             // 1. Products
+             try {
+                const res = await fetch(`${API_BASE_URL}/api/products/?page_size=8`);
+                const data = await res.json();
                 const items = data.results || data;
                 if (Array.isArray(items)) {
-                    setNewArrivals(items.slice(0, 8)); // Show 8 items
+                    setNewArrivals(items.slice(0, 8)); 
                 }
-            })
-            .catch(err => console.error(err));
+             } catch(err) { console.error("Products fetch error:", err); }
+
+             // 2. Flash Sales
+             try {
+                 const fsRes = await axios.get(`${API_BASE_URL}/api/flash-sales/active/`);
+                 if (fsRes.data && fsRes.data.length > 0) {
+                     setActiveFlashSale(fsRes.data[0]); // Get first active one
+                 }
+             } catch (err) { console.error("Flash Sale fetch error:", err); }
+        };
+        fetchData();
     }, []);
+
+    // ✅ Artificial "Premium" Loading
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        // Enforce a minimum stunning load time of 0.8s
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 800);
+        return () => clearTimeout(timer);
+    }, []);
+
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 z-[9999] bg-[#F9F9F7] flex flex-col items-center justify-center">
+                <div className="relative mb-8">
+                    {/* Spinning Outer Ring */}
+                    <div className="w-24 h-24 border-4 border-[#1a4d2e]/10 border-t-[#1a4d2e] rounded-full animate-spin"></div>
+                    {/* Inner Pulse */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-12 h-12 bg-[#1a4d2e] rounded-full animate-pulse shadow-[0_0_30px_rgba(26,77,46,0.3)]"></div>
+                    </div>
+                </div>
+                {/* Text Animation */}
+                <h1 className="text-2xl font-black text-[#263A33] tracking-[0.2em] animate-pulse">
+                    SHOP<span className="text-[#1a4d2e]">.</span>
+                </h1>
+                <p className="text-xs text-gray-400 mt-2 font-medium tracking-widest uppercase">Loading Experience</p>
+            </div>
+        );
+    }
 
     // ✅ Functional Info Bar Handler
     const handleInfoClick = (title, desc, detail) => {
@@ -61,6 +108,9 @@ const HomePage = () => {
 
     return (
         <div className="min-h-screen bg-[#F9F9F7] pb-20">
+            {/* ✅ Marketing Popup */}
+            <MarketingPopup />
+
             {/* Hero Section */}
             <HeroBanner />
 
@@ -68,44 +118,17 @@ const HomePage = () => {
             <div className="max-w-6xl mx-auto px-6 relative z-20 -mt-16 mb-20">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white/90 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.08)] border border-white/60">
                     {[
-                        { 
-                            icon: <Truck size={32} strokeWidth={1.5} />, 
-                            title: "จัดส่งไว 1-3 วัน", 
-                            desc: "ได้รับสินค้าแน่นอน",
-                            detail: "เราจัดส่งด้วยขนส่งเอกชนชั้นนำ (Kerry/Flash) มั่นใจได้ว่าสินค้าจะถึงมือคุณภายใน 1-3 วันทำการ พร้อมเลข Tracking ติดตามสถานะ"
-                        },
-                        { 
-                            icon: <RefreshCw size={32} strokeWidth={1.5} />, 
-                            title: "เปลี่ยนคืนสินค้าง่าย", 
-                            desc: "ภายใน 7 วัน",
-                            detail: "หากสินค้ามีปัญหาหรือไม่พอใจ สามารถเปลี่ยนหรือคืนสินค้าได้ภายใน 7 วัน (ตามเงื่อนไขที่กำหนด) เพื่อความสบายใจของคุณ"
-                        },
-                        { 
-                            icon: <ShieldCheck size={32} strokeWidth={1.5} />, 
-                            title: "ประกันศูนย์แท้", 
-                            desc: "สินค้าลิขสิทธิ์ 100%",
-                            detail: "สินค้าทุกชิ้นเป็นของแท้ 100% รับประกันศูนย์ไทย มั่นใจได้ในคุณภาพและการบริการหลังการขายที่ได้มาตรฐาน"
-                        },
-                        { 
-                            icon: <CreditCard size={32} strokeWidth={1.5} />, 
-                            title: "ผ่อน 0% สูงสุด 10 ด.", 
-                            desc: "บัตรเครดิตที่ร่วมรายการ",
-                            detail: "ช้อปสบายกระเป๋า! ผ่อน 0% นานสูงสุด 10 เดือน กับบัตรเครดิตธนาคารชั้นนำ (กสิกร, ไทยพาณิชย์, กรุงศรี และอื่นๆ)"
-                        },
+                        { icon: Rocket, title: "ฟรีค่าจัดส่ง", desc: "เมื่อช้อปครบ ฿900" },
+                        { icon: ShieldCheck, title: "รับประกันของแท้", desc: "ตรวจสอบอย่างละเอียด" },
+                        { icon: RotateCcw, title: "คืนสินค้าฟรี", desc: "ภายใน 30 วัน" },
+                        { icon: Headphones, title: "ดูแลลูกค้า 24/7", desc: "ทีมงานพร้อมช่วยเหลือ" }
                     ].map((feature, idx) => (
-                        <div 
-                            key={idx} 
-                            onClick={() => handleInfoClick(feature.title, feature.desc, feature.detail)}
-                            className="flex flex-col items-center text-center group cursor-pointer transition-all duration-300 hover:-translate-y-2"
-                        >
-                            <div className="w-16 h-16 mb-4 bg-gradient-to-br from-[#F5F7F6] to-[#E8ECEB] rounded-2xl flex items-center justify-center text-[#1a4d2e] group-hover:from-[#1a4d2e] group-hover:to-[#143d23] group-hover:text-white transition-all duration-500 shadow-sm group-hover:shadow-[0_10px_30px_rgba(26,77,46,0.3)] relative overflow-hidden">
-                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 rounded-2xl"></div>
-                                <div className="relative z-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-                                    {feature.icon}
-                                </div>
+                        <div key={idx} className="flex flex-col items-center text-center p-6 rounded-3xl hover:bg-gray-50/80 transition-all cursor-crosshair group">
+                            <div className="mb-4 text-[#1a4d2e] opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">
+                                <feature.icon size={32} strokeWidth={1.5} />
                             </div>
-                            <h3 className="font-bold text-[#263A33] text-sm md:text-lg group-hover:text-[#1a4d2e] transition-colors">{feature.title}</h3>
-                            <p className="text-gray-400 text-xs md:text-sm mt-1 group-hover:text-gray-500 font-light">{feature.desc}</p>
+                            <h3 className="font-bold text-[#263A33] text-lg mb-1">{feature.title}</h3>
+                            <p className="text-gray-400 text-sm font-medium">{feature.desc}</p>
                         </div>
                     ))}
                 </div>

@@ -192,7 +192,15 @@ function ProductEdit() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Price (THB)</label>
-                    <input type="number" name="price" value={formData.price} onChange={handleChange} className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#1a4d2e]/20 font-black text-[#1a4d2e]" required />
+                    <input 
+                        type="number" 
+                        name="price" 
+                        value={formData.price} 
+                        onChange={handleChange} 
+                        onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                        className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#1a4d2e]/20 font-black text-[#1a4d2e]" 
+                        required 
+                    />
                 </div>
                 <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Category</label>
@@ -207,7 +215,15 @@ function ProductEdit() {
                 </div>
                 <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Stock Units</label>
-                    <input type="number" name="stock" value={formData.stock} onChange={handleChange} className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#1a4d2e]/20 font-bold text-gray-700" required />
+                    <input 
+                        type="number" 
+                        name="stock" 
+                        value={formData.stock} 
+                        onChange={handleChange} 
+                        onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                        className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#1a4d2e]/20 font-bold text-gray-700" 
+                        required 
+                    />
                 </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 const AuthContext = createContext();
 
@@ -10,12 +11,19 @@ export const AuthProvider = ({ children }) => {
     });
     // ✅ Init token from localStorage
     const [token, setToken] = useState(() => localStorage.getItem('token'));
-    // If token exists, start loading. If not, no need to load.
-    const [loading, setLoading] = useState(() => !!localStorage.getItem('token'));
+    
+    // ✅ Optimistic Loading: If we have a cached user, don't block UI (loading=false)
+    // Only block if we have a token but NO user (first load after clear cache or weird state)
+    const [loading, setLoading] = useState(() => {
+        const hasToken = !!localStorage.getItem('token');
+        const hasUser = !!localStorage.getItem('user');
+        return hasToken && !hasUser; 
+    });
+
     const [lastApiStatus, setLastApiStatus] = useState(null); // 🔍 Debug
 
     // ✅ Rule: Backend Port 8000
-    const API_BASE_URL = "http://localhost:8000";
+    // const API_BASE_URL = "http://localhost:8000"; // Moved to config.js
 
     // const getToken = () => localStorage.getItem('token'); // ❌ Deprecated
 
@@ -50,12 +58,9 @@ export const AuthProvider = ({ children }) => {
                 setUser(userData);
                 localStorage.setItem('user', JSON.stringify(userData)); // ✅ Save up-to-date user
             } else {
-                // ✅ Rule: Only logout if token is explicitly invalid (401)
-                if (response.status === 401) {
-                    console.error("Session expired (401). Keeping token for retry.");
-                } else {
-                    console.warn(`Failed to fetch profile (Status: ${response.status}). Keeping session.`);
-                }
+                // ✅ Soft Fail: If network glitch or 401, don't auto-logout immediately on refresh.
+                // Just keep the cached user if we have one. Login page will handle real Auth blocks.
+                console.warn(`Profile sync failed (${response.status}). Using cached session.`);
             }
         } catch (error) {
             console.error("Error fetching user:", error);

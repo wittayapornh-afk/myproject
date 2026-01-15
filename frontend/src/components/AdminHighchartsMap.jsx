@@ -357,21 +357,44 @@ const AdminHighchartsMap = ({ provinceData, categories, onCategoryChange }) => {
                     <p className="text-xs text-gray-400 mt-1">แสดงข้อมูล{metric === 'sales' ? 'ยอดขาย (บาท)' : 'จำนวนออเดอร์ (ครั้ง)'} แยกตามพื้นที่</p>
                 </div>
 
-                <div className="flex bg-gray-100 p-1 rounded-xl items-center gap-2">
+                <div className="flex bg-gray-100 p-1.5 rounded-2xl items-center gap-1">
                     {/* ✅ Category Filter */}
-                    <select 
-                        className="bg-white text-xs font-bold text-gray-700 py-1.5 px-3 rounded-lg border border-gray-200 outline-none focus:border-[#1a4d2e] cursor-pointer"
-                        onChange={(e) => onCategoryChange && onCategoryChange(e.target.value)}
-                        defaultValue="all"
-                    >
-                        <option value="all">ทุกหมวดหมู่</option>
-                        {categories && categories.map(cat => (
-                            <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                    </select>
+                    <div className="relative group">
+                        <select 
+                            className="appearance-none bg-white text-[10px] font-black text-gray-700 py-1.5 pl-3 pr-8 rounded-xl border-none outline-none focus:ring-0 cursor-pointer hover:bg-gray-50 transition-colors shadow-sm"
+                            onChange={(e) => onCategoryChange && onCategoryChange(e.target.value)}
+                            defaultValue="all"
+                        >
+                            <option value="all">ทุกหมวดหมู่</option>
+                            {categories && categories.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                           <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                        </div>
+                    </div>
+                    
                     <div className="w-[1px] h-4 bg-gray-300 mx-1"></div>
-                    <button onClick={() => setMetric('sales')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${metric === 'sales' ? 'bg-white text-[#1a4d2e] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>฿ ยอดขาย</button>
-                    <button onClick={() => setMetric('orders')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${metric === 'orders' ? 'bg-white text-[#1a4d2e] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>📦 ออเดอร์</button>
+                    
+                    <div className="w-[1px] h-8 bg-gray-200 mx-2"></div>
+                    
+                    <div className="flex bg-gray-100/50 p-1 rounded-xl gap-2">
+                        <button 
+                            onClick={() => setMetric('sales')} 
+                            className={`flex flex-col items-center justify-center w-16 py-1.5 rounded-xl transition-all border ${metric === 'sales' ? 'bg-white border-green-100 shadow-sm text-[#1a4d2e]' : 'border-transparent text-gray-400 hover:bg-white/50'}`}
+                        >
+                            <span className="text-sm font-black mb-0.5">฿</span>
+                            <span className="text-[9px] font-bold uppercase">ยอดขาย</span>
+                        </button>
+                        <button 
+                            onClick={() => setMetric('orders')} 
+                            className={`flex flex-col items-center justify-center w-16 py-1.5 rounded-xl transition-all border ${metric === 'orders' ? 'bg-white border-green-100 shadow-sm text-[#1a4d2e]' : 'border-transparent text-gray-400 hover:bg-white/50'}`}
+                        >
+                            <span className="text-sm font-black mb-0.5">📦</span>
+                            <span className="text-[9px] font-bold uppercase">ออเดอร์</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -383,7 +406,28 @@ const AdminHighchartsMap = ({ provinceData, categories, onCategoryChange }) => {
                         constructorType={'mapChart'}
                         options={{
                             ...mapOptions,
-                            exporting: { enabled: true }
+                            exporting: { 
+                                enabled: true,
+                                // Localize Menu Items
+                                menuItemDefinitions: {
+                                    downloadPNG: { text: 'ดาวน์โหลด PNG' },
+                                    downloadJPEG: { text: 'ดาวน์โหลด JPEG' },
+                                    downloadSVG: { text: 'ดาวน์โหลด SVG' },
+                                    printChart: { text: 'พิมพ์แผนภูมิ' },
+                                    viewFullscreen: { text: 'ดูเต็มหน้าจอ' }
+                                },
+                                buttons: {
+                                    contextButton: {
+                                        menuItems: [
+                                            'viewFullscreen',
+                                            'printChart',
+                                            'separator',
+                                            'downloadPNG',
+                                            'downloadJPEG'
+                                        ]
+                                    }
+                                }
+                            }
                         }}
                         ref={chartRef}
                     />

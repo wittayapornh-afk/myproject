@@ -45,8 +45,9 @@ function LoginPage() {
           iconColor: '#1a4d2e'
         });
 
-        const userRole = (userData.role || '').toLowerCase();
-        if (userRole === 'admin' || userRole === 'super_admin') {
+        const userRole = (userData.role || userData.role_code || '').toLowerCase();
+        // Check standard roles OR boolean flags if available
+        if (['admin', 'super_admin'].includes(userRole) || userData.is_superuser || userData.is_staff) {
           navigate('/admin/dashboard');
         } else {
           navigate('/');

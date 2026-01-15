@@ -132,12 +132,29 @@ function ProductAdd() {
                 {/* ข้อมูลพื้นฐาน */}
                 <div className="grid grid-cols-2 gap-6">
                     <div><label className={styles.label}>ชื่อสินค้า</label><input type="text" className={styles.input} onChange={e => setFormData({...formData, title: e.target.value})} required /></div>
-                    <div><label className={styles.label}>ราคา</label><input type="number" className={styles.input} onChange={e => setFormData({...formData, price: e.target.value})} required /></div>
+                    <div>
+                        <label className={styles.label}>ราคา</label>
+                        <input 
+                            type="number" 
+                            className={styles.input} 
+                            onChange={e => setFormData({...formData, price: e.target.value})} 
+                            onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                            required 
+                        />
+                    </div>
                 </div>
 
                 {/* จำนวน & หมวดหมู่ (Dropdown) */}
                 <div className="grid grid-cols-2 gap-6">
-                    <div><label className={styles.label}>จำนวน</label><input type="number" className={styles.input} onChange={e => setFormData({...formData, stock: e.target.value})} /></div>
+                    <div>
+                        <label className={styles.label}>จำนวน</label>
+                        <input 
+                            type="number" 
+                            className={styles.input} 
+                            onChange={e => setFormData({...formData, stock: e.target.value})} 
+                            onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                        />
+                    </div>
                     <div>
                         <label className={styles.label}>หมวดหมู่</label>
                         <select 
