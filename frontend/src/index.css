@@ -1,14 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Prompt:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  background-color: #F2F0E4; /* สีครีม */
-  color: #2C3E50;
-  font-family: 'Sarabun', 'Poppins', sans-serif;
+  background-color: #f2f0e4; /* สีครีม */
+  color: #2c3e50;
+  font-family: "Sarabun", "Prompt", sans-serif; /* ✅ Body: Sarabun (Readable) */
+  font-weight: 400; /* ✅ Regular Weight by default */
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ✅ Titles: Prompt (Modern) - Reduced boldness */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Prompt", sans-serif;
+  font-weight: 600; /* Max bold */
 }
 
 /* Custom Scrollbar */
@@ -16,7 +24,7 @@ body {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #F2F0E4;
+  background: #f2f0e4;
 }
 ::-webkit-scrollbar-thumb {
   background: #305949;
@@ -36,4 +44,118 @@ body {
 /* Label ให้ชัดขึ้น (สีเข้มขึ้น) */
 .label-text {
   @apply block text-xs font-bold text-gray-700 uppercase tracking-widest mb-2 ml-1;
+}
+
+/* =========================================
+   📅 Custom DatePicker Styles (Premium Green)
+   ========================================= */
+.react-datepicker {
+  @apply font-sans border-0 shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-[1.5rem] bg-white overflow-hidden !important;
+}
+
+.react-datepicker__header {
+  @apply bg-gradient-to-b from-[#1a4d2e] to-[#143d24] border-b-0 pt-4 pb-4 !important;
+}
+
+.react-datepicker__current-month {
+  @apply text-white font-black uppercase tracking-wider text-sm mb-2 !important;
+}
+
+.react-datepicker__day-name {
+  @apply text-emerald-200 font-bold w-10 !important;
+}
+
+.react-datepicker__day {
+  @apply w-10 h-10 leading-10 rounded-full font-medium text-gray-700 transition-all hover:bg-emerald-50 hover:text-[#1a4d2e] !important;
+}
+
+/* Selected Day */
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  @apply bg-[#1a4d2e] text-white font-bold shadow-md transform scale-110 !important;
+}
+
+.react-datepicker__day--selected:hover {
+  @apply bg-[#143d24] !important;
+}
+
+/* Today */
+.react-datepicker__day--today {
+  @apply font-black text-[#1a4d2e] border border-[#1a4d2e] bg-transparent !important;
+}
+
+/* Navigation Arrow */
+.react-datepicker__navigation-icon::before {
+  @apply border-white/80 border-r-2 border-t-2 !important;
+}
+
+.react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+  @apply border-white !important;
+}
+
+.react-datepicker__triangle {
+  @apply hidden !important; /* Hide triangle */
+}
+
+/* ⏰ Time Picker Customization */
+.react-datepicker {
+  @apply flex !important; /* ✅ Use Flexbox layout */
+}
+
+.react-datepicker__month-container {
+  @apply bg-white z-10 !important; /* ✅ Ensure visible */
+  float: none !important;
+}
+
+.react-datepicker__time-container {
+  @apply w-32 border-l border-gray-100 z-10 !important;
+  float: none !important;
+}
+
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box {
+  @apply w-full rounded-br-[1.5rem] !important;
+}
+
+.react-datepicker__time-list-item {
+  @apply h-10 leading-10 flex items-center justify-center text-sm font-bold text-gray-500 hover:bg-green-50 hover:text-[#1a4d2e] transition-colors !important;
+}
+
+/* Selected Time */
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box
+  ul.react-datepicker__time-list
+  li.react-datepicker__time-list-item--selected {
+  @apply bg-[#1a4d2e] text-white font-black !important;
+}
+
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box
+  ul.react-datepicker__time-list
+  li.react-datepicker__time-list-item--selected:hover {
+  @apply bg-[#143d24] !important;
+}
+
+/* Time Header */
+.react-datepicker-time__header {
+  @apply text-white font-black uppercase tracking-wider text-xs pt-4 !important;
+}
+
+/* Animation Keyframes */
+@keyframes page-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: page-enter 0.5s ease-out forwards;
 }

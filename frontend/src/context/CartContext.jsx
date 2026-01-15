@@ -90,6 +90,34 @@ export const CartProvider = ({ children }) => {
     localStorage.removeItem(key);
   };
 
+  // ✅ Selection State (New)
+  const [selectedItems, setSelectedItems] = useState([]);
+
+  // Reset selection when cart changes (optional, but safer to keep selected if ID exists)
+  useEffect(() => {
+    setSelectedItems(prev => prev.filter(id => cartItems.some(item => item.id === id)));
+  }, [cartItems]);
+
+  const toggleSelection = (id) => {
+    setSelectedItems(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const selectAll = () => {
+    if (selectedItems.length === cartItems.length) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(cartItems.map(item => item.id));
+    }
+  };
+
+  const getSelectedTotal = () => {
+    return cartItems
+      .filter(item => selectedItems.includes(item.id))
+      .reduce((total, item) => total + item.price * item.quantity, 0);
+  };
+
   const getTotalPrice = () => {
     return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
   };
@@ -103,6 +131,11 @@ export const CartProvider = ({ children }) => {
         updateQuantity,
         clearCart,
         getTotalPrice,
+        // New Selection Props
+        selectedItems,
+        toggleSelection,
+        selectAll,
+        getSelectedTotal,
       }}
     >
       {children}

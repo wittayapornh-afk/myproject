@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: db:3306
--- Generation Time: Jan 07, 2026 at 01:09 AM
+-- Generation Time: Jan 07, 2026 at 03:02 AM
 -- Server version: 8.0.44
 -- PHP Version: 8.3.26
 
@@ -462,27 +462,11 @@ INSERT INTO `order_items` (`id`, `quantity`, `price_at_purchase`, `order_id`, `p
 -- Table structure for table `products`
 --
 
---
--- Table structure for table `categories`
---
-
-CREATE TABLE `categories` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `products`
---
-
 CREATE TABLE `products` (
   `id` bigint NOT NULL,
   `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `price` decimal(10,2) NOT NULL,
   `stock` int NOT NULL,
   `brand` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -492,10 +476,7 @@ CREATE TABLE `products` (
   `created_at` datetime(6) NOT NULL,
   `updated_at` datetime(6) DEFAULT NULL,
   `seller_id` bigint DEFAULT NULL,
-  `original_price` decimal(10,2) DEFAULT NULL,
-  `cat_id` bigint DEFAULT NULL,
-  KEY `products_cat_id_fk_categories_id` (`cat_id`),
-  CONSTRAINT `products_cat_id_fk_categories_id` FOREIGN KEY (`cat_id`) REFERENCES `categories` (`id`)
+  `original_price` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -1447,6 +1428,7 @@ ALTER TABLE `users_user_permissions`
 --
 ALTER TABLE `admin_logs`
   MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
+>>>>>>> origin/main
 
 --
 -- AUTO_INCREMENT for table `auth_group`
@@ -1626,8 +1608,30 @@ ALTER TABLE `users_groups`
 ALTER TABLE `users_user_permissions`
   ADD CONSTRAINT `users_user_permissio_permission_id_6d08dcd2_fk_auth_perm` FOREIGN KEY (`permission_id`) REFERENCES `auth_permission` (`id`),
   ADD CONSTRAINT `users_user_permissions_user_id_92473840_fk_users_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+--
+-- Update for Seller Tracking form Agent
+--
+
+ALTER TABLE `products` 
+ADD COLUMN `seller_id` bigint NULL DEFAULT NULL;
+
+ALTER TABLE `products` 
+ADD CONSTRAINT `fk_products_seller` 
+FOREIGN KEY (`seller_id`) REFERENCES `users` (`id`) 
+ON DELETE CASCADE;
+
+-- Update ALL existing products to belong to Seller (ID 2) "of this one"
+UPDATE `products` SET `seller_id` = 2;
+
+-- Example Insert linking to Seller (User ID 2)
+INSERT INTO `products` 
+(`title`, `description`, `category`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `seller_id`) 
+VALUES 
+('สินค้าใหม่จาก Seller', 'เพิ่มผ่าน SQL โดยตรง', 'general', 500.00, 20, 'MyBrand', '', 0.00, 1, NOW(), NOW(), 2);
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+

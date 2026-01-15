@@ -24,6 +24,7 @@ function PaymentPage() {
   }, [location.state, cartItems, navigate]);
 
   useEffect(() => {
+    // 🔒 ตรวจสอบ Token ถ้าไม่มีให้เด้งไปหน้า Login
     if (!token) {
         Swal.fire({
             icon: 'warning',
@@ -38,9 +39,9 @@ function PaymentPage() {
   }, [token, navigate, location]);
 
   const handlePayment = async () => {
-    if (!token) return;
+    if (!token) return; // ป้องกันการกดจ่ายเงินถ้ายังไม่ล็อกอิน
 
-    setIsProcessing(true);
+    setIsProcessing(true); // ⏳ เริ่มสถานะกำลังโหลด
 
     try {
         const response = await fetch('/api/orders/create/', {
@@ -57,6 +58,7 @@ function PaymentPage() {
 
         const result = await response.json();
 
+        // 🟢 ตรวจสอบสถานะ response
         if (response.ok) {
             Swal.fire({ 
                 title: 'ชำระเงินสำเร็จ!', 
@@ -65,7 +67,7 @@ function PaymentPage() {
                 confirmButtonColor: '#305949' 
             }).then(() => { 
                 clearCart(); 
-                navigate('/order-history'); 
+                navigate('/tracking');  // ✅ ไปที่หน้ารออเดอร์ 
             });
         } else { 
             throw new Error(result.error || 'เกิดข้อผิดพลาดในการสั่งซื้อ'); 

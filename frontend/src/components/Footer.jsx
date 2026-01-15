@@ -5,7 +5,7 @@ import { Facebook, Instagram, Twitter, Send, MapPin, Phone, Mail, ChevronRight, 
 
 function Footer() {
   return (
-    <footer className="bg-[#1D2D27] text-white/80 pt-20 pb-10 mt-auto font-sans">
+    <footer className="bg-[#1D2D27] text-white/80 pt-10 pb-8 mt-auto font-sans">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           

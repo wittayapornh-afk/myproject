@@ -1,36 +1,48 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { useAuth } from '../context/AuthContext'; // ✅ 1. นำเข้า AuthContext
+import { useAuth } from '../context/AuthContext';
+import { ArrowLeft } from 'lucide-react'; // ✅ Import Icon
 
 function ProductAdd() {
   const navigate = useNavigate();
-  const { user } = useAuth(); // ✅ 2. ดึง user จาก Context แทน localStorage
+  const { user } = useAuth();
+  
+  // State
   const [formData, setFormData] = useState({});
+  const [categories, setCategories] = useState([]); // ✅ State สำหรับเก็บหมวดหมู่
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [galleryFiles, setGalleryFiles] = useState([]); 
   const [previewImage, setPreviewImage] = useState(null);
   const [galleryPreviews, setGalleryPreviews] = useState([]);
-  const [categories, setCategories] = useState([]); // ✅ State สำหรับเก็บหมวดหมู่
   
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
-  // ✅ Fetch Categories
-  useEffect(() => {
-    fetch('/api/categories-list/')
-        .then(res => res.json())
-        .then(data => setCategories(data))
-        .catch(err => console.error(err));
-  }, []);
-
-  // ✅ 3. เช็คสิทธิ์ด้วย role_code ให้ตรงกับระบบ login
+  // 1. เช็คสิทธิ์ Admin
   useEffect(() => {
       if (user && user.role_code !== 'admin' && user.role_code !== 'super_admin') {
           Swal.fire('Access Denied', 'สำหรับ Admin เท่านั้น!', 'error').then(() => navigate('/'));
       }
   }, [user, navigate]);
 
+  // 2. ดึงข้อมูลหมวดหมู่
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/categories/');
+        const data = await response.json();
+        if (data.categories) {
+          setCategories(data.categories);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Handlers
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -61,17 +73,17 @@ function ProductAdd() {
         data.append('brand', formData.brand || "");
         data.append('category', formData.category || "");
         data.append('description', formData.description || "");
+        
         if (thumbnailFile) data.append('thumbnail', thumbnailFile);
         galleryFiles.forEach((file) => data.append('images', file));
 
-        const token = localStorage.getItem('token'); // ✅ 4. ดึง Token
+        const token = localStorage.getItem('token'); 
 
-        // ✅ 5. แก้ URL เป็น /api/products/add/ และเพิ่ม Headers Authorization
-        const response = await fetch('/api/products/add/', { 
+        // ✅ ใช้ URL ที่ถูกต้อง (Port 8000)
+        const response = await fetch('http://localhost:8000/api/add_product/', { 
             method: 'POST', 
             headers: {
-                'Authorization': `Token ${token}` // 🔑 สำคัญมาก!
-                // *ไม่ต้องใส่ Content-Type เมื่อส่ง FormData Browser จะจัดการให้เอง
+                'Authorization': `Token ${token}`
             },
             body: data 
         });
@@ -94,7 +106,8 @@ function ProductAdd() {
         <h1 className="text-3xl font-bold text-[#305949] mb-10 text-center">เพิ่มสินค้าใหม่</h1>
         <div className="bg-white p-8 md:p-12 rounded-[2rem] shadow-lg w-full max-w-4xl border border-white">
             <form onSubmit={handleSubmit} className="space-y-8">
-                {/* ... (ส่วน Form เหมือนเดิม ไม่ต้องแก้) ... */}
+                
+                {/* รูปภาพปก */}
                 <div>
                     <label className={styles.label}>รูปภาพปก</label>
                     <div onClick={() => fileInputRef.current.click()} className="border-2 border-dashed rounded-3xl h-64 flex flex-col items-center justify-center cursor-pointer bg-gray-50 hover:bg-white">
@@ -102,6 +115,8 @@ function ProductAdd() {
                         {previewImage ? <img src={previewImage} className="w-full h-full object-contain" /> : <span className="text-gray-400">📸 คลิกเพื่ออัปโหลด</span>}
                     </div>
                 </div>
+
+                {/* รูปเพิ่มเติม */}
                 <div>
                     <label className={styles.label}>รูปเพิ่มเติม</label>
                     <div className="grid grid-cols-4 gap-4">
@@ -113,12 +128,33 @@ function ProductAdd() {
                         ))}
                     </div>
                 </div>
+
+                {/* ข้อมูลพื้นฐาน */}
                 <div className="grid grid-cols-2 gap-6">
                     <div><label className={styles.label}>ชื่อสินค้า</label><input type="text" className={styles.input} onChange={e => setFormData({...formData, title: e.target.value})} required /></div>
-                    <div><label className={styles.label}>ราคา</label><input type="number" className={styles.input} onChange={e => setFormData({...formData, price: e.target.value})} required /></div>
+                    <div>
+                        <label className={styles.label}>ราคา</label>
+                        <input 
+                            type="number" 
+                            className={styles.input} 
+                            onChange={e => setFormData({...formData, price: e.target.value})} 
+                            onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                            required 
+                        />
+                    </div>
                 </div>
+
+                {/* จำนวน & หมวดหมู่ (Dropdown) */}
                 <div className="grid grid-cols-2 gap-6">
-                    <div><label className={styles.label}>จำนวน</label><input type="number" className={styles.input} onChange={e => setFormData({...formData, stock: e.target.value})} /></div>
+                    <div>
+                        <label className={styles.label}>จำนวน</label>
+                        <input 
+                            type="number" 
+                            className={styles.input} 
+                            onChange={e => setFormData({...formData, stock: e.target.value})} 
+                            onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                        />
+                    </div>
                     <div>
                         <label className={styles.label}>หมวดหมู่</label>
                         <select 
@@ -126,15 +162,26 @@ function ProductAdd() {
                             onChange={e => setFormData({...formData, category: e.target.value})}
                             defaultValue=""
                         >
-                            <option value="" disabled>เลือกหมวดหมู่...</option>
-                            {categories.map(c => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
+                            <option value="" disabled>-- เลือกหมวดหมู่ --</option>
+                            {categories.map((cat, index) => (
+                                <option key={index} value={cat}>{cat}</option>
                             ))}
                         </select>
                     </div>
                 </div>
+
+                {/* รายละเอียด */}
                 <div><label className={styles.label}>รายละเอียด</label><textarea rows="4" className={styles.input} onChange={e => setFormData({...formData, description: e.target.value})}></textarea></div>
-                <button type="submit" className="w-full bg-[#305949] text-white py-4 rounded-2xl font-bold hover:bg-[#234236]">บันทึก</button>
+                
+                {/* ✅ Button Group */}
+                <div className="flex gap-4 pt-6">
+                    <button type="submit" className="flex-[2] bg-[#305949] text-white py-4 rounded-2xl font-bold hover:bg-[#234236] shadow-lg hover:shadow-xl transition-all">
+                        บันทึกสินค้า
+                    </button>
+                    <Link to="/admin/dashboard?tab=products" className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-center hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                        <ArrowLeft size={18}/> ย้อนกลับ
+                    </Link>
+                </div>
             </form>
         </div>
     </div>
