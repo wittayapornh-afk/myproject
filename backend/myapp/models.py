@@ -203,6 +203,7 @@ class Coupon(models.Model):
     active = models.BooleanField(default=True)
 
     max_use_per_user = models.IntegerField(default=1, help_text="จำกัดสิทธิ์ต่อคน")
+    allowed_roles = models.JSONField(default=list, blank=True, help_text="Roles that can use this coupon (e.g. ['member', 'vip'])")
     
     class Meta:
         db_table = 'coupons'
@@ -218,6 +219,12 @@ class Coupon(models.Model):
             return False
             
         if user:
+            # Check Role
+            if self.allowed_roles and len(self.allowed_roles) > 0:
+                user_role = getattr(user, 'role', 'customer')
+                if user_role not in self.allowed_roles:
+                    return False
+
             # Check user usage history
             user_usage = Order.objects.filter(user=user, coupon=self).count()
             if user_usage >= self.max_use_per_user:

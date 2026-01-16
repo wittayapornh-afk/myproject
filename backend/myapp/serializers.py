@@ -43,7 +43,7 @@ class ProductSerializer(serializers.ModelSerializer):
 class CouponSerializer(serializers.ModelSerializer):
     class Meta:
         model = Coupon
-        fields = '__all__'
+        fields = ['id', 'code', 'discount_type', 'discount_value', 'min_spend', 'usage_limit', 'used_count', 'start_date', 'end_date', 'active', 'max_use_per_user', 'allowed_roles']
 
 class FlashSaleProductSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.title')

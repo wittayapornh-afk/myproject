@@ -1,17 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
 import HeroBanner from './HeroBanner';
+import FlashSaleSection from './FlashSaleSection'; // ✅ Import Flash Sale
 import CategoryRow from './CategoryRow';
-import { ArrowRight, Star, Truck, ShieldCheck, RefreshCw, CreditCard, Rocket, RotateCcw, Headphones } from 'lucide-react'; // ✅ Import Icons
+import { ArrowRight, Star, Truck, ShieldCheck, RefreshCw, CreditCard, Rocket, RotateCcw, Headphones, Zap } from 'lucide-react'; // ✅ Import Icons
 import Swal from 'sweetalert2';
 import { Link } from 'react-router-dom';
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
-import MarketingPopup from './MarketingPopup'; // ✅ Import Popup
-import FlashSaleSection from './FlashSaleSection'; // ✅ Import Flash Sale
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
+import { useAuth } from '../context/AuthContext'; // ✅ Import Auth
+import CouponSection from './CouponSection'; // ✅ Import Coupon Section
 
 const HomePage = () => {
+    const { user } = useAuth(); // ✅ Get User State
     const [newArrivals, setNewArrivals] = useState([]);
     const [recentlyViewed, setRecentlyViewed] = useState([]);
     const [activeFlashSale, setActiveFlashSale] = useState(null); // ✅ Flash Sale State
@@ -41,98 +43,48 @@ const HomePage = () => {
                 }
              } catch(err) { console.error("Products fetch error:", err); }
 
-             // 2. Flash Sales
+             // 2. Flash Sales (Now supports multiple)
              try {
                  const fsRes = await axios.get(`${API_BASE_URL}/api/flash-sales/active/`);
-                 if (fsRes.data && fsRes.data.length > 0) {
-                     setActiveFlashSale(fsRes.data[0]); // Get first active one
+                 if (fsRes.data && Array.isArray(fsRes.data)) {
+                     setActiveFlashSale(fsRes.data); // ✅ Store Array
                  }
              } catch (err) { console.error("Flash Sale fetch error:", err); }
         };
         fetchData();
     }, []);
 
-    // ✅ Artificial "Premium" Loading
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        // Enforce a minimum stunning load time of 0.8s
-        const timer = setTimeout(() => {
-            setIsLoading(false);
-        }, 800);
-        return () => clearTimeout(timer);
-    }, []);
-
-    if (isLoading) {
-        return (
-            <div className="fixed inset-0 z-[9999] bg-[#F9F9F7] flex flex-col items-center justify-center">
-                <div className="relative mb-8">
-                    {/* Spinning Outer Ring */}
-                    <div className="w-24 h-24 border-4 border-[#1a4d2e]/10 border-t-[#1a4d2e] rounded-full animate-spin"></div>
-                    {/* Inner Pulse */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-12 h-12 bg-[#1a4d2e] rounded-full animate-pulse shadow-[0_0_30px_rgba(26,77,46,0.3)]"></div>
-                    </div>
-                </div>
-                {/* Text Animation */}
-                <h1 className="text-2xl font-black text-[#263A33] tracking-[0.2em] animate-pulse">
-                    SHOP<span className="text-[#1a4d2e]">.</span>
-                </h1>
-                <p className="text-xs text-gray-400 mt-2 font-medium tracking-widest uppercase">Loading Experience</p>
-            </div>
-        );
-    }
-
-    // ✅ Functional Info Bar Handler
-    const handleInfoClick = (title, desc, detail) => {
-        Swal.fire({
-            title: `<h3 class="text-2xl font-bold text-[#1a4d2e]">${title}</h3>`,
-            html: `
-                <div class="text-gray-600">
-                    <p class="mb-4 text-lg font-medium">${desc}</p>
-                    <div class="bg-gray-50 p-4 rounded-xl text-sm text-left border border-gray-100">
-                        ${detail}
-                    </div>
-                </div>
-            `,
-            icon: 'info',
-            confirmButtonText: 'Great!',
-            confirmButtonColor: '#1a4d2e',
-            buttonsStyling: false,
-            customClass: {
-                popup: 'rounded-[2rem] p-6',
-                confirmButton: 'bg-[#1a4d2e] text-white px-8 py-3 rounded-full font-bold hover:bg-[#143d23] transition-all'
-            }
-        });
-    };
+    // ... handleInfoClick ...
 
     return (
         <div className="min-h-screen bg-[#F9F9F7] pb-20">
-            {/* ✅ Marketing Popup */}
-            <MarketingPopup />
-
             {/* Hero Section */}
             <HeroBanner />
 
-            {/* ✅ Trust Features Bar (Interactive & Premium - Thai) */}
-            <div className="max-w-6xl mx-auto px-6 relative z-20 -mt-16 mb-20">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white/90 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.08)] border border-white/60">
-                    {[
-                        { icon: Rocket, title: "ฟรีค่าจัดส่ง", desc: "เมื่อช้อปครบ ฿900" },
-                        { icon: ShieldCheck, title: "รับประกันของแท้", desc: "ตรวจสอบอย่างละเอียด" },
-                        { icon: RotateCcw, title: "คืนสินค้าฟรี", desc: "ภายใน 30 วัน" },
-                        { icon: Headphones, title: "ดูแลลูกค้า 24/7", desc: "ทีมงานพร้อมช่วยเหลือ" }
-                    ].map((feature, idx) => (
-                        <div key={idx} className="flex flex-col items-center text-center p-6 rounded-3xl hover:bg-gray-50/80 transition-all cursor-crosshair group">
-                            <div className="mb-4 text-[#1a4d2e] opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">
-                                <feature.icon size={32} strokeWidth={1.5} />
-                            </div>
-                            <h3 className="font-bold text-[#263A33] text-lg mb-1">{feature.title}</h3>
-                            <p className="text-gray-400 text-sm font-medium">{feature.desc}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            {/* Flash Sale Section - Login Required - Render All Active Sales */}
+            {user ? (
+                activeFlashSale && Array.isArray(activeFlashSale) && activeFlashSale.map(sale => (
+                    <FlashSaleSection key={sale.id} flashSale={sale} />
+                ))
+            ) : (
+               <div className="max-w-7xl mx-auto px-4 py-16 text-center bg-white my-8 rounded-3xl shadow-sm border border-gray-100">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-6 animate-pulse">
+                        <Zap size={32} className="text-orange-600" />
+                    </div>
+                    <h2 className="text-3xl font-black text-gray-800 mb-4">Flash Sale สำหรับสมาชิกเท่านั้น!</h2>
+                    <p className="text-gray-500 mb-8 max-w-lg mx-auto">
+                        เข้าสู่ระบบเพื่อพบกับดีลสินค้าราคาพิเศษลดกระหน่ำที่มีจำนวนจำกัด ห้ามพลาดโอกาสดีๆ แบบนี้
+                    </p>
+                    <Link to="/login" className="inline-flex items-center gap-2 bg-[#1a4d2e] text-white px-8 py-4 rounded-xl font-bold hover:bg-[#143d24] transition-all shadow-lg shadow-green-900/20">
+                        เข้าสู่ระบบเพื่อดูสินค้า <ArrowRight size={20} />
+                    </Link>
+               </div>
+            )}
+
+            {/* ✅ Public Coupon Section (Visible to Everyone) */}
+            <CouponSection />
+
+
 
             {/* Categories Section (Clean & Minimal) */}
             <div className="flex flex-col w-full bg-white relative z-10 overflow-hidden pb-20 pt-16 -mt-10 rounded-t-[3rem]">

@@ -27,7 +27,10 @@ import OrderListAdmin from './components/OrderListAdmin';
 import UserListAdmin from './components/UserListAdmin';
 import AdminLayout from './components/AdminLayout'; // ✅ Layout Wrapper
 import AdminSidebar from './components/AdminSidebar'; // ✅ Global Sidebar
-import CouponManagement from './components/CouponManagement'; // ✅ Coupon Management
+import CouponCenter from './components/CouponCenter';
+import CouponManagement from './components/CouponManagement';
+import MarketingPopup from './components/MarketingPopup'; // ✅ Global Popup
+// ... existing imports ...
 import FlashSaleManagement from './components/FlashSaleManagement'; // ✅ Flash Sale Management
 
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -62,6 +65,8 @@ const AppContent = () => {
 
       {/* ✅ Navbar: Show Always (z-index managed via CSS) */}
       <Navbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+      
+      {/* ❌ Removed Marketing Popup as requested */}
 
 
       {/* Content Wrapper */}
@@ -79,6 +84,7 @@ const AppContent = () => {
               <Route path="/" element={<HomePage />} />
 
               <Route path="/shop" element={<ProductList />} />
+              <Route path="/coupons" element={<CouponCenter />} />
 
               {/* ✅ จุดสำคัญ: เส้นทางต้องตรงกับ Link ใน ProductList */}
               <Route path="/product/:id" element={<ProductDetail />} />
@@ -88,6 +94,9 @@ const AppContent = () => {
 
               {/* --- 🔐 Auth Routes (ยังไม่ Login เท่านั้น) --- */}
               <Route path="/login" element={
+                <RedirectIfAuthenticated><LoginPage /></RedirectIfAuthenticated>
+              } />
+              <Route path="/admin/login" element={
                 <RedirectIfAuthenticated><LoginPage /></RedirectIfAuthenticated>
               } />
               <Route path="/register" element={
