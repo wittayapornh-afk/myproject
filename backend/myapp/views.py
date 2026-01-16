@@ -1887,8 +1887,13 @@ def get_all_users(request):
         "id": u.id,
         "username": u.username,
         "email": u.email,
-        "role": u.role,
+        "first_name": u.first_name,
+        "last_name": u.last_name,
+        "phone": u.phone,
+        "address": u.address,
+        "role": u.role,  # Frontend expects 'role' (or we align frontend to this)
         "is_active": u.is_active,
+        "avatar": u.image.url if u.image else "",
         "date_joined": u.date_joined.strftime("%Y-%m-%d")
     } for u in users]
     return Response(data)
