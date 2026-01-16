@@ -73,13 +73,13 @@ export default function UserListAdmin() {
   const filteredUsers = users.filter(user => {
     // 1. Role Filter
     if (filterRole === 'admin') {
-      if (user.role_code !== 'admin') return false;
+      if (user.role !== 'admin') return false;
     } else if (filterRole === 'seller') {
-      if (user.role_code !== 'seller') return false;
+      if (user.role !== 'seller') return false;
     } else if (filterRole === 'customer') {
-      if (user.role_code !== 'customer') return false;
+      if (user.role !== 'customer') return false;
     } else if (filterRole === 'new_user') {
-      if (user.role_code !== 'new_user') return false;
+      if (user.role !== 'new_user') return false;
     }
 
     // 2. Search Term
@@ -154,7 +154,7 @@ export default function UserListAdmin() {
     setFormData({
       username: user.username,
       email: user.email,
-      role: user.role_code,
+      role: user.role,
       phone: user.phone === '-' ? '' : user.phone,
       first_name: user.first_name,
       last_name: user.last_name,
@@ -277,7 +277,7 @@ export default function UserListAdmin() {
               <tr>
                 <th className="p-5 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('username')}>ชื่อผู้ใช้</th>
                 <th className="p-5 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('email')}>อีเมล/เบอร์โทร</th>
-                <th className="p-5 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('role_code')}>บทบาท</th>
+                <th className="p-5 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('role')}>บทบาท</th>
                 <th className="p-5 text-center cursor-pointer hover:bg-gray-100" onClick={() => handleSort('is_active')}>สถานะ</th>
                 <th className="p-5 text-right">จัดการ</th>
               </tr>
@@ -292,8 +292,8 @@ export default function UserListAdmin() {
                   <tr key={user.id} className="hover:bg-green-50/30 transition-colors group">
                     <td className="p-5">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm ${['admin', 'super_admin'].includes(user.role_code) ? 'bg-purple-500' :
-                          user.role_code === 'seller' ? 'bg-orange-500' : 'bg-[#1a4d2e]'
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm ${['admin', 'super_admin'].includes(user.role) ? 'bg-purple-500' :
+                          user.role === 'seller' ? 'bg-orange-500' : 'bg-[#1a4d2e]'
                           }`}>
                           {user.avatar ? <img src={`${API_BASE_URL}${user.avatar}`} className="w-full h-full object-cover rounded-full" /> : user.username[0].toUpperCase()}
                         </div>
@@ -310,14 +310,14 @@ export default function UserListAdmin() {
                       </div>
                     </td>
                     <td className="p-5">
-                      <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${user.role_code === 'admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                        user.role_code === 'seller' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                      <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${user.role === 'admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                        user.role === 'seller' ? 'bg-orange-100 text-orange-700 border-orange-200' :
                           'bg-gray-100 text-gray-600 border-gray-200'
                         }`}>
-                        {user.role_code === 'admin' ? 'ผู้ดูแลระบบ' :
-                          user.role_code === 'seller' ? 'ผู้ขาย' :
-                            user.role_code === 'customer' ? 'ลูกค้าทั่วไป' :
-                              user.role_code === 'new_user' ? 'สมาชิกใหม่' : 'ลูกค้าทั่วไป'}
+                        {user.role === 'admin' ? 'ผู้ดูแลระบบ' :
+                          user.role === 'seller' ? 'ผู้ขาย' :
+                            user.role === 'customer' ? 'ลูกค้าทั่วไป' :
+                              user.role === 'new_user' ? 'สมาชิกใหม่' : 'ลูกค้าทั่วไป'}
                       </span>
                     </td>
                     <td className="p-5 text-center">
