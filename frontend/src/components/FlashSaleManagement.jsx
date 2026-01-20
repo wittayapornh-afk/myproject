@@ -3,6 +3,7 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Clock, Plus, Trash2, X, Package, TrendingDown, Calendar, ArrowRight, Check } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -92,6 +93,8 @@ const DatePickerStyles = () => (
 );
 
 const FlashSaleManagement = () => {
+    // ✅ Auth Context
+    const { user, token: authContextToken } = useAuth();
     const [flashSales, setFlashSales] = useState([]);
     const [products, setProducts] = useState([]);
     const [showModal, setShowModal] = useState(false);
@@ -107,6 +110,8 @@ const FlashSaleManagement = () => {
     const [selectedProduct, setSelectedProduct] = useState('');
     const [salePrice, setSalePrice] = useState('');
     const [limit, setLimit] = useState(10);
+    const [discountType, setDiscountType] = useState('percent'); // 'percent' | 'fixed'
+    const [discountInput, setDiscountInput] = useState('10'); // Default 10%
     const [showProductSelector, setShowProductSelector] = useState(false);
     const [tempSelectedProducts, setTempSelectedProducts] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -147,6 +152,8 @@ const FlashSaleManagement = () => {
 
     const API_BASE_URL = "http://localhost:8000";
 
+
+
     useEffect(() => {
         fetchFlashSales();
         fetchProducts();
@@ -154,22 +161,30 @@ const FlashSaleManagement = () => {
 
     const fetchFlashSales = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = authContextToken || localStorage.getItem('token');
+            console.log("Fetching Flash Sales with Token:", token ? `Found (${token.substring(0, 10)}...)` : "MISSING");
+            if (!token) {
+                console.warn("No token found aborting fetch");
+                return;
+            }
             const res = await axios.get(`${API_BASE_URL}/api/admin/flash-sales/`, {
                 headers: { Authorization: `Token ${token}` }
             });
+
             setFlashSales(res.data);
         } catch (error) {
             console.error(error);
             if (error.response && error.response.status === 401) {
-                 // Swal.fire({
-                //     title: 'Session หมดอายุ',
-                //     text: 'กรุณาเข้าสู่ระบบใหม่',
-                //     icon: 'warning',
-                //     confirmButtonText: 'ไปหน้า Login'
-                // }).then(() => {
-                //     window.location.href = '/login';
-                // });
+                Swal.fire({
+                    title: 'Session หมดอายุ',
+                    text: 'กรุณาเข้าสู่ระบบใหม่',
+                    icon: 'warning',
+                    confirmButtonText: 'ไปหน้า Login'
+                }).then(() => {
+                    localStorage.removeItem('token'); // Clear invalid token
+                    localStorage.removeItem('user');
+                    window.location.href = '/admin/login'; // Redirect to Admin Login
+                });
                 console.warn("Unauthorized access to Flash Sales. Please re-login manually if needed.");
             }
         }
@@ -179,8 +194,9 @@ const FlashSaleManagement = () => {
         try {
             console.log("Fetching ALL Products (Public Mode)..."); // Debug Log
             const token = localStorage.getItem('token');
-            const res = await axios.get(`${API_BASE_URL}/api/public/products-dropdown/`); // ✅ Changed to Public URL
-            setProducts(res.data);
+            const res = await axios.get(`${API_BASE_URL}/api/products/`); // ✅ Use existing Public API
+            const productsList = res.data.results || res.data; // ✅ Handle Pagination
+            setProducts(productsList);
         } catch (error) { 
             console.error(error); 
             if (error.response && error.response.status === 401) {
@@ -221,8 +237,25 @@ const FlashSaleManagement = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // ✅ Validation: Check if products selected
+        if (formData.products.length === 0) {
+            return Swal.fire('Error', 'กรุณาเลือกสินค้าอย่างน้อย 1 รายการ', 'warning');
+        }
+
         try {
-            const token = localStorage.getItem('token');
+            const token = authContextToken || localStorage.getItem('token');
+            console.log("Submitting Flash Sale. Token:", token ? `Found (${token.substring(0, 10)}...)` : "MISSING"); // DEBUG TOKEN
+            if (!token) {
+                Swal.fire({
+                    title: 'Error', 
+                    text: 'ไม่พบ Token กรุณา Login ใหม่', 
+                    icon: 'error'
+                }).then(() => {
+                     window.location.href = '/admin/login';
+                });
+                return;
+            }
             await axios.post(`${API_BASE_URL}/api/admin/flash-sales/`, formData, {
                 headers: { Authorization: `Token ${token}` }
             });
@@ -236,14 +269,16 @@ const FlashSaleManagement = () => {
             fetchFlashSales();
         } catch (error) {
             if (error.response && error.response.status === 401) {
-                // Swal.fire({
-                //     title: 'Session หมดอายุ',
-                //     text: 'กรุณาเข้าสู่ระบบใหม่',
-                //     icon: 'warning',
-                //     confirmButtonText: 'ไปหน้า Login'
-                // }).then(() => {
-                //     window.location.href = '/login';
-                // });
+                Swal.fire({
+                    title: 'Session หมดอายุ',
+                    text: 'กรุณาเข้าสู่ระบบใหม่',
+                    icon: 'warning',
+                    confirmButtonText: 'ไปหน้า Login'
+                }).then(() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/admin/login';
+                });
                 console.warn("Unauthorized: Cannot save flash sale.");
             } else {
                 Swal.fire('Error', 'เกิดข้อผิดพลาดในการบันทึก', 'error');
@@ -262,13 +297,19 @@ const FlashSaleManagement = () => {
         });
         if (result.isConfirmed) {
             try {
-                const token = localStorage.getItem('token');
-                await axios.delete(`${API_BASE_URL}/api/admin/flash-sales/${id}/`, {
+                // ✅ Fix: Use context token first
+                const token = authContextToken || localStorage.getItem('token');
+                
+                // ✅ Fix: Pass ID in URL for Django Router
+                const url = `${API_BASE_URL}/api/admin/flash-sales/${id}/`;
+                
+                await axios.delete(url, {
                     headers: { Authorization: `Token ${token}` }
                 });
+
+                Swal.fire('Deleted!', 'ลบแคมเปญเรียบร้อยแล้ว', 'success');
                 fetchFlashSales();
-                Swal.fire('Deleted!', '', 'success');
-            } catch (error) { 
+            } catch (error) {
                 if (error.response && error.response.status === 401) {
                     // Swal.fire({ title: 'Session หมดอายุ', text: 'กรุณาเข้าสู่ระบบใหม่', icon: 'warning', confirmButtonText: 'ไปหน้า Login' }).then(() => window.location.href = '/login');
                     console.warn("Unauthorized: Cannot delete flash sale.");
@@ -501,45 +542,19 @@ const FlashSaleManagement = () => {
                                         <h4 className="text-sm font-black text-orange-600 mb-6 uppercase tracking-widest flex items-center gap-2">
                                             <Plus size={18} /> เลือกสินค้าที่ต้องการเข้าร่วม (Bulk Select)
                                         </h4>
-                                        <div className="grid grid-cols-1 gap-6">
-                                            
-                                            <button 
-                                                type="button"
-                                                onClick={() => setShowProductSelector(true)}
-                                                className="w-full bg-white border-2 border-dashed border-orange-300 hover:border-orange-500 hover:bg-orange-50 text-orange-500 font-bold py-6 rounded-3xl transition-all flex flex-col items-center gap-2 group"
-                                            >
-                                                <div className="p-3 bg-orange-100 text-orange-600 rounded-full group-hover:scale-110 transition-transform">
-                                                    <Package size={24} />
-                                                </div>
-                                                <span>คลิกเพื่อเลือกสินค้าหลายรายการ</span>
-                                            </button>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-3xl border border-gray-100">
-                                                <div>
-                                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block ml-4">ราคาลดเหลือ (Global)</label>
-                                                     <input 
-                                                        type="number" 
-                                                        value={salePrice} 
-                                                        onChange={e => setSalePrice(e.target.value)} 
-                                                        className="w-full bg-gray-50 border-2 border-transparent focus:border-orange-500 hover:bg-white focus:bg-white rounded-2xl px-6 py-4 font-bold text-gray-700 outline-none shadow-inner transition-all" 
-                                                        placeholder="ใช้ราคานี้กับทุกสินค้าที่เลือก" 
-                                                    />
-                                                </div>
-                                                <div>
-                                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block ml-4">โควต้า (Global)</label>
-                                                     <input 
-                                                        type="number" 
-                                                        value={limit} 
-                                                        onChange={e => setLimit(e.target.value)} 
-                                                        className="w-full bg-gray-50 border-2 border-transparent focus:border-orange-500 hover:bg-white focus:bg-white rounded-2xl px-6 py-4 font-bold text-gray-700 outline-none shadow-inner transition-all" 
-                                                        placeholder="จำนวนจำกัดต่อสินค้า"
-                                                     />
-                                                </div>
-                                                <div className="md:col-span-2 text-center text-xs text-gray-400">
-                                                    * ค่าที่กรอกจะถูกนำไปใช้กับสินค้าทั้งหมดที่เลือก หากต้องการแก้รายตัวสามารถแก้ได้ในตารางด้านล่าง
-                                                </div>
+                                            <div className="grid grid-cols-1 gap-6">
+                                                
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setShowProductSelector(true)}
+                                                    className="w-full bg-white border-2 border-dashed border-orange-300 hover:border-orange-500 hover:bg-orange-50 text-orange-500 font-bold py-6 rounded-3xl transition-all flex flex-col items-center gap-2 group"
+                                                >
+                                                    <div className="p-3 bg-orange-100 text-orange-600 rounded-full group-hover:scale-110 transition-transform">
+                                                        <Package size={24} />
+                                                    </div>
+                                                    <span>คลิกเพื่อเลือกสินค้าเข้าร่วม</span>
+                                                </button>
                                             </div>
-                                        </div>
                                     </div>
 
                                     {/* Product Selection Modal */}
@@ -573,44 +588,122 @@ const FlashSaleManagement = () => {
                                                     </div>
                                                     
                                                     <div className="p-6 overflow-y-auto custom-scrollbar bg-[#F8F9FA]">
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                        <div className="space-y-3">
                                                             {filteredProducts.map(p => {
-                                                                const isSelected = tempSelectedProducts.includes(p.id);
-                                                                const isDisabled = formData.products.some(fp => fp.product_id === p.id); // Already added to campaign
-                                                                
+                                                                const isAdded = formData.products.some(fp => fp.product_id === p.id);
+                                                                const isActive = selectedProduct === p.id;
+
                                                                 return (
                                                                     <div 
                                                                         key={p.id}
-                                                                        onClick={() => {
-                                                                            if(isDisabled) return;
-                                                                            if(isSelected) {
-                                                                                setTempSelectedProducts(tempSelectedProducts.filter(id => id !== p.id));
-                                                                            } else {
-                                                                                setTempSelectedProducts([...tempSelectedProducts, p.id]);
-                                                                            }
-                                                                        }}
-                                                                        className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden group ${
-                                                                            isDisabled 
-                                                                            ? 'bg-gray-100 border-gray-200 opacity-50 cursor-not-allowed' 
-                                                                            : isSelected 
-                                                                                ? 'bg-orange-50 border-orange-500 shadow-lg shadow-orange-100' 
-                                                                                : 'bg-white border-transparent hover:border-orange-200 hover:shadow-md'
+                                                                        className={`p-4 rounded-2xl border transition-all ${
+                                                                            isAdded ? 'bg-gray-100 border-gray-200 opacity-60' : 
+                                                                            isActive ? 'bg-orange-50 border-orange-500 shadow-lg' : 'bg-white border-gray-100 hover:border-orange-200'
                                                                         }`}
                                                                     >
-                                                                        <div className="flex gap-4 items-start">
+                                                                        <div className="flex items-center gap-4">
                                                                             <img src={p.thumbnail ? (p.thumbnail.startsWith('http') ? p.thumbnail : `${API_BASE_URL}${p.thumbnail}`) : "/placeholder.png"} className="w-16 h-16 rounded-xl object-cover bg-gray-200" alt="" />
                                                                             <div className="flex-1 min-w-0">
-                                                                                <p className="font-bold text-gray-800 text-sm truncate">{p.title}</p>
-                                                                                <p className="text-xs text-gray-500 mt-1">Stock: {p.stock}</p>
-                                                                                <p className="font-black text-orange-600 mt-1">฿{p.price}</p>
+                                                                                <h5 className="font-bold text-gray-800 text-sm truncate">{p.title}</h5>
+                                                                                <p className="text-xs text-gray-500">Stock: {p.stock} | Price: ฿{p.price}</p>
                                                                             </div>
+                                                                            
+                                                                            {!isAdded && !isActive && (
+                                                                                 <button 
+                                                                                    onClick={() => {
+                                                                                        setSelectedProduct(p.id);
+                                                                                        setDiscountType('percent');
+                                                                                        setDiscountInput('10');
+                                                                                        setLimit(10);
+                                                                                    }}
+                                                                                    className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold text-xs hover:bg-orange-100 hover:text-orange-600 transition-colors"
+                                                                                 >
+                                                                                     เลือก
+                                                                                 </button>
+                                                                            )}
+
+                                                                            {isAdded && <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Check size={12}/> เพิ่มแล้ว</span>}
                                                                         </div>
-                                                                        {isSelected && (
-                                                                            <div className="absolute top-2 right-2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-lg">
-                                                                                <Check size={14} strokeWidth={4} />
+
+                                                                        {/* Active Edit Area */}
+                                                                        {isActive && !isAdded && (
+                                                                            <div className="mt-4 pt-4 border-t border-orange-200 animate-fadeIn">
+                                                                                <div className="flex gap-4 mb-4">
+                                                                                    {/* Discount Type Toggle */}
+                                                                                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                                                                                        <button 
+                                                                                            onClick={() => { setDiscountType('percent'); setDiscountInput('10'); }}
+                                                                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${discountType === 'percent' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400'}`}
+                                                                                        >
+                                                                                            % ลดเปอร์เซ็นต์
+                                                                                        </button>
+                                                                                        <button 
+                                                                                            onClick={() => { setDiscountType('fixed'); setDiscountInput(Math.floor(p.price * 0.9)); }}
+                                                                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${discountType === 'fixed' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400'}`}
+                                                                                        >
+                                                                                            ฿ ราคาขายสุทธิ
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="grid grid-cols-2 gap-4">
+                                                                                    <div>
+                                                                                        <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest block mb-1">
+                                                                                            {discountType === 'percent' ? 'ส่วนลด (%)' : 'ราคาขาย (บาท)'}
+                                                                                        </label>
+                                                                                        <input 
+                                                                                            type="number" 
+                                                                                            value={discountInput}
+                                                                                            onChange={(e) => setDiscountInput(e.target.value)}
+                                                                                            className="w-full bg-white border border-orange-300 rounded-lg px-3 py-2 text-sm font-bold text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                                                        />
+                                                                                        {/* Show Final Price Preview */}
+                                                                                        <p className="text-xs text-gray-400 mt-1">
+                                                                                            ราคาขายจริง: <span className="font-bold text-gray-700">
+                                                                                                ฿{discountType === 'percent' 
+                                                                                                    ? Math.floor(p.price * (1 - (parseFloat(discountInput) || 0) / 100)).toLocaleString() 
+                                                                                                    : parseFloat(discountInput || 0).toLocaleString()}
+                                                                                            </span>
+                                                                                        </p>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest block mb-1">จำกัดจำนวน</label>
+                                                                                        <input 
+                                                                                            type="number" 
+                                                                                            value={limit}
+                                                                                            onChange={(e) => setLimit(e.target.value)}
+                                                                                            className="w-full bg-white border border-orange-300 rounded-lg px-3 py-2 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="flex justify-end gap-2 mt-4">
+                                                                                    <button onClick={() => setSelectedProduct(null)} className="px-4 py-2 text-gray-400 hover:text-gray-600 text-xs font-bold">ยกเลิก</button>
+                                                                                    <button 
+                                                                                        onClick={() => {
+                                                                                            const finalPrice = discountType === 'percent' 
+                                                                                                ? Math.floor(p.price * (1 - (parseFloat(discountInput) || 0) / 100))
+                                                                                                : parseFloat(discountInput);
+
+                                                                                            if(!finalPrice || finalPrice < 0) return Swal.fire('แจ้งเตือน', 'ราคาสินค้าไม่ถูกต้อง', 'warning');
+                                                                                            
+                                                                                            const newItem = {
+                                                                                                product_id: p.id,
+                                                                                                product_name: p.title,
+                                                                                                original_price: p.price,
+                                                                                                sale_price: finalPrice,
+                                                                                                limit: parseInt(limit)
+                                                                                            };
+                                                                                            setFormData(prev => ({...prev, products: [...prev.products, newItem]}));
+                                                                                            setSelectedProduct(null); 
+                                                                                        }} 
+                                                                                        className="px-6 py-2 bg-orange-600 text-white rounded-lg font-bold text-xs shadow-lg shadow-orange-200 hover:bg-orange-700 active:scale-95 transition-all"
+                                                                                    >
+                                                                                        ยืนยันเพิ่มสินค้า
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
                                                                         )}
-                                                                        {isDisabled && <div className="absolute inset-0 bg-gray-50/50 flex items-center justify-center font-bold text-gray-400 z-10">Added</div>}
                                                                     </div>
                                                                 )
                                                             })}

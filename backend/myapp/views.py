@@ -593,8 +593,30 @@ def product_detail_api(request, product_id):
             "shop_name": product.seller.first_name
         } if product.seller else None,
         "next_id": next_product.id if next_product else None,
-        "prev_id": prev_product.id if prev_product else None
-    }
+
+
+        }
+
+        # ✅ Check Flash Sale Logic (Manual Injection)
+        now = timezone.now()
+        active_fs = FlashSaleProduct.objects.filter(
+            product=product,
+            flash_sale__start_time__lte=now,
+            flash_sale__end_time__gte=now,
+            flash_sale__is_active=True
+        ).first()
+
+        if active_fs and active_fs.sold_count < active_fs.quantity_limit:
+            data["flash_sale_info"] = {
+                'id': active_fs.flash_sale.id,
+                'sale_price': active_fs.sale_price,
+                'end_time': active_fs.flash_sale.end_time,
+                'quantity_limit': active_fs.quantity_limit,
+                'sold_count': active_fs.sold_count
+            }
+        else:
+            data["flash_sale_info"] = None
+
         return Response(data)
     except Product.DoesNotExist:
         # Debugging: Print all existing IDs to see what's actually in the DB
@@ -767,6 +789,7 @@ def login_api(request):
              return Response({"error": "Account disabled"}, status=403)
              
         token, _ = Token.objects.get_or_create(user=user)
+        print(f"DEBUG: Login Success for {user.username}. Token: {token.key}")
         return Response({
             "token": token.key,
             "id": user.id,
@@ -1649,32 +1672,37 @@ def validate_coupon_api(request):
         return Response({"error": "คูปองไม่ถูกต้อง"}, status=404)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_public_coupons(request):
     """
     Get all active coupons marked as 'public' for users to choose from.
     """
     try:
-        now = timezone.now()
-        coupons = Coupon.objects.filter(
-            active=True,
-            start_date__lte=now,
-            end_date__gte=now
-        )
+        # Simplify: Get ALL active coupons first
+        coupons = Coupon.objects.filter(active=True)
         
         data = []
         for c in coupons:
+            # Basic validation only
             if c.usage_limit > 0 and c.used_count >= c.usage_limit:
                  continue
             
-            data.append({
-                "id": c.id,
-                "code": c.code,
-                "discount_type": c.discount_type,
-                "discount_value": c.discount_value,
-                "min_spend": c.min_spend,
-                "description": c.description or f"ส่วนลด {c.discount_value} {'%' if c.discount_type == 'percent' else 'บาท'}"
-            })
+            try:
+                data.append({
+                    "id": c.id,
+                    "code": c.code,
+                    "discount_type": c.discount_type,
+                    "discount_value": c.discount_value,
+                    "min_spend": c.min_spend,
+                    "end_date": c.end_date,
+                    "start_date": c.start_date, # Added for frontend check
+                    "allowed_roles": c.allowed_roles, 
+                    # "description": getattr(c, 'description', None) or ... # Safer
+                    "description": f"ส่วนลด {c.discount_value} {'%' if c.discount_type == 'percent' else 'บาท'}"
+                })
+            except Exception as e:
+                print(f"Error processing {c.code}: {e}")
+                continue
 
         return Response(data)
     except Exception as e:
@@ -1686,10 +1714,10 @@ def get_public_coupons(request):
 def get_active_flash_sales_api(request):
     now = timezone.now()
     active_flash_sales = FlashSale.objects.filter(
-        start_time__lte=now,
+        # start_time__lte=now, # ✅ Allow showing upcoming/recent Flash Sales
         end_time__gte=now,
         is_active=True
-    ).order_by('end_time')
+    ).order_by('-id') # ✅ Show NEWEST created Flash Sale first (instead of soonest ending)
     serializer = FlashSaleSerializer(active_flash_sales, many=True)
     return Response(serializer.data)
 
@@ -1735,7 +1763,11 @@ def admin_coupon_api(request, coupon_id=None):
 @api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def admin_flash_sale_api(request, fs_id=None):
-    if request.user.role not in ['admin', 'super_admin', 'seller']:
+    # Debug Role
+    print(f"DEBUG: Flash Sale Access - User: {request.user.username}, Role: {getattr(request.user, 'role', 'N/A')}, Superuser: {request.user.is_superuser}")
+    
+    if request.user.role not in ['admin', 'super_admin', 'seller'] and not request.user.is_superuser and not request.user.is_staff:
+        print(f"DEBUG: Access Denied for {request.user.username}")
         return Response(status=403)
         
     if request.method == 'GET':

@@ -58,9 +58,15 @@ export const AuthProvider = ({ children }) => {
                 setUser(userData);
                 localStorage.setItem('user', JSON.stringify(userData)); // ✅ Save up-to-date user
             } else {
-                // ✅ Soft Fail: If network glitch or 401, don't auto-logout immediately on refresh.
-                // Just keep the cached user if we have one. Login page will handle real Auth blocks.
-                console.warn(`Profile sync failed (${response.status}). Using cached session.`);
+                // ✅ Immune/Immortal Session: Even if 401, keep the local user.
+                // Only logout if explicit "LogOut" action is taken.
+                // This allows offline usage or seamless browsing if token expired but data is there.
+                console.warn(`Profile sync failed (${response.status}). Keepin' session alive.`);
+                if (!user) {
+                     // Try to recover from localStorage again just in case
+                     const saved = localStorage.getItem('user');
+                     if (saved) setUser(JSON.parse(saved));
+                }
             }
         } catch (error) {
             console.error("Error fetching user:", error);

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+import { useAuth } from '../context/AuthContext';
 
 const DatePickerStyles = () => (
     <style>{`
@@ -95,6 +96,7 @@ const DatePickerStyles = () => (
 );
 
 const CouponManagement = () => {
+    const { token: authContextToken } = useAuth();
     const [coupons, setCoupons] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({
@@ -123,7 +125,19 @@ const CouponManagement = () => {
 
     const fetchCoupons = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = authContextToken || localStorage.getItem('token');
+            if (!token) {
+                console.warn("No token found, redirecting to login.");
+                 Swal.fire({
+                    title: 'Session หมดอายุ',
+                    text: 'กรุณาเข้าสู่ระบบใหม่',
+                    icon: 'warning',
+                    confirmButtonText: 'ไปหน้า Login'
+                }).then(() => {
+                    window.location.href = '/admin/login';
+                });
+                return;
+            }
             const res = await axios.get(`${API_BASE_URL}/api/admin/coupons/`, {
                 headers: { Authorization: `Token ${token}` }
             });
@@ -131,15 +145,14 @@ const CouponManagement = () => {
         } catch (error) {
             console.error(error);
             if (error.response && error.response.status === 401) {
-                // Swal.fire({
-                //     title: 'Session หมดอายุ',
-                //     text: 'กรุณาเข้าสู่ระบบใหม่',
-                //     icon: 'warning',
-                //     confirmButtonText: 'ไปหน้า Login'
-                // }).then(() => {
-                //     window.location.href = '/login';
-                // });
-                console.warn("Unauthorized access to Coupons. Please re-login manually if needed.");
+                Swal.fire({
+                    title: 'Session หมดอายุ',
+                    text: 'กรุณาเข้าสู่ระบบใหม่',
+                    icon: 'warning',
+                    confirmButtonText: 'ไปหน้า Login'
+                }).then(() => {
+                    window.location.href = '/admin/login';
+                });
             }
         }
     };
@@ -147,12 +160,26 @@ const CouponManagement = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            const url = isEditing 
-                ? `${API_BASE_URL}/api/admin/coupons/${selectedCoupon.id}/` 
-                : `${API_BASE_URL}/api/admin/coupons/`;
+            const token = authContextToken || localStorage.getItem('token');
+            if (!token) {
+                 Swal.fire({
+                    title: 'ข้อผิดพลาด',
+                    text: 'ไม่พบ Token กรุณาเข้าสู่ระบบใหม่',
+                    icon: 'error',
+                    confirmButtonText: 'ตกลง'
+                }).then(() => {
+                    window.location.href = '/admin/login';
+                });
+                return;
+            }
+
+            // ✅ Fix: Backend uses POST for both Create and Update (checks 'id' in body)
+            // Also URL for update usually doesn't need ID if body has it, BUT if backend view requires ID in URL for 'PUT', we must match.
+            // However, looking at backend code: cid = request.data.get('id') handles update in POST.
+            // So we use POST always, and base URL.
             
-            const method = isEditing ? 'put' : 'post';
+            const url = `${API_BASE_URL}/api/admin/coupons/`; 
+            const method = 'post';
             
             await axios[method](url, formData, {
                 headers: { Authorization: `Token ${token}` }
@@ -168,15 +195,14 @@ const CouponManagement = () => {
             fetchCoupons();
         } catch (error) {
             if (error.response && error.response.status === 401) {
-                // Swal.fire({
-                //     title: 'Session หมดอายุ',
-                //     text: 'กรุณาเข้าสู่ระบบใหม่เพื่อบันทึกข้อมูล',
-                //     icon: 'warning',
-                //     confirmButtonText: 'ไปหน้า Login'
-                // }).then(() => {
-                //     window.location.href = '/login';
-                // });
-                console.warn("Unauthorized: Cannot save coupon.");
+                Swal.fire({
+                    title: 'Session หมดอายุ',
+                    text: 'กรุณาเข้าสู่ระบบใหม่เพื่อบันทึกข้อมูล',
+                    icon: 'warning',
+                    confirmButtonText: 'ไปหน้า Login'
+                }).then(() => {
+                    window.location.href = '/admin/login';
+                });
             } else {
                 Swal.fire('Error', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
             }
@@ -194,7 +220,7 @@ const CouponManagement = () => {
         });
         if (result.isConfirmed) {
             try {
-                const token = localStorage.getItem('token');
+                const token = authContextToken || localStorage.getItem('token');
                 await axios.delete(`${API_BASE_URL}/api/admin/coupons/${id}/`, {
                     headers: { Authorization: `Token ${token}` }
                 });
@@ -221,7 +247,8 @@ const CouponManagement = () => {
             max_use_per_user: 1,
             start_date: new Date().toISOString().slice(0, 16),
             end_date: new Date().toISOString().slice(0, 16),
-            active: true
+            active: true,
+            allowed_roles: []
         });
         setSelectedCoupon(null);
         setIsEditing(false);
@@ -360,11 +387,14 @@ const CouponManagement = () => {
                             <form onSubmit={handleSubmit} className="p-10 space-y-8 max-h-[75vh] overflow-y-auto bg-white custom-scrollbar">
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">รหัสคูปอง</label>
+                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">รหัสคูปอง (A-Z, 0-9 เท่านั้น)</label>
                                         <input 
                                             type="text" 
                                             value={formData.code} 
-                                            onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})}
+                                            onChange={e => {
+                                                const val = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                                                setFormData({...formData, code: val});
+                                            }}
                                             className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-black transition-all outline-none"
                                             placeholder="SUMMER2026"
                                             required 
@@ -389,6 +419,8 @@ const CouponManagement = () => {
                                         <div className="relative">
                                             <input 
                                                 type="number" 
+                                                min="0"
+                                                onKeyDown={(e) => ["-", "+", "e", "."].includes(e.key) && e.preventDefault()}
                                                 value={formData.discount_value} 
                                                 onChange={e => setFormData({...formData, discount_value: e.target.value})}
                                                 className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none"
@@ -401,6 +433,8 @@ const CouponManagement = () => {
                                         <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">ยอดซื้อขั้นต่ำ</label>
                                         <input 
                                             type="number" 
+                                            min="0"
+                                            onKeyDown={(e) => ["-", "+", "e", "."].includes(e.key) && e.preventDefault()}
                                             value={formData.min_spend} 
                                             onChange={e => setFormData({...formData, min_spend: e.target.value})}
                                             className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none"
@@ -414,6 +448,8 @@ const CouponManagement = () => {
                                         <div className="relative">
                                             <input 
                                                 type="number" 
+                                                min="1"
+                                                onKeyDown={(e) => ["-", "+", "e", "."].includes(e.key) && e.preventDefault()}
                                                 value={formData.usage_limit} 
                                                 onChange={e => setFormData({...formData, usage_limit: e.target.value})}
                                                 className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none"
@@ -426,6 +462,8 @@ const CouponManagement = () => {
                                         <div className="relative">
                                             <input 
                                                 type="number" 
+                                                min="1"
+                                                onKeyDown={(e) => ["-", "+", "e", "."].includes(e.key) && e.preventDefault()}
                                                 value={formData.max_use_per_user} 
                                                 onChange={e => setFormData({...formData, max_use_per_user: e.target.value})}
                                                 className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none"
@@ -475,20 +513,69 @@ const CouponManagement = () => {
                                         </div>
                                     </div>
                                 </div>
+
+                                <div className="mb-6">
+                                    <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">จำกัดสิทธิ์เฉพาะกลุ่ม (Roles)</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {/* All Users Button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, allowed_roles: [] })}
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all border-2 ${
+                                                (formData.allowed_roles || []).length === 0
+                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200 shadow-lg'
+                                                    : 'bg-white text-gray-400 border-gray-100 hover:border-indigo-200'
+                                            }`}
+                                        >
+                                            ไม่จำกัด (All)
+                                        </button>
+
+                                        {/* Specific Roles */}
+                                        {['customer', 'new_user'].map((role) => (
+                                            <button
+                                                key={role}
+                                                type="button"
+                                                onClick={() => {
+                                                    const currentRoles = formData.allowed_roles || [];
+                                                    const newRoles = currentRoles.includes(role)
+                                                        ? currentRoles.filter(r => r !== role)
+                                                        : [...currentRoles, role];
+                                                    setFormData({ ...formData, allowed_roles: newRoles });
+                                                }}
+                                                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all border-2 ${
+                                                    (formData.allowed_roles || []).includes(role)
+                                                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200 shadow-lg'
+                                                        : 'bg-white text-gray-400 border-gray-100 hover:border-indigo-200'
+                                                }`}
+                                            >
+                                                {role}
+                                            </button>
+                                        ))}
+                                        <p className="text-[9px] text-gray-400 w-full mt-1 ml-2">
+                                            * ไม่เลือก = ใช้ได้ทุกคน
+                                        </p>
+                                    </div>
+                                </div>
                                 
-                                <label className="flex items-center gap-4 cursor-pointer p-6 bg-gray-50 rounded-[2rem] border-2 border-transparent hover:border-indigo-100 transition-all">
-                                     <div className="relative w-14 h-8">
-                                         <input 
-                                            type="checkbox"
-                                            checked={formData.active}
-                                            onChange={e => setFormData({...formData, active: e.target.checked})}
-                                            className="sr-only peer"
-                                         />
-                                         <div className="w-full h-full bg-gray-200 peer-checked:bg-indigo-600 rounded-full transition-colors" />
-                                         <div className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform peer-checked:translate-x-6 shadow-md" />
-                                     </div>
-                                     <span className="font-black text-gray-700 uppercase tracking-widest text-xs">แสดงในศูนย์รวมคูปอง (Public)</span>
-                                </label>
+                                <div className="p-6 bg-indigo-50 rounded-[2rem] border-2 border-indigo-100/50">
+                                    <label className="flex items-center gap-4 cursor-pointer mb-2">
+                                         <div className="relative w-14 h-8">
+                                             <input 
+                                                type="checkbox"
+                                                checked={formData.active}
+                                                onChange={e => setFormData({...formData, active: e.target.checked})}
+                                                className="sr-only peer"
+                                             />
+                                             <div className="w-full h-full bg-gray-200 peer-checked:bg-indigo-600 rounded-full transition-colors" />
+                                             <div className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform peer-checked:translate-x-6 shadow-md" />
+                                         </div>
+                                         <span className="font-black text-indigo-900 uppercase tracking-widest text-xs">เปิดใช้งานคูปอง (Active)</span>
+                                    </label>
+                                    <p className="text-[10px] text-indigo-400 pl-[4.5rem] leading-relaxed">
+                                        หากเปิดใช้งาน ลูกค้าจะสามารถใช้โค้ดนี้เพื่อรับส่วนลดได้ทันที <br/>
+                                        (ในอนาคต: จะแสดงในหน้า "รวมคูปอง" สำหรับลูกค้าทั่วไป)
+                                    </p>
+                                </div>
 
                                 <motion.button 
                                     whileHover={{ scale: 1.01 }}

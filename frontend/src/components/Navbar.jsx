@@ -6,7 +6,7 @@ import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
-// ...
+
 // ✅ Reusable Tooltip Component
 const NavTooltip = ({ text, children }) => (
     <div className="group/tooltip relative flex items-center">
@@ -25,16 +25,16 @@ const NavTooltip = ({ text, children }) => (
 export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const { user, token, logout, loading } = useAuth();
   const { cartItems } = useCart();
-  // Wishlist removed
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownRef = useRef(null);
+  const API_BASE_URL = "http://localhost:8000"; // ✅ Defined at top
 
   // ✅ Smart Search State
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const [categories, setCategories] = useState([]); // ✅ Added Categories State
+  const [categories, setCategories] = useState([]);
   const searchTimeoutRef = useRef(null);
 
   // ✅ Notification State
@@ -42,50 +42,38 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
 
-  // ... (Keep existing code for handleNotificationClick and useEffects) ...
-  // Re-implementing handleNotificationClick and useEffects to ensure continuity if replacing large block, 
-  // but better to target specific lines if possible. 
-  // Since I need to define NavTooltip outside or inside, I'll place it outside.
-  
-  // NOTE: I will only replace the top of the file to add NavTooltip and then use it in specific blocks via multiple ReplaceFileContent calls or one big one if I replace the whole Return.
-  // Actually, replacing specific blocks is safer. I'll split this task.
-
-  // 1. Add NavTooltip Component at the top (after imports)
-  // 2. Wrap Items in Return.
-
-  // Let's do step 1 first: Add NavTooltip
-  // I'll add it before `export default function Navbar`
-  
-  // Wait, I can't use `replace_file_content` to "insert" easily without matching context.
-  // I'll replace the `export default function Navbar` line with `const NavTooltip ... export default function ...`
-  
-  // And then I'll create a separate tool call for the JSX wrapping.
-  
-  // ... (Skipping thinking process to Action)
-  
-  // Just replacing the export line to include the component.
-  
+  // ✅ Dynamic Notification Click Handler
   const handleNotificationClick = (noti) => {
-      Swal.fire({
-          title: `<h3 class="text-xl font-bold text-[#1a4d2e]">${noti.title}</h3>`,
-          html: `
-              <div class="text-left">
-                  <p class="text-gray-600 mb-4 text-sm">${noti.message}</p>
-                  <div class="flex items-center gap-2 text-xs text-gray-400 mt-2 border-t pt-2 border-gray-100">
-                      <span>🕒 ${noti.time}</span>
-                      <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 uppercase font-bold text-[10px]">${noti.type}</span>
-                  </div>
-              </div>
-          `,
-          icon: noti.type === 'alert' ? 'error' : (noti.type === 'success' ? 'success' : 'info'),
-          confirmButtonText: 'รับทราบ',
-          confirmButtonColor: '#1a4d2e',
-          buttonsStyling: false,
-          customClass: {
-              popup: 'rounded-[2rem] p-6',
-              confirmButton: 'bg-[#1a4d2e] text-white px-6 py-2 rounded-xl font-bold hover:bg-[#143d23] transition-all text-sm'
-          }
-      });
+      setShowNotifications(false); // Close dropdown
+
+      // 1. Flash Sale -> Home + Scroll
+      if (noti.type === 'flash_sale') {
+          navigate('/');
+          setTimeout(() => {
+              const element = document.getElementById('flash-sale');
+              if (element) {
+                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+          }, 100); 
+      }
+      // 2. Coupon -> Coupon Center
+      else if (noti.type === 'promotion') {
+          navigate('/coupons');
+      }
+      // 3. Order -> Order History
+      else if (noti.type === 'order' || noti.type === 'success' || noti.type === 'info') {
+          navigate('/order-history'); // ✅ Corrected Route
+      }
+      // 4. Default -> Show Popup
+      else {
+           Swal.fire({
+              title: `<h3 class="text-xl font-bold text-[#1a4d2e]">${noti.title}</h3>`,
+              html: `<p class="text-gray-600">${noti.message}</p>`,
+              icon: 'info',
+              confirmButtonColor: '#1a4d2e',
+              confirmButtonText: 'ตกลง'
+          });
+      }
   };
 
   // ✅ Close Notification when clicking outside
@@ -97,7 +85,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
       };
       document.addEventListener("mousedown", handleClickOutside);
       return () => {
-          document.removeEventListener("mousedown", handleClickOutside);
+           document.removeEventListener("mousedown", handleClickOutside);
       };
   }, []);
 
@@ -110,20 +98,78 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
 
       const fetchNotifications = async () => {
           try {
+              // 1. Fetch Real Notifications
               const res = await axios.get(`${API_BASE_URL}/api/notifications/`, {
-                  headers: { Authorization: `Token ${token || localStorage.getItem('token')}` }
+                   headers: { Authorization: `Token ${token || localStorage.getItem('token')}` }
               });
-              setNotifications(res.data);
+              let notifs = res.data || [];
+
+              // 2. Check for Active Public Coupons
+              try {
+                  const couponsRes = await axios.get(`${API_BASE_URL}/api/coupons-public/`);
+                  console.log("🔍 Coupon Response:", couponsRes.data); // ✅ Debugging
+
+                  const couponData = Array.isArray(couponsRes.data) ? couponsRes.data : [];
+                  
+                  if (couponData.length > 0) {
+                      const activeCoupons = couponData.filter(c => c.active);
+                      console.log("🔍 Active Coupons:", activeCoupons); // ✅ Debugging
+                      
+                      if (activeCoupons.length > 0) {
+                          // Check if we already have this notification
+                          const hasCouponNoti = notifs.some(n => n.id === 'coupon-alert');
+                          if (!hasCouponNoti) {
+                              notifs.unshift({
+                                  id: 'coupon-alert',
+                                  title: '🎉 คูปองใหม่มาแล้ว!',
+                                  message: `มีคูปองส่วนลด ${activeCoupons.length} ใบรอคุณอยู่ เก็บเลย!`,
+                                  type: 'promotion', 
+                                  is_read: false, 
+                                  created_at: new Date().toISOString()
+                              });
+                          }
+                      }
+                  }
+              } catch (e) { console.warn("Coupon fetch failed", e); }
+
+              // 3. Check for Active Flash Sale
+              try {
+                  const flashRes = await axios.get(`${API_BASE_URL}/api/flash-sales/active/`);
+                  console.log("🔍 Flash Sale Response:", flashRes.data); // ✅ Debugging
+
+                  if (Array.isArray(flashRes.data) && flashRes.data.length > 0) {
+                       // Sort by ID descending to show newest created? Or by start_time?
+                       // User complains about "Old" ones showing.
+                       // Let's try to pick the one that started MOST RECENTLY active?
+                       // Or just stick to first one but log it.
+                       const activeFS = flashRes.data[0]; 
+                       if (activeFS.is_active) {
+                            const hasFlashNoti = notifs.some(n => n.id === `flash-alert-${activeFS.id}`);
+                            if (!hasFlashNoti) {
+                                notifs.unshift({
+                                    id: `flash-alert-${activeFS.id}`,
+                                    title: '⚡ Flash Sale เริ่มแล้ว!',
+                                    message: `ลดกระหน่ำกับแคมเปญ "${activeFS.name}" ห้ามพลาด!`,
+                                    type: 'flash_sale', 
+                                    is_read: false,
+                                    created_at: activeFS.start_time
+                                });
+                            }
+                       }
+                  }
+              } catch (e) {}
+
+              setNotifications(notifs);
           } catch (error) {
               console.error("Failed to fetch notifications", error);
           }
       };
 
-      fetchNotifications(); // Initial fetch
-      const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
+      fetchNotifications(); 
+      const interval = setInterval(fetchNotifications, 60000); 
 
       return () => clearInterval(interval);
-  }, [user]);
+  }, [user, token]); 
 
   // ✅ Search Handler (Debounced)
   const handleSearch = (value) => {
@@ -139,48 +185,42 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
           try {
               const res = await axios.get(`${API_BASE_URL}/api/products/?search=${value}`);
               if (res.data && res.data.results) {
-                  setSearchResults(res.data.results.slice(0, 5)); // Limit 5 items
+                  setSearchResults(res.data.results.slice(0, 5)); 
               }
           } catch (error) {
               console.error("Search failed", error);
           }
-      }, 300); // 300ms debounce
+      }, 300); 
   };
 
-  const API_BASE_URL = "http://localhost:8000";
-
-  // ✅ Rule 12: เช็ค Admin/Seller Check
+  // ✅ Rule 12: Admin/Seller Check
   const userRole = (user?.role || user?.role_code || '').toLowerCase();
   const isAdmin = ['admin', 'super_admin'].includes(userRole);
   const isRestricted = ['admin', 'super_admin', 'seller'].includes(userRole);
   const hasAdminPanelAccess = isAdmin || userRole === 'seller';
 
-  // ✅ Rule 4: ปิดเมนูอัตโนมัติเมื่อเปลี่ยนหน้า
+  // ✅ Rule 4: Close menu on route change
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location]);
 
   const handleLogout = () => {
     logout();
-    navigate('/'); // ✅ Redirect to Home instead of Login as requested ("Come Main Page")
+    navigate('/'); 
   };
 
   return (
-    // ✅ Rule 2, 5: Fixed และ Z-Index สูงสุด พร้อมเอฟเฟกต์เบลอ
     <nav className="bg-white/80 backdrop-blur-md fixed w-full z-[999] top-0 border-b border-gray-100 shadow-sm transition-all duration-300">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
 
-        {/* ✅ Left Section: Logo & Burger (for Admin) */}
+        {/* ✅ Left Section */}
         <div className="flex items-center gap-4">
-            
-            {/* ✅ Rule 1, 9: Logo พร้อม Hover Animation - Click to Reset/Home */}
             <Link 
                 to="/" 
                 className="flex items-center gap-2 group"
                 onClick={() => {
                     setSearchQuery('');
                     setSearchResults([]);
-                    // Optional: Scroll to top? window.scrollTo(0,0);
                 }}
             >
             <NavTooltip text="หน้าแรก">
@@ -192,7 +232,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
             </Link>
         </div>
 
-        {/* ✅ Middle Section: Smart Search (Mega Menu Style) */}
+        {/* ✅ Middle Section: Smart Search */}
         <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative z-[1001] transition-all" ref={dropdownRef}> 
             <div className="relative w-full group">
                 <input 
@@ -202,11 +242,8 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                     onChange={(e) => {
                         const val = e.target.value;
                         handleSearch(val);
-                        // If empty, show random again
                         if (!val.trim()) {
-                             // Re-fetch random/latest if desired, or just keep previous suggested
                              axios.get(`${API_BASE_URL}/api/products/`).then(res => {
-                                 // Shuffle or just take first 4
                                  if (res.data && res.data.results) {
                                      setSearchResults(res.data.results.sort(() => 0.5 - Math.random()).slice(0, 4));
                                  }
@@ -214,15 +251,12 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                         }
                     }}
                     onFocus={() => {
-                        // Fetch categories if empty
                         if (categories.length === 0) {
                             axios.get(`${API_BASE_URL}/api/categories/`).then(res => setCategories(res.data.slice(0, 6))).catch(err => console.error(err));
                         }
-                        // Fetch Random/Featured Products if no query
                         if (!searchQuery) {
                              axios.get(`${API_BASE_URL}/api/products/`).then(res => {
                                  if (res.data && res.data.results) {
-                                     // Randomize for "Discovery" feel
                                      setSearchResults(res.data.results.sort(() => 0.5 - Math.random()).slice(0, 4));
                                  }
                              }).catch(console.error);
@@ -231,12 +265,11 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                 />
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
                 
-                {/* 🌟 Mega Search Dropdown - Logic: Show if (Has Results OR Focused) AND Categories exist */}
-                {/* We use searchResults.length check. If focused and empty query, searchResults will hold 'Random' items */}
                 {(searchResults.length > 0 || categories.length > 0) && (
-                    <div className="absolute top-full left-0 w-full mt-3 bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-300 flex flex-col md:flex-row min-h-[300px]">
-                        
-                        {/* 👈 Left Sidebar: Categories */}
+                    <div 
+                        onMouseDown={(e) => e.preventDefault()} 
+                        className="absolute top-full left-0 w-full mt-3 bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-300 flex flex-col md:flex-row min-h-[300px]"
+                    >
                         <div className="w-1/3 bg-[#F9F9F9] p-4 border-r border-gray-100">
                              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-2">หมวดหมู่แนะนำ</h4>
                              <div className="space-y-1">
@@ -251,11 +284,10 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                              </div>
                         </div>
 
-                        {/* 👉 Right Content: Product Grid */}
                         <div className="w-2/3 p-4">
                             <div className="flex justify-between items-center mb-3 px-2">
                                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                    {searchQuery ? "ผลการค้นหา" : "แนะนำสำหรับคุณ"} {/* Dynamic Header */}
+                                    {searchQuery ? "ผลการค้นหา" : "แนะนำสำหรับคุณ"}
                                 </h4>
                                 {searchQuery && <span className="text-[10px] font-bold bg-[#1a4d2e]/10 text-[#1a4d2e] px-2 py-0.5 rounded-full">{searchResults.length} Results</span>}
                             </div>
@@ -265,7 +297,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                                     <Link 
                                         to={`/product/${product.id}`} 
                                         key={product.id}
-                                        // onClick={() => setSearchResults([])} // Don't clear immediately to allow nav
                                         className="group/card flex flex-col bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md hover:border-[#1a4d2e]/20 transition-all cursor-pointer"
                                     >
                                         <div className="h-24 w-full bg-gray-50 relative overflow-hidden">
@@ -292,7 +323,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
 
         <div className="hidden md:flex items-center gap-6">
           
-          {/* ✅ Notification Center (Improved Hover Interaction) */}
+          {/* ✅ Notification Center */}
           <div className="relative group/noti">
               <button className="relative p-2 rounded-full transition-all duration-300 text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50 group-hover/noti:text-[#1a4d2e] group-hover/noti:bg-green-50">
                   <Bell size={22} className={notifications.length > 0 ? 'animate-swing' : ''} />
@@ -303,7 +334,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                   )}
               </button>
               
-              {/* Notification Dropdown */}
               <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden opacity-0 invisible group-hover/noti:opacity-100 group-hover/noti:visible transition-all duration-300 z-[1200] translate-y-2 group-hover/noti:translate-y-0">
                   <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-white/50 backdrop-blur-sm">
                       <h3 className="font-bold text-gray-800 text-sm">การแจ้งเตือน</h3>
@@ -349,7 +379,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
           </div>
 
 
-          {/* ✅ Rule 16: ซ่อนปุ่มตะกร้า/Wishlist สำหรับ Admin & Seller */}
+          {/* ✅ Cart & Wishlist */}
           {!isRestricted && (
             <div className="relative group/cart border-r border-gray-100 pr-6 mr-2">
                 <Link 
@@ -364,7 +394,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                     )}
                 </Link>
 
-                {/* 🛒 Cart Hover Popup */}
                 <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden opacity-0 invisible group-hover/cart:opacity-100 group-hover/cart:visible transition-all duration-300 z-[1100] translate-y-2 group-hover/cart:translate-y-0">
                     <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">ตะกร้าสินค้า ({cartItems.length})</span>
@@ -375,7 +404,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                         {cartItems.length > 0 ? cartItems.slice(0, 5).map((item, idx) => (
                             <div key={idx} className="flex gap-3 p-2 hover:bg-gray-50 rounded-xl transition-colors">
                                 <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden shrink-0 border border-gray-100">
-                                    {/* ✅ Fix Image Property: Try thumbnail first, then image */}
                                     {(item.thumbnail || item.image) ? (
                                         <img src={API_BASE_URL + (item.thumbnail || item.image)} alt={item.title} className="w-full h-full object-cover" />
                                     ) : (
@@ -406,11 +434,11 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
           )}
 
 
-          {/* User Section - Consolidated Logic with Hover Popup */}
+          {/* User Section */}
           {user ? (
             <div className="flex items-center gap-3">
                
-               {/* 1. Order History (Hidden for Admin/Seller) */}
+               {/* 1. Order History */}
                {!hasAdminPanelAccess && (
                  <NavTooltip text="ติดตามสถานะ">
                     <Link 
@@ -422,7 +450,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                  </NavTooltip>
                )}
 
-               {/* 2. Profile Link with Hover Popup */}
+               {/* 2. Profile Link */}
                <div className="relative group/profile">
                     <Link 
                         to={location.pathname === '/profile' ? '/' : '/profile'}
@@ -443,9 +471,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                         <ChevronDown size={14} className="text-gray-300 group-hover/profile:text-[#1a4d2e] transition-colors" />
                     </Link>
                     
-                    {/* 👤 Profile Hover Popup */}
                     <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-300 z-[1100] translate-y-2 group-hover/profile:translate-y-0">
-                         {/* Header: Clickable to Go to Profile Directly */}
                          <Link 
                              to={location.pathname === '/profile' ? '/' : '/profile'}
                              className="block p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-green-50 to-white border-b border-gray-50 text-center hover:bg-gray-50 transition-colors group/header"
@@ -457,7 +483,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                              <span className="text-[10px] font-bold px-2 py-0.5 bg-[#1a4d2e] text-white rounded-full uppercase tracking-widest">{user.role}</span>
                          </Link>
                          
-                         {/* Menu Links: Simplified (Removed redundant 'Profile' link) */}
                          <div className="p-2 space-y-1">
                              {!isAdmin && (
                                  <>
@@ -469,7 +494,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                                     </Link>
                                  </>
                              )}
-                             {/* Admin Dashboard */}
                              {hasAdminPanelAccess && (
                                  <Link to="/admin/dashboard" className="flex items-center gap-3 px-3 py-2 text-xs font-bold text-gray-600 hover:text-[#1a4d2e] hover:bg-green-50 rounded-xl transition-colors">
                                      <LayoutDashboard size={16} /> แดชบอร์ดผู้ดูแล
@@ -477,7 +501,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                              )}
                          </div>
 
-                         {/* Logout: Ensured Visibility */}
                          <div className="p-2 border-t border-gray-50">
                              <button onClick={handleLogout} className="flex items-center justify-center gap-2 w-full px-3 py-2.5 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-all shadow-red-200 shadow-sm">
                                  <LogOut size={16} /> ออกจากระบบ
@@ -488,7 +511,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
 
             </div>
           ) : (
-            // ✅ Only show Login if definitely not loading and no token
             (!loading && !localStorage.getItem('token')) && (
             <div className="flex gap-4">
               <Link to="/login" className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-[#1a4d2e] transition-all">เข้าสู่ระบบ</Link>
@@ -506,7 +528,6 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
         </button>
       </div>
 
-      {/* ✅ Rule 4, 80: Mobile Menu Overlay */}
       {isMenuOpen && (
         <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 shadow-2xl py-6 px-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
           <Link to="/shop" className="block text-lg font-bold text-gray-800 px-4 py-2 hover:bg-gray-50 rounded-xl">สินค้าทั้งหมด</Link>

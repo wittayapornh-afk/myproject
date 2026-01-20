@@ -98,7 +98,7 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
        {/* Width Logic: md:w-[300px] to match reference spaciousness */}
       <aside 
         ref={sidebarRef}
-        className={`fixed top-0 left-0 h-full bg-white text-[#263A33] shadow-[0_0_40px_rgba(0,0,0,0.05)] z-[1001] transition-all duration-300 ease-in-out flex flex-col overflow-hidden border-r border-gray-100
+        className={`fixed top-0 left-0 h-full bg-white/80 backdrop-blur-md text-[#263A33] shadow-[0_0_40px_rgba(0,0,0,0.05)] z-[1001] transition-all duration-300 ease-in-out flex flex-col overflow-hidden border-r border-gray-100/50
         ${isSidebarOpen ? 'w-[300px] translate-x-0' : '-translate-x-full md:translate-x-0 md:w-[84px]'}
         `}
       >

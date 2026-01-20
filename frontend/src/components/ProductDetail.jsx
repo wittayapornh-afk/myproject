@@ -37,9 +37,8 @@ const FlashSaleTimer = ({ endTime }) => {
     if (timeLeft === "Ended") return null;
 
     return (
-        <div className="bg-gradient-to-r from-red-600 to-orange-500 text-white text-sm font-black px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-red-500/30 animate-pulse mb-4 w-fit">
-            <Zap size={16} fill="currentColor" />
-            <span>FLASH SALE ENDS IN: {timeLeft}</span>
+        <div className="text-white text-xs font-bold uppercase tracking-wider tabular-nums">
+             ENDS IN: {timeLeft}
         </div>
     );
 };
@@ -159,8 +158,10 @@ function ProductDetail() {
         return res.json();
       })
       .then(data => {
-        setProduct(data);
-        setActiveImage(data.image || data.thumbnail); 
+        // ✅ Map 'flash_sale_info' from API to 'flash_sale' used in UI
+        const mappedProduct = { ...data, flash_sale: data.flash_sale_info };
+        setProduct(mappedProduct);
+        setActiveImage(mappedProduct.image || mappedProduct.thumbnail); 
         setLoading(false);
 
         // Save to Recently Viewed
@@ -304,8 +305,7 @@ function ProductDetail() {
 
                  <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight">{product.title}</h1>
 
-                 {/* Flash Sale Timer */}
-                 {product.flash_sale && <FlashSaleTimer endTime={product.flash_sale.end_time} />}
+
                  
                  <div className="flex items-center gap-4 mb-8">
                     <div className="flex bg-orange-50 px-3 py-1 rounded-lg gap-1">
@@ -319,28 +319,58 @@ function ProductDetail() {
                  </div>
 
                  {/* Price & Quantity */}
-                 <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-6 mb-10 pb-10 border-b border-gray-100 border-dashed">
-                     <div>
-                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total Price</p>
-                         <div className="flex items-baseline gap-2">
-                              {product.flash_sale ? (
-                                 <>
-                                     <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-500 tracking-tight flex items-center gap-2">
-                                         {formatPrice(product.flash_sale.sale_price * quantity)}
-                                         <Zap size={24} fill="#ef4444" className="animate-bounce text-red-500" />
-                                     </span>
-                                     <span className="text-gray-400 font-bold text-xl line-through decoration-red-400/50 opacity-60">
-                                         {formatPrice(product.price * quantity)}
-                                     </span>
-                                 </>
-                              ) : (
-                                 <span className="text-5xl font-black text-gray-900 tracking-tight">{formatPrice(product.price * quantity)}</span>
-                              )}
-                              
-                              {quantity > 1 && !product.flash_sale && <span className="text-gray-400 font-bold text-sm">({formatPrice(product.price)} / unit)</span>}
-                              {quantity > 1 && product.flash_sale && <span className="text-red-400 font-bold text-sm">({formatPrice(product.flash_sale.sale_price)} / unit)</span>}
-                         </div>
-                     </div>
+                         { product.flash_sale ? (
+                             <div className="w-full bg-gradient-to-br from-red-600 to-orange-500 rounded-[2rem] p-6 text-white shadow-xl shadow-red-200 relative overflow-hidden mb-6 group">
+                                 {/* Animated Background */}
+                                 <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:scale-110 transition-transform duration-700"></div>
+                                 
+                                 <div className="flex justify-between items-start mb-4 relative z-10">
+                                     <div>
+                                         <div className="flex items-center gap-2 mb-2">
+                                             <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1 border border-white/10">
+                                                 <Zap size={12} fill="currentColor" className="animate-pulse"/> Flash Sale
+                                             </div>
+                                             <FlashSaleTimer endTime={product.flash_sale.end_time} />
+                                         </div>
+                                         <div className="flex items-baseline gap-3">
+                                             <h2 className="text-6xl font-black tracking-tighter drop-shadow-sm">
+                                                 {formatPrice(product.flash_sale.sale_price * quantity)}
+                                             </h2>
+                                             <span className="text-white/60 text-xl font-bold line-through decoration-white/40 decoration-2">
+                                                 {formatPrice(product.price * quantity)}
+                                             </span>
+                                         </div>
+                                     </div>
+                                     
+                                     {/* Discount Badge */}
+                                     <div className="bg-white text-red-600 w-16 h-16 rounded-2xl flex flex-col items-center justify-center font-black shadow-lg transform rotate-3 group-hover:rotate-6 transition-transform">
+                                         <span className="text-xl leading-none">-{Math.round(((product.price - product.flash_sale.sale_price) / product.price) * 100)}%</span>
+                                         <span className="text-[8px] uppercase tracking-wide">OFF</span>
+                                     </div>
+                                 </div>
+
+                                 {/* Progress Bar */}
+                                 <div className="relative z-10">
+                                     <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-2 text-white/80">
+                                         <span>Sold: {product.flash_sale.sold_count}</span>
+                                         <span>Limited Stock</span>
+                                     </div>
+                                     <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden backdrop-blur-sm border border-white/10">
+                                         <div 
+                                             className="h-full bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]" 
+                                             style={{ width: `${Math.min((product.flash_sale.sold_count / product.flash_sale.quantity_limit) * 100, 100)}%` }}
+                                         ></div>
+                                     </div>
+                                 </div>
+                             </div>
+                         ) : (
+                             <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-6 mb-10 pb-10 border-b border-gray-100 border-dashed">
+                                 <div>
+                                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total Price</p>
+                                     <span className="text-5xl font-black text-gray-900 tracking-tight">{formatPrice(product.price * quantity)}</span>
+                                 </div>
+                             </div>
+                         )}
 
                       {!isRestricted && !isOutOfStock && (
                          <div className="flex items-center bg-gray-100/80 rounded-[1.2rem] p-1.5 border border-white shadow-inner">
@@ -349,7 +379,6 @@ function ProductDetail() {
                              <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-600 hover:text-indigo-600 transition-colors"><Plus size={18}/></button>
                          </div>
                       )}
-                 </div>
 
                   {/* Actions */}
                   <div className="space-y-4">
