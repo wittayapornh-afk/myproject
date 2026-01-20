@@ -273,27 +273,45 @@ function UserProfile() {
   };
 
   const handleOpenMap = () => {
-    if (!navigator.geolocation) {
-      Swal.fire('Error', 'เบราว์เซอร์ของคุณไม่รองรับ Geolocation', 'error');
+    // 1. Use existing position if already selected/set
+    if (mapPosition) {
+      setShowMap(true);
       return;
     }
 
-    setGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setMapPosition({ lat: latitude, lng: longitude });
+    // 2. Try to load from localStorage (Persist selection)
+    const savedPos = localStorage.getItem('selectedMapPosition');
+    if (savedPos) {
+      try {
+        const { lat, lng } = JSON.parse(savedPos);
+        setMapPosition({ lat, lng });
         setShowMap(true);
-        setGpsLoading(false);
-      },
-      (error) => {
-        console.error('Geolocation Error:', error);
-        // Default to Bangkok if location denied or error
-        setMapPosition({ lat: 13.7563, lng: 100.5018 });
-        setShowMap(true);
-        setGpsLoading(false);
+        return;
+      } catch (e) {
+        localStorage.removeItem('selectedMapPosition');
       }
-    );
+    }
+
+    // 2. Default to Bangkok first (immediate feedback)
+    setMapPosition({ lat: 13.7563, lng: 100.5018 });
+    setShowMap(true);
+
+    // 3. Optional: Try to get actual GPS in background (if user hasn't selected anything yet)
+    if (navigator.geolocation) {
+      setGpsLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          // Only update if map is still open and user hasn't manually moved/clicked (simplified check)
+          setMapPosition({ lat: latitude, lng: longitude });
+          setGpsLoading(false);
+        },
+        (error) => {
+          console.error('Geolocation Error:', error);
+          setGpsLoading(false);
+        }
+      );
+    }
   };
 
   const handleConfirmLocation = async () => {
@@ -329,6 +347,7 @@ function UserProfile() {
       click(e) {
         setMapPosition(e.latlng);
         map.flyTo(e.latlng, map.getZoom());
+        localStorage.setItem('selectedMapPosition', JSON.stringify(e.latlng));
       },
     });
 

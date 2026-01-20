@@ -15,9 +15,9 @@ import L from 'leaflet';
 // Fix Leaflet Marker
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
 const DatePickerStyles = () => (
@@ -89,7 +89,7 @@ function CheckoutPage() {
     const [checkoutItems, setCheckoutItems] = useState(() => {
         // 1. Priority: Direct Buy (from Product Detail)
         if (location.state?.directBuyItem) {
-             return [{ ...location.state.directBuyItem, quantity: location.state.quantity || 1 }];
+            return [{ ...location.state.directBuyItem, quantity: location.state.quantity || 1 }];
         }
         // 2. Fallback: Load from LocalStorage
         const saved = localStorage.getItem('checkout_items_persist');
@@ -101,10 +101,10 @@ function CheckoutPage() {
 
         // Update if new selection from Cart (only if not a direct buy and we have selected items)
         if (!location.state?.directBuyItem && selectedItems.length > 0 && cartItems.length > 0) {
-             items = cartItems.filter(item => selectedItems.includes(item.id));
-             setCheckoutItems(items);
+            items = cartItems.filter(item => selectedItems.includes(item.id));
+            setCheckoutItems(items);
         }
-        
+
         // Save to LocalStorage for persistence
         if (items.length > 0) {
             localStorage.setItem('checkout_items_persist', JSON.stringify(items));
@@ -156,23 +156,40 @@ function CheckoutPage() {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        
+
         // Real-time validation for some fields
         if (['phone', 'zip_code'].includes(name)) {
             validateField(name, value);
         } else {
-             // Clear error if exists when typing
-             if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+            // Clear error if exists when typing
+            if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
         }
     };
     const [transferAmount, setTransferAmount] = useState(0);
-    const [bankName, setBankName] = useState(''); 
-    const [accountNumber, setAccountNumber] = useState(''); 
-    
+    const [bankName, setBankName] = useState('');
+    const [accountNumber, setAccountNumber] = useState('');
+
     // UI State
     const [loading, setLoading] = useState(false);
     const [showMap, setShowMap] = useState(false);
-    const [mapPosition, setMapPosition] = useState(null); 
+    const [mapPosition, setMapPosition] = useState(() => {
+        const saved = localStorage.getItem('checkout_map_position');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                console.error("Error parsing map position", e);
+            }
+        }
+        return null;
+    });
+
+    // Save Map Position
+    useEffect(() => {
+        if (mapPosition) {
+            localStorage.setItem('checkout_map_position', JSON.stringify(mapPosition));
+        }
+    }, [mapPosition]);
     const [qrPayload, setQrPayload] = useState('');
     const [isResolvingAddress, setIsResolvingAddress] = useState(false);
 
@@ -209,7 +226,7 @@ function CheckoutPage() {
                 email: user.email || '',
                 phone: user.phone_number || '',
                 address: user.address || '',
-                zip_code: '' 
+                zip_code: ''
             });
         }
     }, [user]);
@@ -239,7 +256,7 @@ function CheckoutPage() {
         if (!stateName) return 'กรุงเทพมหานคร';
         // 1. Direct match in mapping
         if (PROVINCE_MAPPING[stateName]) return PROVINCE_MAPPING[stateName];
-        
+
         // 2. Fuzzy match
         for (const [eng, thai] of Object.entries(PROVINCE_MAPPING)) {
             if (stateName.includes(eng)) return thai;
@@ -251,13 +268,13 @@ function CheckoutPage() {
     };
 
     const LocationMarker = () => {
-         const map = useMapEvents({
-            click(e) { 
-                setMapPosition(e.latlng); 
-                map.flyTo(e.latlng, map.getZoom()); 
+        const map = useMapEvents({
+            click(e) {
+                setMapPosition(e.latlng);
+                map.flyTo(e.latlng, map.getZoom());
             },
-         });
-         return mapPosition === null ? null : <Marker position={mapPosition}></Marker>;
+        });
+        return mapPosition === null ? null : <Marker position={mapPosition}></Marker>;
     };
 
 
@@ -266,22 +283,22 @@ function CheckoutPage() {
             setShowMap(false);
             return;
         }
-        
+
         setIsResolvingAddress(true);
         try {
             // ✅ Change to 'th' for Thai Address
-            const res = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${mapPosition.lat}&lon=${mapPosition.lng}&accept-language=th`); 
+            const res = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${mapPosition.lat}&lon=${mapPosition.lng}&accept-language=th`);
             if (res.data && res.data.display_name) {
                 setFormData(prev => {
                     const newFormData = { ...prev, address: res.data.display_name };
-                    
+
                     // Improved ZipCode Extraction
                     if (res.data.address) {
                         const zip = res.data.address.postcode || res.data.address.zip;
                         if (zip) {
                             newFormData.zip_code = zip;
                             // Trigger validation for zipcode if needed
-                            validateField('zip_code', zip); 
+                            validateField('zip_code', zip);
                         }
                     }
                     return newFormData;
@@ -290,10 +307,10 @@ function CheckoutPage() {
                 if (res.data.address) {
                     const { state, province, city } = res.data.address;
                     const locationName = state || province || city || '';
-                    
+
                     // 1. Try Direct Thai Match
                     let thaiMatch = THAI_PROVINCES.find(p => locationName.includes(p));
-                    
+
                     // 2. Fallback: Try English Mapping
                     if (!thaiMatch) {
                         for (const [eng, thai] of Object.entries(PROVINCE_MAPPING)) {
@@ -313,7 +330,7 @@ function CheckoutPage() {
                         setProvince(thaiMatch);
                     }
                 }
-            } 
+            }
         } catch (error) {
             console.error("Reverse geocode failed", error);
         } finally {
@@ -324,7 +341,7 @@ function CheckoutPage() {
 
     const handleMapOpen = () => {
         setShowMap(true);
-        if (!mapPosition) setMapPosition({ lat: 13.7563, lng: 100.5018 }); 
+        if (!mapPosition) setMapPosition({ lat: 13.7563, lng: 100.5018 });
     };
 
     const [couponCode, setCouponCode] = useState('');
@@ -332,7 +349,7 @@ function CheckoutPage() {
     const [couponData, setCouponData] = useState(null);
     const [availableCoupons, setAvailableCoupons] = useState([]);
     const [showCouponModal, setShowCouponModal] = useState(false);
-    const [flashSaleItems, setFlashSaleItems] = useState({}); 
+    const [flashSaleItems, setFlashSaleItems] = useState({});
 
     useEffect(() => {
         const fetchFlashSales = async () => {
@@ -342,7 +359,7 @@ function CheckoutPage() {
                 const saleMap = {};
                 sales.forEach(sale => {
                     sale.products.forEach(p => {
-                        saleMap[p.product] = p.sale_price; 
+                        saleMap[p.product] = p.sale_price;
                     });
                 });
                 setFlashSaleItems(saleMap);
@@ -364,12 +381,12 @@ function CheckoutPage() {
 
     useEffect(() => {
         if (!hasFlashSaleItem) {
-             const storedToken = localStorage.getItem('token') || (user && user.token);
-             if (storedToken) {
-                 axios.get('http://localhost:8000/api/coupons-public/', { headers: { Authorization: `Token ${storedToken}` } })
-                     .then(res => setAvailableCoupons(res.data))
-                     .catch(err => console.error("Error fetching coupons", err));
-             }
+            const storedToken = localStorage.getItem('token') || (user && user.token);
+            if (storedToken) {
+                axios.get('http://localhost:8000/api/coupons-public/', { headers: { Authorization: `Token ${storedToken}` } })
+                    .then(res => setAvailableCoupons(res.data))
+                    .catch(err => console.error("Error fetching coupons", err));
+            }
         }
     }, [hasFlashSaleItem, user]);
 
@@ -379,15 +396,15 @@ function CheckoutPage() {
         setCouponCode(code);
         setShowCouponModal(false);
         // Delay to allow state update then apply
-        setTimeout(() => handleApplyCoupon(code), 200); 
+        setTimeout(() => handleApplyCoupon(code), 200);
     };
 
     const handleApplyCoupon = async (codeToUse) => {
         const code = codeToUse || couponCode;
         if (hasFlashSaleItem) {
-             Swal.fire({ icon: 'warning', title: 'ใช้คูปองไม่ได้', text: 'สินค้า Flash Sale ไม่ร่วมรายการส่วนลด' });
-             removeCoupon();
-             return;
+            Swal.fire({ icon: 'warning', title: 'ใช้คูปองไม่ได้', text: 'สินค้า Flash Sale ไม่ร่วมรายการส่วนลด' });
+            removeCoupon();
+            return;
         }
         if (!code) return;
         try {
@@ -403,8 +420,8 @@ function CheckoutPage() {
                 setDiscount(res.data.discount_amount);
                 setCouponData(res.data);
                 Swal.fire({
-                    icon: 'success', 
-                    title: 'ใช้คูปองสำเร็จ', 
+                    icon: 'success',
+                    title: 'ใช้คูปองสำเร็จ',
                     text: `ลดไป ฿${res.data.discount_amount}`,
                     timer: 1500,
                     showConfirmButton: false,
@@ -423,7 +440,7 @@ function CheckoutPage() {
             });
         }
     };
-    
+
     const removeCoupon = () => {
         setCouponCode('');
         setDiscount(0);
@@ -438,8 +455,8 @@ function CheckoutPage() {
                 axios.post('http://localhost:8000/api/payment/promptpay_payload/', { amount: finalTotal }, {
                     headers: { Authorization: `Token ${storedToken}` }
                 })
-                .then(res => setQrPayload(res.data.payload))
-                .catch(err => console.error("QR Error", err));
+                    .then(res => setQrPayload(res.data.payload))
+                    .catch(err => console.error("QR Error", err));
             }
         }
     }, [finalTotal, user]);
@@ -450,7 +467,7 @@ function CheckoutPage() {
             Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลจัดส่งให้ครบถ้วน', 'warning');
             return;
         }
-        
+
         // Validate Phone Format (Thai Mobile 10 digits, starts with 0)
         if (!/^0\d{9}$/.test(formData.phone)) {
             Swal.fire('เบอร์โทรศัพท์ไม่ถูกต้อง', 'กรุณากรอกเบอร์โทรศัพท์ 10 หลัก และขึ้นต้นด้วย 0', 'warning');
@@ -458,8 +475,8 @@ function CheckoutPage() {
         }
 
         if (formData.zip_code && formData.zip_code.length > 5) {
-             Swal.fire('รหัสไปรษณีย์ไม่ถูกต้อง', 'รหัสไปรษณีย์ต้องไม่เกิน 5 หลัก', 'warning');
-             return;
+            Swal.fire('รหัสไปรษณีย์ไม่ถูกต้อง', 'รหัสไปรษณีย์ต้องไม่เกิน 5 หลัก', 'warning');
+            return;
         }
         setStep(2);
         window.scrollTo(0, 0);
@@ -470,20 +487,20 @@ function CheckoutPage() {
 
         // VALIDATION
         if (['QR', 'Bank'].includes(paymentMethod)) {
-             if (!file) {
-                 Swal.fire('กรุณาแนบสลิป', 'โปรดอัพโหลดหลักฐานการโอนเงินเพื่อดำเนินการต่อ', 'warning');
-                 return;
-             }
-             if (paymentMethod === 'Bank') {
-                 if (accountNumber && accountNumber.length !== 10) {
-                     Swal.fire('เลขบัญชีไม่ถูกต้อง', 'กรุณาระบุเลขบัญชีผู้โอนให้ครบ 10 หลัก', 'warning');
-                     return;
-                 }
-                 if (!bankName) {
-                      Swal.fire('กรุณาเลือกธนาคาร', 'โปรดเลือกธนาคารที่คุณใช้โอนเงิน', 'warning');
-                      return;
-                 }
-             }
+            if (!file) {
+                Swal.fire('กรุณาแนบสลิป', 'โปรดอัพโหลดหลักฐานการโอนเงินเพื่อดำเนินการต่อ', 'warning');
+                return;
+            }
+            if (paymentMethod === 'Bank') {
+                if (accountNumber && accountNumber.length !== 10) {
+                    Swal.fire('เลขบัญชีไม่ถูกต้อง', 'กรุณาระบุเลขบัญชีผู้โอนให้ครบ 10 หลัก', 'warning');
+                    return;
+                }
+                if (!bankName) {
+                    Swal.fire('กรุณาเลือกธนาคาร', 'โปรดเลือกธนาคารที่คุณใช้โอนเงิน', 'warning');
+                    return;
+                }
+            }
         }
         // CHECKOUT ITEMS VALIDATION
         if (checkoutItems.length === 0) {
@@ -508,46 +525,46 @@ function CheckoutPage() {
                     ...formData,
                     name: `${formData.first_name} ${formData.last_name}`.trim(),
                     address: `${formData.address} ${formData.zip_code}`.trim(),
-                    province: province 
+                    province: province
                 },
                 paymentMethod: ['QR', 'Bank'].includes(paymentMethod) ? 'Transfer' : paymentMethod,
-                couponCode: couponData ? couponData.code : null 
+                couponCode: couponData ? couponData.code : null
             };
-            
+
             const res = await axios.post('http://localhost:8000/api/orders/create/', payload, {
                 headers: { Authorization: `Token ${storedToken}` }
             });
-            
+
             const orderId = res.data.order_id;
 
             if (['QR', 'Bank'].includes(paymentMethod) && file) {
-               const slipFormData = new FormData();
+                const slipFormData = new FormData();
                 slipFormData.append('slip_image', file);
                 slipFormData.append('transfer_amount', transferAmount);
-                slipFormData.append('bank_name', bankName || 'Unknown'); 
+                slipFormData.append('bank_name', bankName || 'Unknown');
                 slipFormData.append('transfer_account_number', accountNumber || 'Unknown');
 
                 await axios.post(`http://localhost:8000/api/upload_slip/${orderId}/`, slipFormData, {
-                    headers: { 
-                        Authorization: `Token ${storedToken}`, 
-                        'Content-Type': 'multipart/form-data' 
+                    headers: {
+                        Authorization: `Token ${storedToken}`,
+                        'Content-Type': 'multipart/form-data'
                     }
                 });
             }
 
             await Swal.fire({
                 icon: 'success',
-                title: 'สั่งซื้อสำเร็จ!', 
-                text: 'ขอบคุณที่ใช้บริการครับ', 
-                timer: 2000, 
-                showConfirmButton: false 
+                title: 'สั่งซื้อสำเร็จ!',
+                text: 'ขอบคุณที่ใช้บริการครับ',
+                timer: 2000,
+                showConfirmButton: false
             });
 
             // ✅ Clear Cart only if NOT Direct Buy
             if (!location.state?.directBuyItem) {
-                 clearCart(); 
+                clearCart();
             }
-            
+
             // ✅ Clear Saved Form Data
             localStorage.removeItem('checkout_form_data');
             localStorage.removeItem('checkout_province');
@@ -563,13 +580,13 @@ function CheckoutPage() {
 
             if (error.response?.data) {
                 const data = error.response.data;
-                
+
                 // Case 1: Complex Validation Error (List of errors)
                 if (data.errors && Array.isArray(data.errors)) {
                     errorTitle = data.message || 'ข้อมูลไม่ถูกต้อง';
                     // Combine all error messages
                     errorMsg = data.errors.map(e => `• ${e.message}`).join('\n');
-                } 
+                }
                 // Case 2: Simple Error Key
                 else if (data.error) {
                     errorMsg = data.error;
@@ -584,7 +601,7 @@ function CheckoutPage() {
                     errorMsg = data;
                 }
             }
-            
+
             Swal.fire({
                 icon: 'error',
                 title: errorTitle,
@@ -626,16 +643,16 @@ function CheckoutPage() {
                 </div>
                 <h2 className="text-2xl font-black text-[#1a4d2e] mb-2 tracking-tight">ไม่พบสินค้าที่จะชำระเงิน</h2>
                 <p className="text-gray-500 mb-8 max-w-md font-medium leading-relaxed">
-                    ดูเหมือนว่ารายการสินค้าจะว่างเปล่า<br/>กรุณากลับไปเลือกสินค้าในตะกร้าใหม่อีกครั้งครับ
+                    ดูเหมือนว่ารายการสินค้าจะว่างเปล่า<br />กรุณากลับไปเลือกสินค้าในตะกร้าใหม่อีกครั้งครับ
                 </p>
                 <div className="flex gap-4">
-                    <button 
+                    <button
                         onClick={() => navigate('/cart')}
                         className="px-8 py-3 bg-[#1a4d2e] text-white rounded-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-green-900/10 flex items-center gap-2"
                     >
-                         <ChevronLeft size={20} /> กลับไปตะกร้า
+                        <ChevronLeft size={20} /> กลับไปตะกร้า
                     </button>
-                    <button 
+                    <button
                         onClick={() => navigate('/shop')}
                         className="px-8 py-3 bg-white text-[#1a4d2e] border border-[#1a4d2e]/20 rounded-xl font-bold hover:bg-green-50 transition-all shadow-sm"
                     >
@@ -665,13 +682,13 @@ function CheckoutPage() {
                             <span className="text-xs font-bold uppercase hidden md:inline">Payment</span>
                         </div>
                     </div>
-                    <div className="w-20"></div> 
+                    <div className="w-20"></div>
                 </div>
             </div>
 
             <main className="max-w-7xl mx-auto px-4 md:px-8 pt-8">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    
+
                     {/* ✅ Step 1: Shipping Info */}
                     {step === 1 && (
                         <div className="lg:col-span-8 space-y-6 animate-in fade-in slide-in-from-left-4">
@@ -692,14 +709,14 @@ function CheckoutPage() {
                                     <div className="space-y-1 md:col-span-2">
                                         <label className="text-xs font-bold text-gray-400 ml-1">ที่อยู่</label>
                                         <div className="relative">
-                                             <input required name="address" value={formData.address} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#263A33] focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all pr-12" placeholder={isResolvingAddress ? "กำลังค้นหาตำแหน่ง..." : ""} />
-                                             <button type="button" onClick={handleMapOpen} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
-                                                 <MapPin size={20} />
-                                             </button>
+                                            <input required name="address" value={formData.address} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#263A33] focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all pr-12" placeholder={isResolvingAddress ? "กำลังค้นหาตำแหน่ง..." : ""} />
+                                            <button type="button" onClick={handleMapOpen} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                                                <MapPin size={20} />
+                                            </button>
                                         </div>
                                         <p className="text-[10px] text-gray-400 ml-1">* คลิกหมุดเพื่อเลือกตำแหน่งจากแผนที่ และอัปเดตจังหวัดอัตโนมัติ</p>
                                     </div>
-                                    
+
                                     <div className="space-y-1">
                                         <label className="text-xs font-bold text-gray-400 ml-1">จังหวัด</label>
                                         <select value={province} onChange={(e) => setProvince(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#263A33] focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all cursor-pointer appearence-none">
@@ -710,10 +727,10 @@ function CheckoutPage() {
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-xs font-bold text-gray-400 ml-1">รหัสไปรษณีย์</label>
-                                        <input 
-                                            required 
-                                            name="zip_code" 
-                                            value={formData.zip_code} 
+                                        <input
+                                            required
+                                            name="zip_code"
+                                            value={formData.zip_code}
                                             onChange={(e) => {
                                                 const val = e.target.value.replace(/\D/g, '');
                                                 if (val.length <= 5) {
@@ -721,26 +738,26 @@ function CheckoutPage() {
                                                     validateField('zip_code', val);
                                                 }
                                             }}
-                                            className={`w-full bg-gray-50 border rounded-xl px-4 py-3 font-bold text-[#263A33] outline-none transition-all ${errors.zip_code ? 'border-red-500 focus:ring-red-500/10' : 'border-gray-200 focus:border-[#1a4d2e] focus:ring-green-500/10'}`} 
+                                            className={`w-full bg-gray-50 border rounded-xl px-4 py-3 font-bold text-[#263A33] outline-none transition-all ${errors.zip_code ? 'border-red-500 focus:ring-red-500/10' : 'border-gray-200 focus:border-[#1a4d2e] focus:ring-green-500/10'}`}
                                         />
                                         <ErrorMessage message={errors.zip_code} />
                                     </div>
 
                                     <div className="space-y-1">
                                         <label className="text-xs font-bold text-gray-400 ml-1">เบอร์โทรศัพท์ (10 หลัก)</label>
-                                        <input 
-                                            required 
-                                            type="tel" 
-                                            name="phone" 
-                                            value={formData.phone} 
+                                        <input
+                                            required
+                                            type="tel"
+                                            name="phone"
+                                            value={formData.phone}
                                             onChange={(e) => {
                                                 const val = e.target.value.replace(/\D/g, '');
                                                 if (val.length <= 10) {
-                                                    setFormData({...formData, phone: val});
+                                                    setFormData({ ...formData, phone: val });
                                                     validateField('phone', val);
                                                 }
-                                            }} 
-                                            className={`w-full bg-gray-50 border rounded-xl px-4 py-3 font-bold text-[#263A33] outline-none transition-all ${errors.phone ? 'border-red-500 focus:ring-red-500/10' : 'border-gray-200 focus:border-[#1a4d2e] focus:ring-green-500/10'}`} 
+                                            }}
+                                            className={`w-full bg-gray-50 border rounded-xl px-4 py-3 font-bold text-[#263A33] outline-none transition-all ${errors.phone ? 'border-red-500 focus:ring-red-500/10' : 'border-gray-200 focus:border-[#1a4d2e] focus:ring-green-500/10'}`}
                                         />
                                         <ErrorMessage message={errors.phone} />
                                     </div>
@@ -757,7 +774,7 @@ function CheckoutPage() {
                     {step === 2 && (
                         <div className="lg:col-span-8 space-y-6 animate-in fade-in slide-in-from-right-4">
                             <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-                                 <h2 className="text-xl font-black flex items-center gap-3 mb-6 text-[#263A33]">
+                                <h2 className="text-xl font-black flex items-center gap-3 mb-6 text-[#263A33]">
                                     <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-[#1a4d2e]"><CreditCard size={20} /></div>
                                     วิธีการชำระเงิน
                                 </h2>
@@ -765,9 +782,9 @@ function CheckoutPage() {
                                     {['QR', 'Bank', 'COD'].map(method => (
                                         <label key={method} className={`cursor-pointer border-2 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === method ? 'border-[#1a4d2e] bg-green-50/50 text-[#1a4d2e]' : 'border-gray-100 hover:border-gray-300 text-gray-400'}`}>
                                             <input type="radio" name="payment" value={method} checked={paymentMethod === method} onChange={() => setPaymentMethod(method)} className="hidden" />
-                                            {method === 'QR' && <QrCode size={24}/>}
-                                            {method === 'Bank' && <Landmark size={24}/>}
-                                            {method === 'COD' && <Package size={24}/>}
+                                            {method === 'QR' && <QrCode size={24} />}
+                                            {method === 'Bank' && <Landmark size={24} />}
+                                            {method === 'COD' && <Package size={24} />}
                                             <span className="font-bold text-sm">{method === 'QR' ? 'สแกนจ่าย' : method === 'Bank' ? 'โอนเงิน' : 'เก็บปลายทาง'}</span>
                                         </label>
                                     ))}
@@ -784,15 +801,15 @@ function CheckoutPage() {
                                                 <p className="text-sm text-gray-500 font-medium mt-1">ผู้ชำระเงิน: {formData.first_name || '-'} {formData.last_name || '-'}</p>
                                             </div>
                                         )}
-                                        
+
                                         <div className="mb-6">
                                             <h4 className="font-black text-sm text-gray-600 uppercase tracking-wide mb-3">โอนเงินเข้าบัญชี (ร้านค้า)</h4>
                                             <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-center gap-4 shadow-sm">
                                                 <div className="w-12 h-12 rounded-full bg-[#0ea5e9] flex items-center justify-center text-white font-black text-xl shadow-sm overflow-hidden p-2">
-                                                    <img 
-                                                        src="https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/ktb.svg" 
-                                                        className="w-full h-full object-contain" 
-                                                        onError={(e) => {e.target.style.display='none'; e.target.parentElement.innerHTML = 'KTB'}} 
+                                                    <img
+                                                        src="https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/ktb.svg"
+                                                        className="w-full h-full object-contain"
+                                                        onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = 'KTB' }}
                                                     />
                                                 </div>
                                                 <div>
@@ -812,19 +829,19 @@ function CheckoutPage() {
                                                 <div className="col-span-2">
                                                     <label className="text-xs font-bold text-gray-400 block mb-1">สลิปโอนเงิน <span className="text-red-500">*</span></label>
                                                     <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:bg-white hover:border-[#1a4d2e] transition-all relative group bg-white/50">
-                                                        <input 
-                                                            type="file" 
-                                                            accept="image/*" 
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
                                                             required
-                                                            onChange={(e) => setFile(e.target.files[0])} 
-                                                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" 
+                                                            onChange={(e) => setFile(e.target.files[0])}
+                                                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                                                         />
                                                         <div className="flex flex-col items-center gap-2 text-gray-400 group-hover:text-[#1a4d2e] transition-colors">
                                                             {file ? (
                                                                 <>
                                                                     <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center relative">
-                                                                         <img src={URL.createObjectURL(file)} className="h-full object-contain" />
-                                                                         <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold text-xs">คลิกเพื่อเปลี่ยน</div>
+                                                                        <img src={URL.createObjectURL(file)} className="h-full object-contain" />
+                                                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold text-xs">คลิกเพื่อเปลี่ยน</div>
                                                                     </div>
                                                                     <span className="text-xs font-bold text-[#1a4d2e]">{file.name}</span>
                                                                 </>
@@ -843,56 +860,56 @@ function CheckoutPage() {
                                                     <label className="text-xs font-bold text-gray-400 block mb-1">จำนวนเงิน</label>
                                                     <input type="number" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none text-[#263A33]" />
                                                 </div>
-                                                
+
                                                 {paymentMethod === 'Bank' && (
                                                     <div className="col-span-2 space-y-3 pt-2 border-t border-dashed border-gray-200 mt-2 animate-in fade-in">
                                                         <label className="text-xs font-bold text-gray-400 block mb-1">ธนาคารของคุณ (ที่ใช้โอน)</label>
                                                         <div className="flex flex-wrap gap-3">
-                                                             {BANKS.map(bank => (
-                                                                 <div 
-                                                                    key={bank.id} 
+                                                            {BANKS.map(bank => (
+                                                                <div
+                                                                    key={bank.id}
                                                                     onClick={() => { setBankName(bank.name); setSelectedBank(bank); }}
                                                                     style={{ borderColor: selectedBank.id === bank.id ? bank.color : '' }}
                                                                     className={`w-14 h-14 rounded-2xl cursor-pointer flex items-center justify-center transition-all relative overflow-hidden shadow-sm p-1 bg-white ${selectedBank.id === bank.id ? 'ring-4 ring-offset-1 scale-110 z-10 border-2' : 'hover:scale-105 opacity-80 hover:opacity-100 border border-gray-100'}`}
-                                                                 >
-                                                                     <div className="w-full h-full rounded-xl flex items-center justify-center text-[10px] font-black text-white" style={{backgroundColor: bank.color}}>
-                                                                         <img 
-                                                                             src={bank.iconUrl} 
-                                                                             className="w-full h-full object-contain" 
-                                                                             onError={(e) => {
-                                                                                 e.target.style.display='none'; 
-                                                                                 e.target.parentElement.innerHTML = bank.initials;
-                                                                             }} 
-                                                                         />
-                                                                     </div>
-                                                                     {selectedBank.id === bank.id && <div className="absolute inset-0 bg-white/20"></div>}
-                                                                 </div>
-                                                             ))}
+                                                                >
+                                                                    <div className="w-full h-full rounded-xl flex items-center justify-center text-[10px] font-black text-white" style={{ backgroundColor: bank.color }}>
+                                                                        <img
+                                                                            src={bank.iconUrl}
+                                                                            className="w-full h-full object-contain"
+                                                                            onError={(e) => {
+                                                                                e.target.style.display = 'none';
+                                                                                e.target.parentElement.innerHTML = bank.initials;
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    {selectedBank.id === bank.id && <div className="absolute inset-0 bg-white/20"></div>}
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                         <div className="bg-white/50 p-3 rounded-xl border border-gray-100 flex items-center gap-2">
                                                             <span className="text-xs font-bold text-gray-500">เลือก:</span>
-                                                            <span className="text-sm font-bold px-2 py-0.5 rounded text-white shadow-sm" style={{backgroundColor: selectedBank.color}}>{selectedBank.name}</span>
+                                                            <span className="text-sm font-bold px-2 py-0.5 rounded text-white shadow-sm" style={{ backgroundColor: selectedBank.color }}>{selectedBank.name}</span>
                                                         </div>
 
 
                                                         <div className="mt-2">
-                                                             <label className="text-xs font-bold text-gray-400 block mb-1">เลขบัญชีของคุณ (10 หลัก)</label>
-                                                             <div className="relative">
-                                                                 <input 
-                                                                    value={accountNumber} 
+                                                            <label className="text-xs font-bold text-gray-400 block mb-1">เลขบัญชีของคุณ (10 หลัก)</label>
+                                                            <div className="relative">
+                                                                <input
+                                                                    value={accountNumber}
                                                                     name="source_account"
                                                                     onChange={e => {
                                                                         const val = e.target.value.replace(/\D/g, '');
                                                                         if (val.length <= 10) setAccountNumber(val);
-                                                                    }} 
-                                                                    placeholder="XXXXXXXXXX" 
-                                                                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold outline-none text-[#263A33] tracking-widest text-center focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 transition-all placeholder-gray-200" 
-                                                                 />
-                                                                 <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold px-2 py-1 rounded-full ${accountNumber.length === 10 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                                                                     {accountNumber.length}/10
-                                                                 </div>
-                                                             </div>
-                                                             <p className="text-[10px] text-gray-400 mt-1 pl-1">* โปรดระบุให้ครบ 10 หลักเพื่อยืนยัน</p>
+                                                                    }}
+                                                                    placeholder="XXXXXXXXXX"
+                                                                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold outline-none text-[#263A33] tracking-widest text-center focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 transition-all placeholder-gray-200"
+                                                                />
+                                                                <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold px-2 py-1 rounded-full ${accountNumber.length === 10 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                                                    {accountNumber.length}/10
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-[10px] text-gray-400 mt-1 pl-1">* โปรดระบุให้ครบ 10 หลักเพื่อยืนยัน</p>
                                                         </div>
                                                     </div>
                                                 )}
@@ -905,102 +922,102 @@ function CheckoutPage() {
                     )}
 
                     <div className="lg:col-span-4 transition-all duration-500">
-                            <div className="bg-gray-900 p-8 rounded-[3rem] text-white shadow-xl sticky top-28">
-                                <h2 className="text-xl font-black mb-6 border-b border-white/10 pb-4">สรุปคำสั่งซื้อ</h2>
-                                <div className="space-y-4 mb-8 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
-                                    {checkoutItems.map((item) => {
-                                        const isFlashSale = !!flashSaleItems[item.id];
-                                        const price = getEffectivePrice(item);
-                                        return (
-                                            <div key={item.id} className="flex gap-4 items-center">
-                                                <div className="w-12 h-12 rounded-xl bg-white/10 flex-shrink-0 p-1 relative">
-                                                    <img src={getImageUrl(item.thumbnail)} className="w-full h-full object-contain" />
-                                                    {isFlashSale && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1 rounded-full animate-pulse"><Zap size={8} fill="currentColor" /></div>}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-bold truncate">{item.title}</p>
-                                                    <p className="text-[10px] text-white/50">x{item.quantity}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className={`font-black text-sm ${isFlashSale ? 'text-orange-400' : ''}`}>{formatPrice(price * item.quantity)}</p>
-                                                </div>
+                        <div className="bg-gray-900 p-8 rounded-[3rem] text-white shadow-xl sticky top-28">
+                            <h2 className="text-xl font-black mb-6 border-b border-white/10 pb-4">สรุปคำสั่งซื้อ</h2>
+                            <div className="space-y-4 mb-8 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {checkoutItems.map((item) => {
+                                    const isFlashSale = !!flashSaleItems[item.id];
+                                    const price = getEffectivePrice(item);
+                                    return (
+                                        <div key={item.id} className="flex gap-4 items-center">
+                                            <div className="w-12 h-12 rounded-xl bg-white/10 flex-shrink-0 p-1 relative">
+                                                <img src={getImageUrl(item.thumbnail)} className="w-full h-full object-contain" />
+                                                {isFlashSale && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1 rounded-full animate-pulse"><Zap size={8} fill="currentColor" /></div>}
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                                
-                                <div className={`mb-6 transition-opacity ${hasFlashSaleItem ? 'opacity-50 pointer-events-none' : ''}`}>
-                                    <label className="text-[10px] font-bold text-white/60 mb-2 block uppercase tracking-widest flex justify-between">
-                                        โค้ดส่วนลด
-                                        {hasFlashSaleItem ? 
-                                            <span className="text-orange-400 flex items-center gap-1"><Zap size={10} /> Flash Sale</span> : 
-                                            <button type="button" onClick={() => setShowCouponModal(true)} className="text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"><Tag size={10} /> เลือกคูปอง ({availableCoupons.length})</button>
-                                        }
-                                    </label>
-                                    <div className="flex bg-white/10 rounded-xl p-1 border border-white/10 focus-within:border-white/50 transition-colors">
-                                        <div className="pl-3 flex items-center text-white/50"><Tag size={16} /></div>
-                                        <input 
-                                            value={couponCode}
-                                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                                            disabled={!!couponData || hasFlashSaleItem}
-                                            placeholder={hasFlashSaleItem ? "งดร่วมรายการ" : "กรอกโค้ด"}
-                                            className="bg-transparent w-full p-2 text-sm font-bold text-white placeholder-white/30 outline-none disabled:opacity-50"
-                                        />
-                                        {couponData ? (
-                                             <button type="button" onClick={removeCoupon} className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">ลบ</button>
-                                        ) : (
-                                             <button type="button" onClick={() => handleApplyCoupon(couponCode)} disabled={hasFlashSaleItem} className="bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-600 transition disabled:bg-gray-400 disabled:text-gray-200">ใช้</button>
-                                        )}
-                                    </div>
-                                    {couponData && <p className="text-[10px] text-indigo-300 mt-2 flex items-center gap-1"><Check size={10} /> ลด {formatPrice(discount)}</p>}
-                                </div>
-
-                                <div className="border-t border-white/10 pt-4 space-y-2">
-                                    <div className="flex justify-between text-xs font-bold text-white/60"><span>ยอดรวม</span><span>{formatPrice(subtotal)}</span></div>
-                                    {discount > 0 && <div className="flex justify-between text-xs font-bold text-green-300"><span>ส่วนลด</span><span>- {formatPrice(discount)}</span></div>}
-                                    <div className="flex justify-between items-end pt-2 border-t border-white/10 mt-2">
-                                        <span className="text-2xl font-black">ยอดสุทธิ</span>
-                                        <span className="text-3xl font-black">{formatPrice(finalTotal)}</span>
-                                    </div>
-                                </div>
-                                
-                                {step === 1 ? (
-                                    <button
-                                        type="button"
-                                        onClick={handleNextStep}
-                                        className="w-full mt-8 py-4 rounded-2xl font-black text-lg transition-all shadow-lg flex items-center justify-center gap-2 bg-white text-[#1a4d2e] hover:shadow-xl hover:-translate-y-1 active:scale-95"
-                                    >
-                                        ดำเนินการชำระเงิน <ArrowRight size={20} />
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="submit"
-                                        disabled={loading}
-                                        className={`w-full mt-8 py-4 rounded-2xl font-black text-lg transition-all shadow-lg flex items-center justify-center gap-2 
-                                        ${loading ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-400 hover:shadow-xl hover:-translate-y-1 active:scale-95'}`}
-                                    >
-                                        {loading ? 'Processing...' : <>ยืนยันสั่งซื้อ <ShieldCheck size={20} /></>}
-                                    </button>
-                                )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold truncate">{item.title}</p>
+                                                <p className="text-[10px] text-white/50">x{item.quantity}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className={`font-black text-sm ${isFlashSale ? 'text-orange-400' : ''}`}>{formatPrice(price * item.quantity)}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
+
+                            <div className={`mb-6 transition-opacity ${hasFlashSaleItem ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <label className="text-[10px] font-bold text-white/60 mb-2 block uppercase tracking-widest flex justify-between">
+                                    โค้ดส่วนลด
+                                    {hasFlashSaleItem ?
+                                        <span className="text-orange-400 flex items-center gap-1"><Zap size={10} /> Flash Sale</span> :
+                                        <button type="button" onClick={() => setShowCouponModal(true)} className="text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"><Tag size={10} /> เลือกคูปอง ({availableCoupons.length})</button>
+                                    }
+                                </label>
+                                <div className="flex bg-white/10 rounded-xl p-1 border border-white/10 focus-within:border-white/50 transition-colors">
+                                    <div className="pl-3 flex items-center text-white/50"><Tag size={16} /></div>
+                                    <input
+                                        value={couponCode}
+                                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                        disabled={!!couponData || hasFlashSaleItem}
+                                        placeholder={hasFlashSaleItem ? "งดร่วมรายการ" : "กรอกโค้ด"}
+                                        className="bg-transparent w-full p-2 text-sm font-bold text-white placeholder-white/30 outline-none disabled:opacity-50"
+                                    />
+                                    {couponData ? (
+                                        <button type="button" onClick={removeCoupon} className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">ลบ</button>
+                                    ) : (
+                                        <button type="button" onClick={() => handleApplyCoupon(couponCode)} disabled={hasFlashSaleItem} className="bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-600 transition disabled:bg-gray-400 disabled:text-gray-200">ใช้</button>
+                                    )}
+                                </div>
+                                {couponData && <p className="text-[10px] text-indigo-300 mt-2 flex items-center gap-1"><Check size={10} /> ลด {formatPrice(discount)}</p>}
+                            </div>
+
+                            <div className="border-t border-white/10 pt-4 space-y-2">
+                                <div className="flex justify-between text-xs font-bold text-white/60"><span>ยอดรวม</span><span>{formatPrice(subtotal)}</span></div>
+                                {discount > 0 && <div className="flex justify-between text-xs font-bold text-green-300"><span>ส่วนลด</span><span>- {formatPrice(discount)}</span></div>}
+                                <div className="flex justify-between items-end pt-2 border-t border-white/10 mt-2">
+                                    <span className="text-2xl font-black">ยอดสุทธิ</span>
+                                    <span className="text-3xl font-black">{formatPrice(finalTotal)}</span>
+                                </div>
+                            </div>
+
+                            {step === 1 ? (
+                                <button
+                                    type="button"
+                                    onClick={handleNextStep}
+                                    className="w-full mt-8 py-4 rounded-2xl font-black text-lg transition-all shadow-lg flex items-center justify-center gap-2 bg-white text-[#1a4d2e] hover:shadow-xl hover:-translate-y-1 active:scale-95"
+                                >
+                                    ดำเนินการชำระเงิน <ArrowRight size={20} />
+                                </button>
+                            ) : (
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className={`w-full mt-8 py-4 rounded-2xl font-black text-lg transition-all shadow-lg flex items-center justify-center gap-2 
+                                        ${loading ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-400 hover:shadow-xl hover:-translate-y-1 active:scale-95'}`}
+                                >
+                                    {loading ? 'Processing...' : <>ยืนยันสั่งซื้อ <ShieldCheck size={20} /></>}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </form>
             </main>
-                
-                {showCouponModal && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-                        <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-                            <div className="p-4 bg-indigo-600 text-white flex justify-between items-center">
-                                <h3 className="font-bold text-lg flex items-center gap-2"><Tag size={20} /> เลือกคูปองส่วนลด</h3>
-                                <button onClick={() => setShowCouponModal(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
-                            </div>
-                            <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
-                                {availableCoupons.length === 0 ? (
-                                    <div className="text-center py-8">
-                                        <Tag size={40} className="mx-auto text-gray-300 mb-2"/>
-                                        <p className="text-gray-500 font-bold">ไม่มีคูปองที่ใช้ได้ในขณะนี้</p>
-                                    </div>
-                                ) : 
+
+            {showCouponModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+                        <div className="p-4 bg-indigo-600 text-white flex justify-between items-center">
+                            <h3 className="font-bold text-lg flex items-center gap-2"><Tag size={20} /> เลือกคูปองส่วนลด</h3>
+                            <button onClick={() => setShowCouponModal(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
+                        </div>
+                        <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+                            {availableCoupons.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Tag size={40} className="mx-auto text-gray-300 mb-2" />
+                                    <p className="text-gray-500 font-bold">ไม่มีคูปองที่ใช้ได้ในขณะนี้</p>
+                                </div>
+                            ) :
                                 availableCoupons.map(coupon => (
                                     <div key={coupon.id} onClick={() => handleSelectCoupon(coupon.code)} className="border border-indigo-100 rounded-xl p-4 hover:bg-indigo-50 cursor-pointer transition relative group overflow-hidden">
                                         <div className="absolute top-0 right-0 bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded-bl-lg">CODE: {coupon.code}</div>
@@ -1008,34 +1025,34 @@ function CheckoutPage() {
                                         <p className="text-xs text-indigo-400">ขั้นต่ำ {formatPrice(coupon.min_spend)}</p>
                                     </div>
                                 ))}
-                            </div>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {showMap && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="bg-white rounded-3xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
-                           <div className="p-4 bg-[#1a4d2e] text-white flex justify-between items-center">
-                                <h3 className="font-bold text-lg flex items-center gap-2"><MapPin size={20} /> เลือกตำแหน่งที่อยู่</h3>
-                                <button onClick={() => setShowMap(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
-                            </div>
-                            <div className="flex-1 relative">
-                                <MapContainer center={mapPosition || { lat: 13.7563, lng: 100.5018 }} zoom={13} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
-                                    <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                                    <LocationMarker />
-                                </MapContainer>
-                            </div>
-                            <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-                                <button type="button" onClick={() => setShowMap(false)} className="px-6 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-200">ยกเลิก</button>
-                                <button type="button" onClick={handleConfirmLocation} disabled={isResolvingAddress || !mapPosition} className="px-6 py-2.5 rounded-xl font-bold text-white bg-[#1a4d2e] hover:bg-[#143d24] flex items-center gap-2 disabled:bg-gray-300">
-                                    {isResolvingAddress ? 'กำลังดึงที่อยู่...' : <><MapPin size={18} /> ยืนยันตำแหน่ง</>}
-                                </button>
-                            </div>
+            {showMap && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+                        <div className="p-4 bg-[#1a4d2e] text-white flex justify-between items-center">
+                            <h3 className="font-bold text-lg flex items-center gap-2"><MapPin size={20} /> เลือกตำแหน่งที่อยู่</h3>
+                            <button onClick={() => setShowMap(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
+                        </div>
+                        <div className="flex-1 relative">
+                            <MapContainer center={mapPosition || { lat: 13.7563, lng: 100.5018 }} zoom={13} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
+                                <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                <LocationMarker />
+                            </MapContainer>
+                        </div>
+                        <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                            <button type="button" onClick={() => setShowMap(false)} className="px-6 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-200">ยกเลิก</button>
+                            <button type="button" onClick={handleConfirmLocation} disabled={isResolvingAddress || !mapPosition} className="px-6 py-2.5 rounded-xl font-bold text-white bg-[#1a4d2e] hover:bg-[#143d24] flex items-center gap-2 disabled:bg-gray-300">
+                                {isResolvingAddress ? 'กำลังดึงที่อยู่...' : <><MapPin size={18} /> ยืนยันตำแหน่ง</>}
+                            </button>
                         </div>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
+        </div>
     );
 }
 
