@@ -3,7 +3,6 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from myapp import views
-from myapp.views import DashboardStatsView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -41,12 +40,19 @@ urlpatterns = [
     # ==============================
     # 🎟️ Coupon & Flash Sale APIs
     # ==============================
+    path('api/coupons/<int:coupon_id>/collect/', views.collect_coupon_api), # ✅ Coupon Collection
+    path('api/user-coupons/', views.get_my_coupons_api), # ✅ My Coupons
     path('api/coupons/validate/', views.validate_coupon_api),
     path('api/flash-sales/active/', views.get_active_flash_sales_api),
     path('api/admin/coupons/', views.admin_coupon_api),
     path('api/admin/coupons/<int:coupon_id>/', views.admin_coupon_api),
     path('api/admin/flash-sales/', views.admin_flash_sale_api),
     path('api/admin/flash-sales/<int:fs_id>/', views.admin_flash_sale_api),
+    
+    # 🎯 Flash Sale Campaigns (Timeline & Batch View)
+    path('api/admin/campaigns/', views.admin_campaign_api),
+    path('api/admin/campaigns/<int:campaign_id>/', views.admin_campaign_api),
+    path('api/admin/campaigns/<int:campaign_id>/flash-sales/', views.get_campaign_flash_sales),
     path('api/orders/<int:order_id>/confirm-received/', views.confirm_received_api), # ✅ Confirm Received
     path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
     path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
@@ -77,6 +83,7 @@ urlpatterns = [
     path('api/admin/orders_v2/', views.admin_orders_api_v4), # ✅ Point to V4 (Fixed View)
     path('api/admin/orders/bulk-update/', views.bulk_update_orders_api),
     path('api/admin/order_status/<int:order_id>/', views.update_order_status_api),
+    path('api/admin/orders/', views.get_admin_orders, name='admin_orders'), # ✅ Fixed Missing Path
     path('api/admin/order/<int:order_id>/delete/', views.delete_order_api),
     
     # ✅ Missing Paths from User Reports

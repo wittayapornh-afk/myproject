@@ -205,8 +205,13 @@ function TrackingPage() {
                                 {/* Progress Stepper (Visual) */}
                                 {['Pending', 'Processing', 'Shipped', 'Completed'].includes(order.status) && (
                                     <div className="mb-8 px-4">
+                                        {/* 🎓 Concept: ใช้วิธีเปลี่ยนความกว้าง (Width) ของ div สีเขียวเพื่อสร้าง Effect Progress Bar */}
                                         <div className="flex justify-between relative">
-                                            <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-100 -z-10 rounded-full"></div>
+                                            {/* Background Line (สีเทา) */}
+                                            <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 -z-10 rounded-full"></div>
+                                            
+                                            {/* Active Progress Line (สีเขียววิ่งตามสถานะ) */}
+                                            {/* 🎓 Logic: เช็ค status เพื่อกำหนด class w-[%] */}
                                             <div className={`absolute top-1/2 left-0 h-1 bg-[#1a4d2e] -z-10 rounded-full transition-all duration-1000 ${
                                                 order.status === 'Pending' ? 'w-[15%]' : 
                                                 order.status === 'Processing' ? 'w-[50%]' : 
@@ -214,22 +219,46 @@ function TrackingPage() {
                                                 'w-[100%]'
                                             }`}></div>
 
+                                            {/* Steps Loop */}
                                             {['ได้รับการสั่งซื้อ', 'กำลังเตรียมพัสดุ', 'อยู่ระหว่างจัดส่ง', 'จัดส่งสำเร็จ'].map((step, index) => {
+                                                // 🎓 Calculation: คำนวณว่า Step นี้ผ่านไปหรือยัง โดยดูจาก index เทียบกับ status ปัจจุบัน
                                                 const isActive = 
                                                     (order.status === 'Pending' && index === 0) ||
                                                     (order.status === 'Processing' && index <= 1) ||
                                                     (order.status === 'Shipped' && index <= 2) ||
                                                     (order.status === 'Completed' && index <= 3);
                                                 
+                                                const isCurrent = 
+                                                    (order.status === 'Pending' && index === 0) ||
+                                                    (order.status === 'Processing' && index === 1) ||
+                                                    (order.status === 'Shipped' && index === 2) ||
+                                                    (order.status === 'Completed' && index === 3);
+
                                                 return (
-                                                    <div key={index} className="flex flex-col items-center gap-2">
-                                                        <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center bg-white transition-all ${isActive ? 'border-[#1a4d2e] text-[#1a4d2e] scale-110' : 'border-gray-200 text-gray-300'}`}>
-                                                            {index === 0 && <Box size={12} />}
-                                                            {index === 1 && <Package size={12} />}
-                                                            {index === 2 && <Truck size={12} />}
-                                                            {index === 3 && <CheckCircle size={12} />}
+                                                    <div key={index} className="flex flex-col items-center gap-2 relative">
+                                                        {/* Icon Circle */}
+                                                        <div className={`w-10 h-10 rounded-full border-4 flex items-center justify-center bg-white transition-all duration-500 z-10 ${
+                                                            isActive ? 'border-[#1a4d2e] text-[#1a4d2e] scale-110 shadow-lg' : 'border-gray-200 text-gray-300'
+                                                        } ${isCurrent ? 'animate-bounce-slight ring-4 ring-green-100' : ''}`}>
+                                                            {index === 0 && <Box size={16} />}
+                                                            {index === 1 && <Package size={16} />}
+                                                            {index === 2 && <Truck size={16} />}
+                                                            {index === 3 && <CheckCircle size={16} />}
                                                         </div>
-                                                        <span className={`text-[10px] font-bold uppercase transition-colors ${isActive ? 'text-[#1a4d2e]' : 'text-gray-300'}`}>{step}</span>
+                                                        
+                                                        {/* Label */}
+                                                        <span className={`text-[10px] md:text-xs font-bold uppercase transition-colors duration-300 ${
+                                                            isActive ? 'text-[#1a4d2e]' : 'text-gray-300'
+                                                        }`}>
+                                                            {step}
+                                                        </span>
+
+                                                        {/* 🎓 Conditional Rendering: แสดงวันที่ถ้ามี (Ex. Completed ให้โชว์วันที่รับ) */}
+                                                        {isCurrent && (
+                                                            <div className="absolute -bottom-6 w-24 text-center bg-[#1a4d2e] text-white text-[9px] py-0.5 rounded px-1 opacity-80">
+                                                                Current Status
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )
                                             })}

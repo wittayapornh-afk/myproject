@@ -9,8 +9,8 @@ from django.db import transaction  # ✅ สำหรับระบบ Checkout
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework.authtoken.models import Token
 # ✅ รวม Model ทุกตัวไว้ในบรรทัดเดียว (ป้องกัน Error)
-from .models import Product, Order, OrderItem, AdminLog, ProductImage, Review, StockHistory, Category, Tag, Coupon, FlashSale, FlashSaleProduct
-from .serializers import CouponSerializer, FlashSaleSerializer, FlashSaleProductSerializer 
+from .models import Product, Order, OrderItem, AdminLog, ProductImage, Review, StockHistory, Category, Tag, Coupon, FlashSale, FlashSaleProduct, UserCoupon, FlashSaleCampaign
+from .serializers import CouponSerializer, FlashSaleSerializer, FlashSaleProductSerializer, FlashSaleCampaignSerializer 
 from .validators import validate_order_data
 from .exceptions import InlineValidationError 
 import logging
@@ -554,6 +554,7 @@ def product_detail_api(request, product_id):
                     "rating": r.rating,
                     "comment": r.comment,
                     "date": r.created_at.strftime("%d/%m/%Y") if r.created_at else "",
+                    "image": r.image.url if r.image else None,  # ✅ เพิ่มรูปภาพรีวิว
                     # ✅ Return Reply Data
                     "reply_comment": r.reply_comment,
                     "reply_date": r.reply_timestamp.strftime("%d/%m/%Y %H:%M") if r.reply_timestamp else ""
@@ -1679,7 +1680,9 @@ def get_public_coupons(request):
     """
     try:
         # Simplify: Get ALL active coupons first
-        coupons = Coupon.objects.filter(active=True)
+        # ✅ Filter out expired coupons (Expired = End Date < Now)
+        now = timezone.now()
+        coupons = Coupon.objects.filter(active=True, end_date__gte=now)
         
         data = []
         for c in coupons:
@@ -1722,7 +1725,7 @@ def get_active_flash_sales_api(request):
     return Response(serializer.data)
 
 # --- Admin Coupon Management ---
-@api_view(['GET', 'POST', 'DELETE'])
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def admin_coupon_api(request, coupon_id=None):
     if request.user.role not in ['admin', 'super_admin', 'seller']:
@@ -1760,7 +1763,7 @@ def admin_coupon_api(request, coupon_id=None):
         return Response({"message": "Delete success"})
 
 # --- Admin Flash Sale Management ---
-@api_view(['GET', 'POST', 'DELETE'])
+@api_view(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def admin_flash_sale_api(request, fs_id=None):
     # Debug Role
@@ -1786,6 +1789,15 @@ def admin_flash_sale_api(request, fs_id=None):
         data = request.data
         fs_id_param = data.get('id')
         
+        # Handle parsed JSON if sent via FormData
+        import json
+        products_data = data.get('products', [])
+        if isinstance(products_data, str):
+            try:
+                products_data = json.loads(products_data)
+            except json.JSONDecodeError:
+                products_data = []
+
         try:
             with transaction.atomic():
                 if fs_id_param:
@@ -1794,7 +1806,18 @@ def admin_flash_sale_api(request, fs_id=None):
                         fs.name = data.get('name', fs.name)
                         fs.start_time = data.get('start_time', fs.start_time)
                         fs.end_time = data.get('end_time', fs.end_time)
-                        fs.is_active = data.get('is_active', fs.is_active)
+                        
+                        # Fix Boolean
+                        raw_active = data.get('is_active', fs.is_active)
+                        if isinstance(raw_active, str):
+                            raw_active = raw_active.lower() == 'true'
+                        fs.is_active = raw_active
+                        
+                        if 'campaign_id' in data:
+                             # ✅ อัปเดต Campaign ที่ Flash Sale นี้สังกัดอยู่
+                             # ถ้าส่งเป็น null = ถอดออกจาก Campaign, ถ้าส่งเป็น ID = ย้ายไป Campaign นั้น
+                             fs.campaign_id = data.get('campaign_id')
+                        
                         fs.save()
                     except FlashSale.DoesNotExist:
                         return Response({"error": "Flash Sale not found"}, status=404)
@@ -1802,24 +1825,94 @@ def admin_flash_sale_api(request, fs_id=None):
                     # Clear old products and re-add (Simple Strategy)
                     FlashSaleProduct.objects.filter(flash_sale=fs).delete()
                 else:
+                    # Fix Boolean
+                    raw_active = data.get('is_active', True)
+                    if isinstance(raw_active, str):
+                        raw_active = raw_active.lower() == 'true'
+                        
                     fs = FlashSale.objects.create(
                         name=data['name'],
                         start_time=data['start_time'],
                         end_time=data['end_time'],
-                        is_active=data.get('is_active', True)
+                        is_active=raw_active,
+                        # ✅ กำหนด Campaign ตั้งแต่ตอนสร้าง (Optional)
+                        campaign_id=data.get('campaign_id')
                     )
                 
                 # Add Products
-                products_data = data.get('products', [])
+                # products_data is already parsed above
+                print(f"DEBUG: Processing products for create: {products_data}")
                 for p_item in products_data:
+                    pid = p_item.get('product_id') or p_item.get('id')
+                    if not pid:
+                        raise ValueError(f"Missing product_id in item: {p_item}")
+                        
                     FlashSaleProduct.objects.create(
                         flash_sale=fs,
-                        product_id=p_item['product_id'],
+                        product_id=pid,
                         sale_price=p_item['sale_price'],
-                        quantity_limit=p_item.get('limit', 10)
+                        quantity_limit=p_item.get('quantity_limit', p_item.get('limit', 10)),
+                        limit_per_user=p_item.get('limit_per_user', 1)
                     )
                     
             return Response({"message": "Saved successfully"})
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+    
+    elif request.method in ['PUT', 'PATCH']:
+        # RESTful update - fs_id must be provided in URL
+        if not fs_id:
+            return Response({"error": "Flash Sale ID required in URL"}, status=400)
+        
+        data = request.data
+        
+        # Handle parsed JSON if sent via FormData
+        import json
+        products_data = data.get('products', [])
+        if isinstance(products_data, str):
+            try:
+                products_data = json.loads(products_data)
+            except json.JSONDecodeError:
+                products_data = []
+        
+        try:
+            with transaction.atomic():
+                try:
+                    fs = FlashSale.objects.get(id=fs_id)
+                    fs.name = data.get('name', fs.name)
+                    fs.start_time = data.get('start_time', fs.start_time)
+                    fs.end_time = data.get('end_time', fs.end_time)
+                    
+                    # Fix Boolean
+                    raw_active = data.get('is_active', fs.is_active)
+                    if isinstance(raw_active, str):
+                        raw_active = raw_active.lower() == 'true'
+                    fs.is_active = raw_active
+                    
+                    fs.save()
+                except FlashSale.DoesNotExist:
+                    return Response({"error": "Flash Sale not found"}, status=404)
+                
+                # Clear old products and re-add (Simple Strategy)
+                FlashSaleProduct.objects.filter(flash_sale=fs).delete()
+                
+                # Add Products
+                # products_data is parsed above
+                print(f"DEBUG: Processing products for update: {products_data}")
+                for p_item in products_data:
+                    pid = p_item.get('product_id') or p_item.get('id')
+                    if not pid:
+                        raise ValueError(f"Missing product_id in item: {p_item}")
+
+                    FlashSaleProduct.objects.create(
+                        flash_sale=fs,
+                        product_id=pid,
+                        sale_price=p_item['sale_price'],
+                        quantity_limit=p_item.get('quantity_limit', p_item.get('limit', 10)),
+                        limit_per_user=p_item.get('limit_per_user', 1)
+                    )
+                    
+            return Response({"message": "Updated successfully"})
         except Exception as e:
             return Response({"error": str(e)}, status=400)
             
@@ -1831,6 +1924,252 @@ def admin_flash_sale_api(request, fs_id=None):
             return Response({"message": "Deleted successfully"})
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+
+# ==========================================
+# 🎯 Flash Sale Campaign API (สำหรับ Timeline & Batch View)
+# ==========================================
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_campaign_api(request, campaign_id=None):
+    """
+    🎯 API สำหรับจัดการ Flash Sale Campaign (CRUD)
+    
+    Campaign คือแคมเปญใหญ่ที่รวม Flash Sale หลายรอบเข้าด้วยกัน
+    เช่น "Mega Sale 12.12" อาจมี Flash Sale 5 รอบ (Midnight, Morning, Lunch, Afternoon, Evening)
+    
+    Methods:
+    --------
+    GET: ดึงรายการ Campaign ทั้งหมด หรือ 1 Campaign
+    POST: สร้าง Campaign ใหม่
+    PUT: แก้ไข Campaign ที่มีอยู่
+    DELETE: ลบ Campaign
+    
+    Permissions:
+    -----------
+    Admin, Super Admin, Seller เท่านั้น
+    
+    Examples:
+    --------
+    GET /api/admin/campaigns/           # ดึงทั้งหมด
+    GET /api/admin/campaigns/1/         # ดึง Campaign ID 1
+    POST /api/admin/campaigns/          # สร้างใหม่
+    PUT /api/admin/campaigns/1/         # แก้ไข ID 1
+    DELETE /api/admin/campaigns/1/      # ลบ ID 1
+    """
+    
+    # ✅ Check Permission - เฉพาะ Admin/Seller/Super Admin เท่านั้น
+    if request.user.role not in ['admin', 'super_admin', 'seller'] and not request.user.is_superuser:
+        return Response({"error": "Unauthorized"}, status=403)
+    
+    # ==========================================
+    # 📖 GET - ดึงข้อมูล Campaign
+    # ==========================================
+    if request.method == 'GET':
+        if campaign_id:
+            # ดึง 1 Campaign เฉพาะ
+            try:
+                campaign = FlashSaleCampaign.objects.get(id=campaign_id)
+                return Response(FlashSaleCampaignSerializer(campaign).data)
+            except FlashSaleCampaign.DoesNotExist:
+                return Response({"error": "Campaign not found"}, status=404)
+        else:
+            # ดึงทั้งหมด (เรียงจากวันที่ล่าสุดและ priority สูงสุดก่อน)
+            campaigns = FlashSaleCampaign.objects.all().order_by('-campaign_start', '-priority')
+            return Response(FlashSaleCampaignSerializer(campaigns, many=True).data)
+    
+    # ==========================================
+    # ➕ POST - สร้าง Campaign ใหม่
+    # ==========================================
+    elif request.method == 'POST':
+        """
+        Expected Payload:
+        {
+            "name": "Mega Sale 12.12",
+            "description": "แคมเปญใหญ่ประจำปี สุดคุ้ม!",
+            "campaign_start": "2024-12-12T00:00:00Z",
+            "campaign_end": "2024-12-14T23:59:59Z",
+            "theme_color": "#ff6600",
+            "is_active": true,
+            "priority": 10
+        }
+        """
+        try:
+            data = request.data
+            
+            # ✅ Parse Dates to ensure they are datetime objects
+            from django.utils.dateparse import parse_datetime
+            start_date = parse_datetime(data.get('campaign_start'))
+            end_date = parse_datetime(data.get('campaign_end'))
+
+            # ✅ สร้าง Campaign Object ใหม่
+            campaign = FlashSaleCampaign.objects.create(
+                name=data.get('name'),
+                description=data.get('description', ''),
+                campaign_start=start_date,
+                campaign_end=end_date,
+                theme_color=data.get('theme_color', '#f97316'),  # สีส้ม (default)
+                is_active=data.get('is_active', True),
+                priority=data.get('priority', 0)
+            )
+            
+            # ✅ รับรูป Banner (Optional) - ถ้ามีส่งมา
+            if 'banner_image' in request.FILES:
+                campaign.banner_image = request.FILES['banner_image']
+                campaign.save()
+            
+            # ✅ Return ข้อมูล Campaign ที่สร้างสำเร็จ
+            # Create response first
+            response_data = FlashSaleCampaignSerializer(campaign).data
+            
+            # ✅ Handle Flash Sale Assignment (ถ้ามีการส่ง list ของ Flash Sale IDs มา)
+            if 'flash_sale_ids' in data and isinstance(data['flash_sale_ids'], list):
+                fs_ids = data['flash_sale_ids']
+                # 1. Clear existing (optional - depending on logic, here we just add)
+                # 2. Add new ones
+                FlashSale.objects.filter(id__in=fs_ids).update(campaign=campaign)
+                
+            return Response(response_data, status=201)
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+    
+    # ==========================================
+    # ✏️ PUT - แก้ไข Campaign ที่มีอยู่
+    # ==========================================
+    elif request.method == 'PUT':
+        if not campaign_id:
+            return Response({"error": "Campaign ID required in URL"}, status=400)
+        
+        try:
+            campaign = FlashSaleCampaign.objects.get(id=campaign_id)
+            data = request.data
+            
+            # ✅ Update ทุก field (ถ้าไม่ส่งมา                
+            # ✅ Parse Dates if provided
+            from django.utils.dateparse import parse_datetime
+            if 'campaign_start' in data:
+                campaign.campaign_start = parse_datetime(data['campaign_start'])
+            if 'campaign_end' in data:
+                 campaign.campaign_end = parse_datetime(data['campaign_end'])
+
+            campaign.name = data.get('name', campaign.name)
+            campaign.description = data.get('description', campaign.description)
+            campaign.theme_color = data.get('theme_color', campaign.theme_color)
+            campaign.is_active = data.get('is_active', campaign.is_active)
+            campaign.priority = data.get('priority', campaign.priority)
+            
+            # ✅ Update รูป Banner (ถ้ามีส่งมาใหม่)
+            if 'banner_image' in request.FILES:
+                campaign.banner_image = request.FILES['banner_image']
+            
+            campaign.save()
+
+            # ✅ Handle Flash Sale Assignment (Update)
+            if 'flash_sale_ids' in data and isinstance(data['flash_sale_ids'], list):
+                fs_ids = data['flash_sale_ids']
+                
+                # 1. Reset Flash Sales that were in this campaign but NOT in the new list to NULL
+                FlashSale.objects.filter(campaign=campaign).exclude(id__in=fs_ids).update(campaign=None)
+                
+                # 2. Set Campaign for the new list
+                FlashSale.objects.filter(id__in=fs_ids).update(campaign=campaign)
+            
+            return Response(FlashSaleCampaignSerializer(campaign).data)
+            
+        except FlashSaleCampaign.DoesNotExist:
+            return Response({"error": "Campaign not found"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+    
+    # ==========================================
+    # 🗑️ DELETE - ลบ Campaign
+    # ==========================================
+    elif request.method == 'DELETE':
+        if not campaign_id:
+            return Response({"error": "Campaign ID required in URL"}, status=400)
+        
+        try:
+            campaign = FlashSaleCampaign.objects.get(id=campaign_id)
+            
+            # ✅ ตรวจสอบว่ามี Flash Sale ข้างในหรือไม่
+            flash_sale_count = campaign.flash_sales.count()
+            
+            if flash_sale_count > 0:
+                # ⚠️ Warning: ยังมี Flash Sale อยู่ข้างใน
+                # แต่ยังลบได้ (Flash Sales จะกลายเป็น orphan - ไม่อยู่ใน Campaign)
+                campaign.delete()
+                return Response({
+                    "message": f"Campaign deleted. {flash_sale_count} Flash Sales are now uncategorized."
+                })
+            else:
+                # ✅ ปลอดภัย ไม่มี Flash Sale ข้างใน ลบได้เลย
+                campaign.delete()
+                return Response({"message": "Campaign deleted successfully"})
+                
+        except FlashSaleCampaign.DoesNotExist:
+            return Response({"error": "Campaign not found"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_campaign_flash_sales(request, campaign_id):
+    """
+    📋 ดึง Flash Sales ทั้งหมดที่อยู่ใน Campaign นี้
+    
+    ใช้สำหรับแสดงรายละเอียด Campaign ว่ามี Flash Sale อะไรบ้างข้างใน
+    
+    Usage:
+    ------
+    GET /api/admin/campaigns/1/flash-sales/
+    
+    Response Example:
+    ----------------
+    [
+        {
+            "id": 1,
+            "name": "Midnight Sale",
+            "start_time": "2024-12-12T00:00:00Z",
+            "end_time": "2024-12-12T04:00:00Z",
+            "status": "Live",
+            "timeline_position_percent": 0,
+            "timeline_width_percent": 16.67,
+            "timeline_color": "#6366f1",
+            ...
+        },
+        {
+            "id": 2,
+            "name": "Lunch Flash",
+            "start_time": "2024-12-12T11:00:00Z",
+            "end_time": "2024-12-12T14:00:00Z",
+            ...
+        }
+    ]
+    
+    Permissions:
+    -----------
+    Admin, Super Admin, Seller เท่านั้น
+    """
+    
+    # ✅ Check Permission
+    if request.user.role not in ['admin', 'super_admin', 'seller'] and not request.user.is_superuser:
+        return Response({"error": "Unauthorized"}, status=403)
+    
+    try:
+        # ดึง Campaign ที่ต้องการ
+        campaign = FlashSaleCampaign.objects.get(id=campaign_id)
+        
+        # ✅ ดึง Flash Sales ทั้งหมดใน Campaign นี้
+        # เรียงตาม start_time (แต่ละรอบ) และ display_order
+        flash_sales = campaign.flash_sales.all().order_by('start_time', 'display_order')
+        
+        # Return พร้อม Timeline data (position, width, color)
+        return Response(FlashSaleSerializer(flash_sales, many=True).data)
+        
+    except FlashSaleCampaign.DoesNotExist:
+        return Response({"error": "Campaign not found"}, status=404)
 
 # ==========================================
 # 🔄 Restored Missing Functions
@@ -2080,9 +2419,16 @@ def submit_review(request):
         product_id = request.data.get('product_id')
         rating = request.data.get('rating')
         comment = request.data.get('comment', '')
+        image = request.FILES.get('image', None)  # ✅ รับรูปภาพจาก FormData
         
         product = Product.objects.get(id=product_id)
-        Review.objects.create(user=user, product=product, rating=rating, comment=comment)
+        Review.objects.create(
+            user=user, 
+            product=product, 
+            rating=rating, 
+            comment=comment,
+            image=image  # ✅ บันทึกรูปภาพ
+        )
         
         # Update product average rating
         all_reviews = product.reviews.all()
@@ -2241,3 +2587,85 @@ def get_all_products_simple(request):
         "thumbnail": p.thumbnail.url if p.thumbnail else ""
     } for p in products]
     return Response(data)
+
+# ==========================================
+# 🎫 Coupon System API (Collection)
+# ==========================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def collect_coupon_api(request, coupon_id):
+    """
+    เก็บคูปอง (Collect Coupon)
+    """
+    try:
+        coupon = Coupon.objects.get(pk=coupon_id)
+        
+        # 1. เช็คว่าเคยเก็บไปแล้วหรือยัง (ตาม limit_per_user)
+        collected_count = UserCoupon.objects.filter(user=request.user, coupon=coupon).count()
+        if collected_count >= coupon.limit_per_user:
+             return Response({'message': 'คุณเก็บคูปองนี้ครบจำนวนสิทธิ์แล้ว'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # 2. เช็คว่าคูปองหมดอายุหรือยัง
+        now = timezone.now()
+        if not coupon.active or not (coupon.start_date <= now <= coupon.end_date):
+             return Response({'message': 'คูปองหมดอายุหรือยังไม่เปิดให้เก็บ'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 3. เช็คสิทธิ์รวม (Total Supply)
+        # เช็คจำนวนคนที่เก็บไปแล้ว
+        total_collected = UserCoupon.objects.filter(coupon=coupon).count()
+        limit = max(coupon.total_supply, coupon.usage_limit)
+        if total_collected >= limit:
+             return Response({'message': 'คูปองหมดแล้ว!'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 4. สร้าง UserCoupon
+        UserCoupon.objects.create(
+            user=request.user, 
+            coupon=coupon,
+            status='active'
+        )
+        
+        return Response({'message': 'เก็บคูปองสำเร็จ!'}, status=status.HTTP_200_OK)
+
+    except Coupon.DoesNotExist:
+        return Response({'message': 'ไม่พบคูปอง'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Collect Coupon Error: {str(e)}")
+        return Response({'message': 'เกิดข้อผิดพลาดในการเก็บคูปอง'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_my_coupons_api(request):
+    """
+    ดึงคูปองของฉัน (My Coupons)
+    """
+    try:
+        # ดึงคูปองที่เก็บไว้ เรียงตามวันที่เก็บล่าสุด
+        user_coupons = UserCoupon.objects.filter(user=request.user).select_related('coupon').order_by('-collected_at')
+        
+        data = []
+        for uc in user_coupons:
+            c = uc.coupon
+            
+            # คำนวณวันหมดอายุจริง (Expiry Date)
+            expiry_date = c.end_date
+            
+            data.append({
+                "id": c.id,
+                "user_coupon_id": uc.id,
+                "code": c.code,
+                "name": c.name,
+                "description": c.description,
+                "discount_type": c.discount_type,
+                "discount_value": c.discount_value,
+                "min_spend": c.min_spend,
+                "expiry_date": expiry_date,
+                "is_expired": expiry_date < timezone.now(),
+                "status": uc.status, # active, used, expired
+                "is_used": uc.status == 'used' or uc.used_at is not None
+            })
+            
+        return Response(data)
+    except Exception as e:
+        logger.error(f"Get My Coupons Error: {str(e)}")
+        return Response({'message': 'เกิดข้อผิดพลาดในการดึงข้อมูลคูปอง'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

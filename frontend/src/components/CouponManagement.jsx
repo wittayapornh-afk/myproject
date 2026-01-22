@@ -6,58 +6,77 @@ import {
     Ticket, Tag, Clock, Plus, Trash2, X, Info, Percent, 
     ChevronRight, Calendar, Users, Check, AlertCircle 
 } from 'lucide-react';
-import DatePicker from 'react-datepicker';
+import DatePicker, { registerLocale } from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+import { th } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 
+registerLocale('th', th);
+
+/* ✅ Premium SaaS Calendar Styles */
 const DatePickerStyles = () => (
     <style>{`
-        #coupon-root .react-datepicker {
-            font-family: 'Inter', sans-serif;
-            border-radius: 2rem;
+        .react-datepicker {
+            font-family: 'Inter', 'Sarabun', sans-serif;
             border: none;
-            box-shadow: 0 20px 40px -10px rgba(79, 70, 229, 0.3);
-            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 50px -12px rgba(79, 70, 229, 0.25); /* Purple shadow */
             font-size: 0.85rem;
+            background-color: white;
+            padding: 1rem;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
-        #coupon-root .react-datepicker__header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        .react-datepicker__header {
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
             border-bottom: none;
-            padding: 1rem 0;
+            padding: 1.2rem 0 0.8rem 0;
+            border-radius: 1rem 1rem 0 0;
+            margin: -1rem -1rem 1rem -1rem; /* Pull to edges */
         }
-        #coupon-root .react-datepicker__current-month, #coupon-root .react-datepicker__day-name {
+        .react-datepicker__current-month {
             color: white;
-            font-weight: 900;
+            font-weight: 800;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            font-size: 0.8rem;
+            letter-spacing: 1px;
         }
-        #coupon-root .react-datepicker__day {
-            color: #4b5563;
-            font-weight: 600;
-            margin: 0.3rem;
+        .react-datepicker__day-name {
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 700;
             width: 2.2rem;
             line-height: 2.2rem;
+            margin: 0.1rem;
+            font-size: 0.75rem;
+        }
+        .react-datepicker__day {
+            color: #334155;
+            width: 2.2rem;
+            line-height: 2.2rem;
+            margin: 0.1rem;
+            border-radius: 50%; /* Circle days */
+            font-weight: 600;
             transition: all 0.2s;
         }
-        #coupon-root .react-datepicker__day:hover {
-            background-color: #f5f3ff !important;
-            color: #4f46e5 !important;
-            border-radius: 0.8rem;
+        .react-datepicker__day:hover {
+            background-color: #e0e7ff;
+            color: #4f46e5;
             transform: scale(1.1);
         }
-        #coupon-root .react-datepicker__day--selected, #coupon-root .react-datepicker__day--keyboard-selected {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+        .react-datepicker__day--selected,
+        .react-datepicker__day--keyboard-selected {
+            background-color: #4f46e5 !important;
             color: white !important;
-            border-radius: 0.8rem;
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
         }
-        #coupon-root .react-datepicker__day--today {
+        .react-datepicker__day--today {
             color: #4f46e5;
             font-weight: 900;
             position: relative;
         }
-        #coupon-root .react-datepicker__day--today::after {
+        .react-datepicker__day--today::after {
             content: '';
             position: absolute;
             bottom: 4px;
@@ -66,31 +85,46 @@ const DatePickerStyles = () => (
             width: 4px;
             height: 4px;
             background: #4f46e5;
-            border-radius: 9999px; /* full */
+            border-radius: 50%;
         }
-        #coupon-root .react-datepicker__time-container {
-            border-left: 1px solid #f5f3ff !important;
-            width: 100px !important;
+        .react-datepicker__day--selected::after {
+             background: white;
         }
-        #coupon-root .react-datepicker__time-header {
-            color: #4f46e5 !important;
-            font-weight: 900 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.05em !important;
+        .react-datepicker__navigation {
+            top: 15px;
         }
-        #coupon-root .react-datepicker__time-list-item--selected {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
-            font-weight: bold !important;
+        .react-datepicker__navigation-icon::before {
+            border-color: white;
+            border-width: 3px 3px 0 0;
+            width: 8px;
+            height: 8px;
         }
-        #coupon-root .react-datepicker__navigation {
-            top: 1.5rem;
+        .react-datepicker__triangle {
+            display: none;
         }
-        #coupon-root .react-datepicker__input-container input:focus {
-            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
-            border-color: #4f46e5 !important;
+        
+        /* ✅ Popup Positioning - Floating Right */
+        .react-datepicker-popper {
+            z-index: 9999 !important;
         }
-        #coupon-root .react-datepicker__day--outside-month {
-            color: #e5e7eb !important;
+        /* Target the specific classes we add */
+        .start-date-popper[data-placement^="right"],
+        .end-date-popper[data-placement^="right"] {
+            margin-left: 24px !important; /* Spacing from modal */
+        }
+        
+        /* Time Select */
+        .react-datepicker__time-container {
+            border-left: 1px solid #f1f5f9;
+            width: 80px;
+        }
+        .react-datepicker__header--time {
+            padding-left: 0;
+            padding-right: 0;
+        }
+        .react-datepicker__time-box {
+            width: 80px !important;
+            border-radius: 0 0 1rem 0;
         }
     `}</style>
 );
@@ -101,14 +135,21 @@ const CouponManagement = () => {
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({
         code: '',
+        name: '', 
+        description: '', 
         discount_type: 'fixed',
         discount_value: '',
+        max_discount_amount: '', 
         min_spend: 0,
         usage_limit: 100,
-        max_use_per_user: 1,
+        limit_per_user: 1, 
+        limit_per_user_per_day: 0, 
         start_date: '',
         end_date: '',
-        active: true
+        active: true,
+        is_public: true, 
+        auto_apply: false, 
+        is_stackable_with_flash_sale: false 
     });
     const [isEditing, setIsEditing] = useState(false);
     const [selectedCoupon, setSelectedCoupon] = useState(null);
@@ -173,13 +214,16 @@ const CouponManagement = () => {
                 return;
             }
 
-            // ✅ Fix: Backend uses POST for both Create and Update (checks 'id' in body)
-            // Also URL for update usually doesn't need ID if body has it, BUT if backend view requires ID in URL for 'PUT', we must match.
-            // However, looking at backend code: cid = request.data.get('id') handles update in POST.
-            // So we use POST always, and base URL.
+            if (!formData.code || formData.code.length < 3) {
+                Swal.fire('ข้อผิดพลาด', 'รหัสคูปองต้องมีอย่างน้อย 3 ตัวอักษร', 'warning');
+                return;
+            }
+
+            const url = isEditing && selectedCoupon 
+                ? `${API_BASE_URL}/api/admin/coupons/${selectedCoupon.id}/` 
+                : `${API_BASE_URL}/api/admin/coupons/`;
             
-            const url = `${API_BASE_URL}/api/admin/coupons/`; 
-            const method = 'post';
+            const method = isEditing && selectedCoupon ? 'put' : 'post';
             
             await axios[method](url, formData, {
                 headers: { Authorization: `Token ${token}` }
@@ -194,6 +238,7 @@ const CouponManagement = () => {
             setShowModal(false);
             fetchCoupons();
         } catch (error) {
+            console.error(error); // Log detailed error
             if (error.response && error.response.status === 401) {
                 Swal.fire({
                     title: 'Session หมดอายุ',
@@ -204,12 +249,13 @@ const CouponManagement = () => {
                     window.location.href = '/admin/login';
                 });
             } else {
-                Swal.fire('Error', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
+                Swal.fire('Error', 'ไม่สามารถบันทึกข้อมูลได้: ' + (error.response?.data?.message || error.message), 'error');
             }
         }
     };
 
     const handleDelete = async (id) => {
+        // ... (existing helper) ...
         const result = await Swal.fire({ 
             title: 'ยืนยันการลบ?', 
             text: "คูปองนี้จะไม่สามารถกู้คืนได้",
@@ -229,10 +275,10 @@ const CouponManagement = () => {
             } catch (error) { Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถลบได้', 'error'); }
         }
     };
-
+    
     const openEdit = (coupon) => {
         setFormData(coupon);
-        setSelectedCoupon(coupon); // Set selected coupon for update
+        setSelectedCoupon(coupon); 
         setIsEditing(true);
         setShowModal(true);
     };
@@ -240,14 +286,21 @@ const CouponManagement = () => {
     const resetForm = () => {
         setFormData({
             code: '',
+            name: '',
+            description: '',
             discount_type: 'fixed',
             discount_value: '',
+            max_discount_amount: '',
             min_spend: 0,
             usage_limit: 100,
-            max_use_per_user: 1,
-            start_date: new Date().toISOString().slice(0, 16),
-            end_date: new Date().toISOString().slice(0, 16),
+            limit_per_user: 1,
+            limit_per_user_per_day: 0,
             active: true,
+            is_public: true,
+            auto_apply: false,
+            is_stackable_with_flash_sale: false,
+            start_date: new Date(),
+            end_date: new Date(new Date().setDate(new Date().getDate() + 7)),
             allowed_roles: []
         });
         setSelectedCoupon(null);
@@ -284,7 +337,7 @@ const CouponManagement = () => {
             <DatePickerStyles />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-                {coupons.map((coupon) => (
+                {coupons.length > 0 ? coupons.map((coupon) => (
                     <motion.div 
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -300,8 +353,12 @@ const CouponManagement = () => {
                             <div className="absolute top-1/2 -right-4 w-8 h-8 bg-gray-50 rounded-full border border-gray-100 -translate-y-1/2" />
 
                             <div className="flex justify-between items-start mb-6">
-                                <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${coupon.active ? 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200' : 'bg-red-50 text-red-600 ring-1 ring-red-200'}`}>
-                                    {coupon.active ? 'Available' : 'Disabled'}
+                                <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1 ${
+                                    !coupon.active ? 'bg-gray-100 text-gray-500 ring-1 ring-gray-200' : 
+                                    (Number(coupon.used_count) >= Number(coupon.usage_limit)) ? 'bg-red-50 text-red-600 ring-1 ring-red-200 animate-pulse' : 
+                                    'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200'
+                                }`}>
+                                    {!coupon.active ? 'Disabled' : (Number(coupon.used_count) >= Number(coupon.usage_limit)) ? <><AlertCircle size={10}/> หมด (Sold Out)</> : 'Available'}
                                 </div>
                                 <div className="text-indigo-600 font-black text-xs uppercase flex items-center gap-1 opacity-50">
                                     <Tag size={12} />
@@ -311,8 +368,8 @@ const CouponManagement = () => {
                             
                             <div className="flex flex-col items-center mb-6 text-center">
                                 <span className="text-indigo-600 font-black text-5xl mb-2 tracking-tighter">
-                                    {coupon.discount_type === 'percent' ? `${parseInt(coupon.discount_value)}%` : `฿${parseInt(coupon.discount_value)}`}
-                                    <span className="text-xl ml-1 text-gray-400">OFF</span>
+                                    {coupon.discount_type === 'percent' ? `${Number(coupon.discount_value)}%` : `฿${Number(coupon.discount_value)}`}
+                                    <span className="text-xl ml-1 text-gray-400">ส่วนลด</span>
                                 </span>
                                 <div className="bg-gray-50 px-6 py-2 rounded-xl border border-gray-200 flex items-center gap-3 group-hover:border-indigo-400 group-hover:bg-indigo-50 transition-colors">
                                     <span className="font-black text-gray-800 tracking-wider text-lg uppercase select-all">{coupon.code}</span>
@@ -336,7 +393,7 @@ const CouponManagement = () => {
                                  </div>
                                  <div className="flex justify-between items-center px-2">
                                     <span className="uppercase text-[10px] tracking-widest opacity-60">Expires On</span>
-                                    <span className="text-indigo-500">{new Date(coupon.end_date).toLocaleDateString('th-TH')}</span>
+                                    <span className="text-indigo-500">{new Date(coupon.end_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                  </div>
                             </div>
 
@@ -351,7 +408,15 @@ const CouponManagement = () => {
                             <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-indigo-50 rounded-full opacity-50 group-hover:bg-indigo-100 transition-colors pointer-events-none" />
                         </div>
                     </motion.div>
-                ))}
+                )) : (
+                     <div className="col-span-full py-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-200">
+                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                            <Ticket size={40} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-500 uppercase tracking-widest">ยังไม่มีคูปอง</h3>
+                        <p className="text-gray-400 mt-2">กดปุ่มสร้างคูปองด้านบนได้เลย</p>
+                    </div>
+                )}
             </div>
 
             <AnimatePresence>
@@ -365,226 +430,289 @@ const CouponManagement = () => {
                             onClick={() => setShowModal(false)}
                         />
                         <motion.div 
-                            initial={{ scale: 0.9, opacity: 0, y: 50 }}
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.9, opacity: 0, y: 50 }}
-                            className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden relative z-[1001] border border-white"
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[420px] overflow-visible relative z-[1001] border border-gray-100" // ✅ Compact 420px
                         >
-                            <div className="p-10 bg-indigo-600 text-white flex justify-between items-center relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none" />
-                                <div className="relative">
-                                    <h2 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3">
-                                        <Ticket size={32} />
-                                        {isEditing ? 'Update' : 'Generate'} <span className="text-indigo-200">Coupon</span>
-                                    </h2>
-                                    <p className="text-indigo-100 font-bold text-sm mt-1 opacity-80 uppercase tracking-widest">ตั้งค่าเงื่อนไข</p>
-                                </div>
-                                <button onClick={() => setShowModal(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all active:scale-90">
-                                    <X size={24} />
+                            {/* Minimal Header */}
+                            <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-[2rem]">
+                                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                    <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600">
+                                        <Ticket size={18} />
+                                    </div>
+                                    GENERATE COUPON
+                                </h2>
+                                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-50 p-1 rounded-full">
+                                    <X size={20} />
                                 </button>
                             </div>
                             
-                            <form onSubmit={handleSubmit} className="p-10 space-y-8 max-h-[75vh] overflow-y-auto bg-white custom-scrollbar">
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">รหัสคูปอง (A-Z, 0-9 เท่านั้น)</label>
+                            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                                {/* Campaign Info */}
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ชื่อแคมเปญ (Internal)</label>
                                         <input 
                                             type="text" 
-                                            value={formData.code} 
-                                            onChange={e => {
-                                                const val = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-                                                setFormData({...formData, code: val});
-                                            }}
-                                            className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-black transition-all outline-none"
-                                            placeholder="SUMMER2026"
-                                            required 
+                                            value={formData.name} 
+                                            onChange={e => setFormData({...formData, name: e.target.value})}
+                                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-medium text-gray-800 outline-none transition-all text-sm"
+                                            placeholder="e.g. New Year 2026"
                                         />
                                     </div>
-                                    <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">ประเภทส่วนลด</label>
-                                        <select 
-                                            value={formData.discount_type} 
-                                            onChange={e => setFormData({...formData, discount_type: e.target.value})}
-                                            className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none appearance-none"
-                                        >
-                                            <option value="fixed">บาท (฿)</option>
-                                            <option value="percent">เปอร์เซ็นต์ (%)</option>
-                                        </select>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">รหัส (Code)</label>
+                                            <input 
+                                                type="text" 
+                                                value={formData.code} 
+                                                onChange={e => setFormData({...formData, code: e.target.value.toUpperCase().slice(0, 15)})} 
+                                                className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-bold text-indigo-600 outline-none transition-all tracking-wider text-sm text-center"
+                                                placeholder="CODE (3-15 chars)"
+                                                maxLength={15}
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ประเภท (Type)</label>
+                                            <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-200">
+                                                {['fixed', 'percent'].map(type => (
+                                                    <button
+                                                        key={type}
+                                                        type="button"
+                                                        onClick={() => setFormData({...formData, discount_type: type})}
+                                                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${formData.discount_type === type ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                                                    >
+                                                        {type === 'fixed' ? '฿ บาท' : '% ลด'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">รายละเอียด (Customer View)</label>
+                                        <textarea 
+                                            value={formData.description} 
+                                            onChange={e => setFormData({...formData, description: e.target.value})}
+                                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-medium text-gray-600 outline-none transition-all h-16 resize-none text-sm"
+                                            placeholder="เงื่อนไขการใช้งาน..."
+                                        />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">มูลค่าส่วนลด</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ส่วนลด (Value)</label>
                                         <div className="relative">
                                             <input 
                                                 type="number" 
                                                 min="0"
-                                                onKeyDown={(e) => ["-", "+", "e", "."].includes(e.key) && e.preventDefault()}
+                                                step="0.01"
+                                                onKeyDown={(e) => ["-", "e", "+"].includes(e.key) && e.preventDefault()}
                                                 value={formData.discount_value} 
                                                 onChange={e => setFormData({...formData, discount_value: e.target.value})}
-                                                className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none"
+                                                className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-black text-gray-800 outline-none transition-all text-sm"
+                                                placeholder="0.00"
                                                 required 
                                             />
-                                            {formData.discount_type === 'percent' ? <Percent className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-300" size={20} /> : <span className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-300 font-black">฿</span>}
                                         </div>
                                     </div>
-                                    <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">ยอดซื้อขั้นต่ำ</label>
+                                    
+                                     {formData.discount_type === 'percent' ? (
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ลดสูงสุด (Max)</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    placeholder="Unlimited"
+                                                    value={formData.max_discount_amount} 
+                                                    onChange={e => setFormData({...formData, max_discount_amount: e.target.value})}
+                                                    className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none transition-all text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                     ) : (
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ยอดซื้อขั้นต่ำ (Min)</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={formData.min_spend} 
+                                                    onChange={e => setFormData({...formData, min_spend: e.target.value})}
+                                                    className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none transition-all text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                     )}
+                                </div>
+                                
+                                {formData.discount_type === 'percent' && (
+                                     <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ยอดซื้อขั้นต่ำ (Min Spend)</label>
                                         <input 
                                             type="number" 
                                             min="0"
-                                            onKeyDown={(e) => ["-", "+", "e", "."].includes(e.key) && e.preventDefault()}
                                             value={formData.min_spend} 
                                             onChange={e => setFormData({...formData, min_spend: e.target.value})}
-                                            className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none"
+                                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none transition-all text-sm"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">รวมจำนวน (Total)</label>
+                                        <input 
+                                            type="number" 
+                                            min="1"
+                                            value={formData.usage_limit} 
+                                            onChange={e => setFormData({...formData, usage_limit: e.target.value})}
+                                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none transition-all text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ต่อคน (Per User)</label>
+                                        <input 
+                                            type="number" 
+                                            min="1"
+                                            value={formData.limit_per_user} 
+                                            onChange={e => setFormData({...formData, limit_per_user: e.target.value})}
+                                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none transition-all text-sm"
                                         />
                                     </div>
                                 </div>
-
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">จำนวนสิทธิ์ทั้งหมด</label>
-                                        <div className="relative">
-                                            <input 
-                                                type="number" 
-                                                min="1"
-                                                onKeyDown={(e) => ["-", "+", "e", "."].includes(e.key) && e.preventDefault()}
-                                                value={formData.usage_limit} 
-                                                onChange={e => setFormData({...formData, usage_limit: e.target.value})}
-                                                className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none"
-                                            />
-                                            <ChevronRight className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
-                                        </div>
-                                    </div>
-                                    <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">จำกัดการใช้ต่อคน</label>
-                                        <div className="relative">
-                                            <input 
-                                                type="number" 
-                                                min="1"
-                                                onKeyDown={(e) => ["-", "+", "e", "."].includes(e.key) && e.preventDefault()}
-                                                value={formData.max_use_per_user} 
-                                                onChange={e => setFormData({...formData, max_use_per_user: e.target.value})}
-                                                className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none"
-                                            />
-                                            <Users className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                 <div className="grid grid-cols-2 gap-6">
-                                    <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">เริ่มใช้งานได้ตั้งแต่</label>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                     <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">วันเริ่ม (Start)</label>
                                         <div className="relative">
                                             <DatePicker 
                                                 ref={startDateRef}
-                                                selected={formData.start_date ? new Date(formData.start_date) : null}
+                                                selected={formData.start_date ? new Date(formData.start_date) : new Date()}
                                                 onChange={date => setFormData({...formData, start_date: date})}
                                                 showTimeSelect
-                                                dateFormat="Pp"
-                                                className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none block w-full"
+                                                timeFormat="HH:mm"
+                                                timeIntervals={15} 
+                                                minDate={new Date()} 
+                                                popperPlacement="right-start"
+                                                popperClassName="start-date-popper"
+                                                portalId="root"
+                                                showMonthDropdown
+                                                showYearDropdown
+                                                dropdownMode="select"
+                                                locale="th"
+                                                dateFormat="d MMM yy HH:mm"
+                                                className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-bold text-gray-700 outline-none block w-full text-xs cursor-pointer"
                                                 required 
                                             />
-                                            <Calendar 
-                                                size={20} 
-                                                className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-300 cursor-pointer hover:text-indigo-500 transition-colors"
-                                                onClick={() => startDateRef.current.setFocus()}
-                                            />
+                                            <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                                         </div>
                                     </div>
-                                    <div className="relative group">
-                                        <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">หมดเขต</label>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">วันหมดเขต (End)</label>
                                         <div className="relative">
                                             <DatePicker 
                                                 ref={endDateRef}
                                                 selected={formData.end_date ? new Date(formData.end_date) : null}
                                                 onChange={date => setFormData({...formData, end_date: date})}
                                                 showTimeSelect
-                                                dateFormat="Pp"
-                                                className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl px-6 py-4 font-bold outline-none block w-full"
+                                                timeFormat="HH:mm"
+                                                timeIntervals={15} 
+                                                minDate={formData.start_date ? new Date(formData.start_date) : new Date()} 
+                                                popperPlacement="right-start" 
+                                                popperClassName="end-date-popper"
+                                                portalId="root"
+                                                showMonthDropdown
+                                                showYearDropdown
+                                                dropdownMode="select"
+                                                locale="th"
+                                                dateFormat="d MMM yy HH:mm"
+                                                className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 font-bold text-gray-700 outline-none block w-full text-xs cursor-pointer"
                                                 required 
                                             />
-                                            <Calendar 
-                                                size={20} 
-                                                className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-300 cursor-pointer hover:text-indigo-500 transition-colors"
-                                                onClick={() => endDateRef.current.setFocus()}
-                                            />
+                                            <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="mb-6">
-                                    <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-4">จำกัดสิทธิ์เฉพาะกลุ่ม (Roles)</label>
+                                {/* Roles */}
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">เฉพาะกลุ่ม (Roles)</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {/* All Users Button */}
                                         <button
                                             type="button"
                                             onClick={() => setFormData({ ...formData, allowed_roles: [] })}
-                                            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all border-2 ${
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                                                 (formData.allowed_roles || []).length === 0
-                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200 shadow-lg'
-                                                    : 'bg-white text-gray-400 border-gray-100 hover:border-indigo-200'
+                                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                                             }`}
                                         >
-                                            ไม่จำกัด (All)
+                                            All Users
                                         </button>
-
-                                        {/* Specific Roles */}
                                         {['customer', 'new_user'].map((role) => (
                                             <button
                                                 key={role}
                                                 type="button"
                                                 onClick={() => {
-                                                    const currentRoles = formData.allowed_roles || [];
-                                                    const newRoles = currentRoles.includes(role)
-                                                        ? currentRoles.filter(r => r !== role)
-                                                        : [...currentRoles, role];
+                                                    const current = formData.allowed_roles || [];
+                                                    const newRoles = current.includes(role) ? current.filter(r => r !== role) : [...current, role];
                                                     setFormData({ ...formData, allowed_roles: newRoles });
                                                 }}
-                                                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all border-2 ${
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                                                     (formData.allowed_roles || []).includes(role)
-                                                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200 shadow-lg'
-                                                        : 'bg-white text-gray-400 border-gray-100 hover:border-indigo-200'
+                                                        ? 'bg-indigo-600 text-white border-indigo-600'
+                                                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                                                 }`}
                                             >
                                                 {role}
                                             </button>
                                         ))}
-                                        <p className="text-[9px] text-gray-400 w-full mt-1 ml-2">
-                                            * ไม่เลือก = ใช้ได้ทุกคน
-                                        </p>
                                     </div>
                                 </div>
-                                
-                                <div className="p-6 bg-indigo-50 rounded-[2rem] border-2 border-indigo-100/50">
-                                    <label className="flex items-center gap-4 cursor-pointer mb-2">
-                                         <div className="relative w-14 h-8">
-                                             <input 
-                                                type="checkbox"
-                                                checked={formData.active}
-                                                onChange={e => setFormData({...formData, active: e.target.checked})}
-                                                className="sr-only peer"
-                                             />
-                                             <div className="w-full h-full bg-gray-200 peer-checked:bg-indigo-600 rounded-full transition-colors" />
-                                             <div className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform peer-checked:translate-x-6 shadow-md" />
-                                         </div>
-                                         <span className="font-black text-indigo-900 uppercase tracking-widest text-xs">เปิดใช้งานคูปอง (Active)</span>
-                                    </label>
-                                    <p className="text-[10px] text-indigo-400 pl-[4.5rem] leading-relaxed">
-                                        หากเปิดใช้งาน ลูกค้าจะสามารถใช้โค้ดนี้เพื่อรับส่วนลดได้ทันที <br/>
-                                        (ในอนาคต: จะแสดงในหน้า "รวมคูปอง" สำหรับลูกค้าทั่วไป)
-                                    </p>
+
+                                {/* Advanced Switches */}
+                                <div className="space-y-3 pt-4 border-t border-gray-100">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-gray-700">เปิดใช้งาน (Active)</span>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={formData.active} onChange={e => setFormData({...formData, active: e.target.checked})} className="sr-only peer" />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-gray-700">แสดงใน Coupon Center</span>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={formData.is_public} onChange={e => setFormData({...formData, is_public: e.target.checked})} className="sr-only peer" />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                         <span className="text-sm font-medium text-gray-700">Auto Apply (ในตะกร้า)</span>
+                                         <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={formData.auto_apply} onChange={e => setFormData({...formData, auto_apply: e.target.checked})} className="sr-only peer" />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center justify-between opacity-50 pointer-events-none grayscale">
+                                         <span className="text-sm font-medium text-gray-700">ใช้ร่วมกับ Flash Sale (Stackable)</span>
+                                         <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={formData.is_stackable_with_flash_sale} onChange={e => setFormData({...formData, is_stackable_with_flash_sale: e.target.checked})} className="sr-only peer" />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                                        </label>
+                                    </div>
                                 </div>
 
-                                <motion.button 
-                                    whileHover={{ scale: 1.01 }}
-                                    whileTap={{ scale: 0.98 }}
+                                <button 
                                     type="submit" 
-                                    className="w-full bg-indigo-600 text-white py-6 rounded-[2rem] font-black text-xl uppercase tracking-widest shadow-2xl shadow-indigo-100/50 hover:bg-indigo-700 transition-all mt-4 mb-4"
+                                    className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-sm uppercase tracking-wider shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all flex items-center justify-center gap-2 mt-4"
                                 >
+                                    <Ticket size={20} />
                                     {isEditing ? 'บันทึกการแก้ไข' : 'สร้างคูปอง'}
-                                </motion.button>
+                                </button>
                             </form>
                         </motion.div>
                     </div>

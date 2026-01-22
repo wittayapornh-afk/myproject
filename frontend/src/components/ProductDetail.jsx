@@ -2,13 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ShoppingCart, Heart, ArrowLeft, Star, Plus, Minus, 
-  ChevronRight, ChevronLeft, MessageSquare, Send, Zap, ShieldCheck, Truck, Package 
+  ChevronRight, ChevronLeft, MessageSquare, Send, Zap, ShieldCheck, Truck, Package,
+  Camera, X, Image as ImageIcon, PenTool
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
-// Wishlist removed
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
+
+// 🎠 Swiper - สำหรับทำ Gallery รูปสินค้า
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Thumbs, FreeMode } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/thumbs';
+import 'swiper/css/free-mode';
 
 // Flash Sale Timer Component
 const FlashSaleTimer = ({ endTime }) => {
@@ -54,11 +63,16 @@ function ProductDetail() {
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [activeImage, setActiveImage] = useState(null); 
   
+  // 🎠 Swiper State: สำหรับเชื่อม Gallery หลักกับ Thumbnails
+  const [thumbsSwiper, setThumbsSwiper] = useState(null);
+  const [mainSwiper, setMainSwiper] = useState(null); // เก็บ Main Swiper เพื่อควบคุม
+  
   const { addToCart } = useCart();
-  // Wishlist removed
 
   // Review & Reply States
-  const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
+  const [showReviewModal, setShowReviewModal] = useState(false); // ✅ Modal State
+  const [newReview, setNewReview] = useState({ rating: 5, comment: '', image: null }); 
+  const [previewImage, setPreviewImage] = useState(null); 
   const [submitting, setSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState("");
@@ -90,21 +104,28 @@ function ProductDetail() {
 
     setSubmitting(true);
     try {
+        const formData = new FormData(); // ✅ Use FormData
+        formData.append('product_id', parseInt(id));
+        formData.append('rating', parseInt(newReview.rating));
+        formData.append('comment', newReview.comment);
+        if (newReview.image) {
+            formData.append('image', newReview.image); // ✅ Append Image
+        }
+
         const res = await fetch(`${API_BASE_URL}/api/submit-review/`, {
             method: 'POST',
             headers: { 
-                  'Content-Type': 'application/json',
                   'Authorization': `Token ${token}`
+                  // Content-Type must strictly not be set manually for FormData
               },
-              body: JSON.stringify({
-                  product_id: parseInt(id),
-                  rating: parseInt(newReview.rating),
-                  comment: newReview.comment
-              })
+              body: formData
           });
+
           if (res.ok) {
               Swal.fire('สำเร็จ', 'รีวิวของคุณถูกบันทึกแล้ว', 'success');
-              setNewReview({ rating: 5, comment: '' });
+              setNewReview({ rating: 5, comment: '', image: null });
+              setPreviewImage(null);
+              setShowReviewModal(false); // ✅ Close Modal
               window.location.reload(); 
           } else {
               const errorData = await res.json();
@@ -114,6 +135,15 @@ function ProductDetail() {
           Swal.fire('ผิดพลาด', err.message, 'error');
       } finally {
           setSubmitting(false);
+      }
+  };
+
+  // ✅ Image Handler
+  const handleImageChange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+          setNewReview({ ...newReview, image: file });
+          setPreviewImage(URL.createObjectURL(file));
       }
   };
 
@@ -139,10 +169,10 @@ function ProductDetail() {
               Swal.fire({ icon: 'success', title: 'ตอบกลับสำเร็จ', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
           } else {
               const errorData = await res.json();
-              Swal.fire("Error", errorData.error || "Failed to reply", "error");
+              Swal.fire("ข้อผิดพลาด", errorData.error || "ตอบกลับไม่สำเร็จ", "error");
           }
       } catch (err) {
-          Swal.fire("Error", err.message || "Something went wrong", "error");
+          Swal.fire("ข้อผิดพลาด", err.message || "เกิดข้อผิดพลาดบางอย่าง", "error");
       }
   };
 
@@ -256,41 +286,93 @@ function ProductDetail() {
       <div className="max-w-7xl mx-auto px-4 md:px-8 mt-8">
         <div className="bg-white rounded-[3rem] shadow-xl shadow-gray-200/50 flex flex-col lg:flex-row overflow-hidden border border-gray-200/50">
           
-          {/* 🖼️ Product Image Section */}
+          {/* ========================================
+              🖼️ Product Image Gallery (Swiper)
+              Gallery รูปสินค้าพร้อม Thumbnail Navigation
+              ======================================== */}
           <div className="lg:w-1/2 bg-gray-50 p-8 lg:p-12 flex flex-col items-center justify-center relative group">
-             {/* Main Image */}
-             <div className="relative w-full aspect-square flex items-center justify-center z-10">
-                 <img src={getImageUrl(activeImage || product.image || product.thumbnail)} className={`max-h-[500px] w-full object-contain drop-shadow-2xl transition-all duration-500 ${isOutOfStock ? 'grayscale opacity-70' : 'group-hover:scale-105'}`} alt="" />
-             </div>
-             
-             {/* Gallery */}
-             {product.images && product.images.length > 0 && (
-                <div className="flex gap-3 overflow-x-auto p-2 w-full justify-center mt-8 relative z-20">
-                    <button 
-                        onClick={() => setActiveImage(product.image || product.thumbnail)} 
-                        className={`w-16 h-16 rounded-2xl bg-white border-2 overflow-hidden flex-shrink-0 transition-all ${activeImage === (product.image || product.thumbnail) ? 'border-indigo-600 scale-110 shadow-lg' : 'border-transparent opacity-70 hover:opacity-100'}`}
-                    >
-                        <img src={getImageUrl(product.image || product.thumbnail)} className="w-full h-full object-contain p-1" alt="main"/>
-                    </button>
-                    {product.images.map((img) => (
-                        <button 
-                            key={img.id} 
-                            onClick={() => setActiveImage(img.image)} 
-                            className={`w-16 h-16 rounded-2xl bg-white border-2 overflow-hidden flex-shrink-0 transition-all ${activeImage === img.image ? 'border-indigo-600 scale-110 shadow-lg' : 'border-transparent opacity-70 hover:opacity-100'}`}
-                        >
-                            <img src={getImageUrl(img.image)} className="w-full h-full object-contain p-1" alt="gallery"/>
-                        </button>
-                    ))}
-                </div>
-             )}
+              {/* 🎠 Main Swiper: รูปภาพหลัก */}
+              <Swiper
+                  modules={[Navigation, Thumbs]}
+                  onSwiper={setMainSwiper} // เก็บ instance สำหรับควบคุม
+                  navigation // เปิดใช้ปุ่มเลื่อน
+                  thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }} // เชื่อมกับ Thumbnail Swiper
+                  className="w-full aspect-square mb-4"
+              >
+                  {/* รูปหลัก (Main Image) */}
+                  <SwiperSlide>
+                      <div className="w-full h-full flex items-center justify-center">
+                          <img 
+                              src={getImageUrl(product.image || product.thumbnail)} 
+                              className={`max-h-[500px] w-full object-contain drop-shadow-2xl transition-all duration-500 ${isOutOfStock ? 'grayscale opacity-70' : 'group-hover:scale-105'}`} 
+                              alt={product.title}
+                          />
+                      </div>
+                  </SwiperSlide>
+                  
+                  {/* รูปเพิ่มเติม (Gallery Images) */}
+                  {product.images && product.images.map((img) => (
+                      <SwiperSlide key={img.id}>
+                          <div className="w-full h-full flex items-center justify-center">
+                              <img 
+                                  src={getImageUrl(img.image)} 
+                                  className={`max-h-[500px] w-full object-contain drop-shadow-2xl transition-all duration-500 ${isOutOfStock ? 'grayscale opacity-70' : 'group-hover:scale-105'}`} 
+                                  alt={`${product.title} - ${img.id}`}
+                              />
+                          </div>
+                      </SwiperSlide>
+                  ))}
+              </Swiper>
+              
+              {/* 🎠 Thumbnail Swiper: รูปขนาดเล็ก (Thumbnails) */}
+              {product.images && product.images.length > 0 && (
+                  <Swiper
+                      modules={[FreeMode, Thumbs]}
+                      onSwiper={setThumbsSwiper} // เก็บ instance ไว้ใน state
+                      freeMode // เลื่อนแบบอิสระ
+                      watchSlidesProgress // ติดตามสถานะ Slide
+                      slidesPerView={4} // แสดง 4 รูปพร้อมกัน
+                      spaceBetween={12} // ระยะห่างระหว่างรูป
+                      className="w-full max-w-md mt-4"
+                  >
+                      {/* Thumbnail รูปหลัก */}
+                      <SwiperSlide>
+                          <div 
+                              className="w-16 h-16 rounded-2xl bg-white border-2 border-transparent overflow-hidden cursor-pointer hover:border-indigo-600 transition-all"
+                              onMouseEnter={() => mainSwiper && mainSwiper.slideTo(0)} // ชี้ที่ Thumbnail → เปลี่ยนรูปใหญ่
+                          >
+                              <img 
+                                  src={getImageUrl(product.image || product.thumbnail)} 
+                                  className="w-full h-full object-contain p-1" 
+                                  alt="thumb-main"
+                              />
+                          </div>
+                      </SwiperSlide>
+                      
+                      {/* Thumbnail รูปเพิ่มเติม */}
+                      {product.images.map((img, index) => (
+                          <SwiperSlide key={img.id}>
+                              <div 
+                                  className="w-16 h-16 rounded-2xl bg-white border-2 border-transparent overflow-hidden cursor-pointer hover:border-indigo-600 transition-all"
+                                  onMouseEnter={() => mainSwiper && mainSwiper.slideTo(index + 1)} // ชี้ที่ Thumbnail → เปลี่ยนรูปใหญ่ (index + 1 เพราะรูปแรกคือ Main)
+                              >
+                                  <img 
+                                      src={getImageUrl(img.image)} 
+                                      className="w-full h-full object-contain p-1" 
+                                      alt={`thumb-${img.id}`}
+                                  />
+                              </div>
+                          </SwiperSlide>
+                      ))}
+                  </Swiper>
+              )}
 
-             {isOutOfStock && (
-                 <div className="absolute inset-0 flex items-center justify-center z-20 bg-white/20 backdrop-blur-[2px]">
-                     <span className="bg-red-600/90 text-white px-8 py-3 rounded-2xl font-black rotate-[-12deg] shadow-2xl text-2xl border-4 border-white">OUT OF STOCK</span>
-                 </div>
-             )}
-             
-
+              {/* 🚫 Badge "OUT OF STOCK" (ถ้าสินค้าหมด) */}
+              {isOutOfStock && (
+                  <div className="absolute inset-0 flex items-center justify-center z-20 bg-white/20 backdrop-blur-[2px]">
+                      <span className="bg-red-600/90 text-white px-8 py-3 rounded-2xl font-black rotate-[-12deg] shadow-2xl text-2xl border-4 border-white">OUT OF STOCK</span>
+                  </div>
+              )}
           </div>
 
           {/* 📝 Product Info Section */}
@@ -453,9 +535,9 @@ function ProductDetail() {
         <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-sm border border-gray-200 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-indigo-600 to-transparent opacity-20"></div>
             
-            <h3 className="text-2xl font-black text-gray-900 mb-10 flex items-center gap-3">
+            <h3 className="text-2xl font-black text-gray-900 mb-10 flex items-center gap-3">{/* ✅ เปลี่ยนหัวข้อเป็นภาษาไทย */}
                 <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center"><MessageSquare size={20}/></div>
-                Customer Reviews <span className="text-gray-300 text-lg font-bold">({product.reviews ? product.reviews.length : 0})</span>
+                รีวิวจากลูกค้า (Customer Reviews) <span className="text-gray-300 text-lg font-bold">({product.reviews ? product.reviews.length : 0})</span>
             </h3>
             
             <div className="grid md:grid-cols-3 gap-12">
@@ -482,12 +564,31 @@ function ProductDetail() {
                                 </div>
                                 
                                 <p className="text-gray-600 text-sm leading-relaxed pl-14">"{review.comment}"</p>
+                                
+                                {/* ✅ Show Review Image */}
+                                {review.image && (
+                                    <div className="mt-3 ml-14">
+                                        <img 
+                                            src={review.image.startsWith('http') ? review.image : `${API_BASE_URL}${review.image}`} 
+                                            alt="Review attachment" 
+                                            className="h-24 w-auto rounded-xl border border-gray-200 object-cover cursor-pointer hover:scale-105 transition-transform"
+                                            onClick={() => Swal.fire({
+                                                imageUrl: review.image.startsWith('http') ? review.image : `${API_BASE_URL}${review.image}`,
+                                                imageAlt: 'Review Image',
+                                                showConfirmButton: false,
+                                                background: 'transparent',
+                                                backdrop: 'rgba(0,0,0,0.8)'
+                                            })}
+                                        />
+                                    </div>
+                                )}
 
                                 {/* Reply */}
                                 {review.reply_comment && (
                                     <div className="mt-4 ml-14 p-4 bg-gray-50 rounded-xl border-l-4 border-indigo-600">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[10px] font-black text-indigo-600 uppercase bg-white px-2 py-0.5 rounded shadow-sm">Admin Reply</span>
+                                            {/* ✅ เปลี่ยนป้าย Admin Reply เป็นภาษาไทย */}
+                                            <span className="text-[10px] font-black text-indigo-600 uppercase bg-white px-2 py-0.5 rounded shadow-sm">ตอบกลับจากร้าน (Admin Reply)</span>
                                             <span className="text-[10px] text-gray-400">{review.reply_date}</span>
                                         </div>
                                         <p className="text-gray-600 text-sm">{review.reply_comment}</p>
@@ -499,13 +600,14 @@ function ProductDetail() {
                                     <div className="mt-4 ml-14">
                                         {replyingTo === review.id ? (
                                             <div className="flex gap-2 animate-fade-in-up">
-                                                <input type="text" className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" placeholder="Type your reply..." value={replyText} onChange={(e) => setReplyText(e.target.value)} />
-                                                <button onClick={() => handleReplySubmit(review.id)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700">Send</button>
-                                                <button onClick={() => setReplyingTo(null)} className="text-gray-400 px-3 hover:text-gray-600 font-bold text-sm">Cancel</button>
+                                                {/* ✅ เปลี่ยน Placeholder และปุ่มเป็นภาษาไทย */}
+                                                <input type="text" className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" placeholder="เขียนคำตอบกลับ..." value={replyText} onChange={(e) => setReplyText(e.target.value)} />
+                                                <button onClick={() => handleReplySubmit(review.id)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700">ส่ง</button>
+                                                <button onClick={() => setReplyingTo(null)} className="text-gray-400 px-3 hover:text-gray-600 font-bold text-sm">ยกเลิก</button>
                                             </div>
                                         ) : (
                                             <button onClick={() => { setReplyingTo(review.id); setReplyText(""); }} className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1 mt-2 opacity-50 hover:opacity-100 transition-opacity">
-                                                <MessageSquare size={12}/> Reply to review
+                                                <MessageSquare size={12}/> ตอบกลับรีวิว
                                             </button>
                                         )}
                                     </div>
@@ -515,40 +617,124 @@ function ProductDetail() {
                     ) : (
                         <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                              <MessageSquare className="mx-auto text-gray-300 mb-2" size={32}/>
-                             <p className="text-gray-400 font-bold text-sm">No reviews yet. Be the first!</p>
+                             {/* ✅ ข้อความเมื่อยังไม่มีรีวิว */}
+                             <p className="text-gray-400 font-bold text-sm">ยังไม่มีรีวิว เป็นคนแรกที่รีวิวเลย!</p>
                         </div>
                     )}
                 </div>
 
-                {/* Write Review */}
+                {/* Write Review Trigger & Modal */}
                 <div className="md:col-span-1">
-                    <div className="bg-gray-50 p-6 rounded-[2rem] sticky top-24 border border-gray-100">
-                        <h4 className="font-bold text-gray-900 mb-4 text-center">Write a Review</h4>
-                        <div className="flex justify-center gap-2 mb-6">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <button key={star} onClick={() => setNewReview({ ...newReview, rating: star })} type="button" className="group">
-                                    <Star size={24} className={`transition-all ${star <= newReview.rating ? "fill-orange-400 text-orange-400 scale-110" : "text-gray-300 group-hover:text-orange-200"}`} />
-                                </button>
-                            ))}
+                   <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-8 rounded-[2rem] sticky top-24 text-center text-white shadow-xl shadow-indigo-200">
+                        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/30">
+                            <PenTool size={32} />
                         </div>
-
-                        <textarea 
-                            className="w-full p-4 rounded-xl border border-gray-200 outline-none text-sm resize-none mb-4 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition-all bg-white" 
-                            rows="4" 
-                            placeholder="Share your thoughts about this product..."
-                            value={newReview.comment}
-                            onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                        ></textarea>
+                        <h4 className="font-black text-2xl mb-2">คุณเคยใช้สินค้านี้หรือไม่?</h4>
+                        <p className="text-indigo-100 mb-6 text-sm">เล่าประสบการณ์ของคุณให้เราฟังหน่อย!</p>
                         
                         <button 
-                            onClick={handleSubmitReview}
-                            disabled={submitting}
-                            className={`w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-900/10 transition-all active:scale-95 ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={() => setShowReviewModal(true)}
+                            className="w-full bg-white text-indigo-600 py-4 rounded-xl font-black text-lg shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
-                            <Send size={16}/> {submitting ? 'Submitting...' : 'Submit Review'}
+                            เขียนรีวิว
                         </button>
                     </div>
                 </div>
+
+                {/* ✅ Review Modal */}
+                <AnimatePresence>
+                    {showReviewModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                            <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setShowReviewModal(false)}
+                                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                            />
+                            
+                            <motion.div 
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                className="bg-white rounded-[2.5rem] p-8 w-full max-w-lg relative z-10 shadow-2xl overflow-hidden"
+                            >
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-2xl font-black text-gray-900">เขียนรีวิว</h3>
+                                    <button onClick={() => setShowReviewModal(false)} className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                                        <X size={20} className="text-gray-500"/>
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {/* Rating */}
+                                    <div className="flex flex-col items-center gap-2">
+                                        <span className="text-sm font-bold text-gray-400 uppercase tracking-wider">คะแนนของคุณ</span>
+                                        <div className="flex gap-2">
+                                            {[1, 2, 3, 4, 5].map((star) => (
+                                                <button key={star} onClick={() => setNewReview({ ...newReview, rating: star })} type="button" className="group p-1">
+                                                    <Star size={32} className={`transition-all ${star <= newReview.rating ? "fill-orange-400 text-orange-400 scale-110 drop-shadow-sm" : "text-gray-200 group-hover:text-orange-200"}`} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Comment */}
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-900 mb-2 block">ความคิดเห็น</label>
+                                        <textarea 
+                                            className="w-full p-4 rounded-2xl border border-gray-200 outline-none text-sm resize-none h-32 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all bg-gray-50/50" 
+                                            placeholder="คุณชอบหรือไม่ชอบอะไร? สินค้านี้ใช้งานเป็นอย่างไร?"
+                                            value={newReview.comment}
+                                            onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                                        ></textarea>
+                                    </div>
+
+                                    {/* Image Upload */}
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-900 mb-2 block">เพิ่มรูปภาพ</label>
+                                        <div className="flex gap-3">
+                                            <label className="w-24 h-24 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 transition-all group">
+                                                <Camera size={24} className="text-gray-400 group-hover:text-indigo-500 mb-1" />
+                                                <span className="text-[10px] font-bold text-gray-400 group-hover:text-indigo-500">อัปโหลด</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                                            </label>
+
+                                            {previewImage && (
+                                                <div className="relative w-24 h-24 group">
+                                                    <img src={previewImage} alt="Preview" className="w-full h-full object-cover rounded-2xl border border-gray-200" />
+                                                    <button 
+                                                        onClick={() => { setPreviewImage(null); setNewReview({ ...newReview, image: null }); }}
+                                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={handleSubmitReview}
+                                        disabled={submitting}
+                                        className={`w-full bg-indigo-600 text-white py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-xl shadow-indigo-900/20 transition-all active:scale-95 ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        {submitting ? (
+                                            <>
+                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                                                กำลังบันทึก...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Send size={20}/> ยืนยันรีวิว
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
       </div>

@@ -33,6 +33,9 @@ const FlashSaleSection = ({ flashSale }) => {
     }, [flashSale]);
 
     if (!flashSale || !flashSale.is_active) return null;
+    
+    // ✅ Custom: Hide if expired on frontend
+    if (new Date(flashSale.end_time) < new Date()) return null;
 
     const products = flashSale.products || [];
 
@@ -64,9 +67,17 @@ const FlashSaleSection = ({ flashSale }) => {
                     </Link>
                 </div>
 
+                {/* ✅ Campaign Description */}
+                {flashSale.description && (
+                    <div className="mb-6 bg-orange-50 px-4 py-3 rounded-xl border border-orange-100 flex items-start gap-3">
+                        <Flame className="text-orange-500 shrink-0 mt-0.5" size={18} />
+                        <p className="text-sm text-gray-700 font-medium leading-relaxed">{flashSale.description}</p>
+                    </div>
+                )}
+
                 {products.length === 1 ? (
                     // ✅ SINGLE ITEM LAYOUT (Hero Style - Compact Version)
-                    <div className="bg-white border border-gray-100 rounded-lg shadow-sm overflow-hidden flex flex-col md:flex-row h-auto md:h-[320px]">
+                    <div className="bg-white border border-gray-100 rounded-lg shadow-sm overflow-hidden flex flex-col md:flex-row h-auto md:min-h-[320px]">
                         {/* Left: Image (Reduced Size 35%) */}
                         <div className="w-full md:w-[35%] bg-gray-50 relative">
                             {/* Tags */}
@@ -112,9 +123,9 @@ const FlashSaleSection = ({ flashSale }) => {
 
                              <Link 
                                 to={`/product/${products[0].product}`}
-                                className="w-full max-w-xs bg-orange-500 hover:bg-orange-600 text-white font-bold text-base py-3 rounded-lg shadow-md shadow-orange-100 transition-all text-center"
+                                className="w-full max-w-xs bg-white border-2 border-orange-500 text-orange-500 hover:bg-orange-50 font-bold text-base py-3 rounded-lg transition-all text-center"
                              >
-                                ซื้อทันที
+                                ดูรายละเอียด
                              </Link>
                         </div>
                     </div>

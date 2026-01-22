@@ -342,7 +342,8 @@ function CheckoutPage() {
                 const saleMap = {};
                 sales.forEach(sale => {
                     sale.products.forEach(p => {
-                        saleMap[p.product] = p.sale_price; 
+                        // ✅ Fix: Use product_id (from API) instead of product (which might be object or undefined)
+                        saleMap[p.product_id] = p.sale_price; 
                     });
                 });
                 setFlashSaleItems(saleMap);
@@ -358,13 +359,29 @@ function CheckoutPage() {
         return item.price;
     };
 
-    const subtotal = checkoutItems.reduce((total, item) => total + (getEffectivePrice(item) * item.quantity), 0);
-    const finalTotal = subtotal - discount;
+    // ✅ Refactored Calculation for Clarity
+    const SHIPPING_COST = 50; 
+    
+    // 1. Calculate Base Subtotal (Full Price)
+    const baseSubtotal = checkoutItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    
+    // 2. Calculate Flash Savings
+    const flashSavings = checkoutItems.reduce((total, item) => {
+        if (flashSaleItems[item.id]) {
+            const savingsPerUnit = item.price - parseFloat(flashSaleItems[item.id]);
+            return total + (savingsPerUnit * item.quantity);
+        }
+        return total;
+    }, 0);
+
+    // 3. Final Total
+    // Base - Flash - Coupon + Shipping
+    const finalTotal = baseSubtotal - flashSavings - discount + SHIPPING_COST;
     const hasFlashSaleItem = checkoutItems.some(item => flashSaleItems[item.id]);
 
     useEffect(() => {
         if (!hasFlashSaleItem) {
-             const storedToken = localStorage.getItem('token') || (user && user.token);
+             const storedToken = token || localStorage.getItem('token') || (user && user.token);
              if (storedToken) {
                  axios.get('http://localhost:8000/api/coupons-public/', { headers: { Authorization: `Token ${storedToken}` } })
                      .then(res => setAvailableCoupons(res.data))
@@ -374,28 +391,42 @@ function CheckoutPage() {
     }, [hasFlashSaleItem, user]);
 
 
-    const handleSelectCoupon = (code) => {
+    const handleSelectCoupon = (coupon) => {
+        if (baseSubtotal < coupon.min_spend) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'ยอดซื้อไม่ถึงเกณฑ์',
+                text: `คูปองนี้ต้องมียอดซื้อขั้นต่ำ ${formatPrice(coupon.min_spend)}`,
+                confirmButtonColor: '#1a4d2e'
+            });
+            return;
+        }
         removeCoupon(); // Clear previous
-        setCouponCode(code);
+        setCouponCode(coupon.code);
         setShowCouponModal(false);
         // Delay to allow state update then apply
-        setTimeout(() => handleApplyCoupon(code), 200); 
+        setTimeout(() => handleApplyCoupon(coupon.code), 200); 
     };
 
     const handleApplyCoupon = async (codeToUse) => {
         const code = codeToUse || couponCode;
-        if (hasFlashSaleItem) {
-             Swal.fire({ icon: 'warning', title: 'ใช้คูปองไม่ได้', text: 'สินค้า Flash Sale ไม่ร่วมรายการส่วนลด' });
-             removeCoupon();
-             return;
-        }
+        
         if (!code) return;
         try {
-            const storedToken = localStorage.getItem('token') || (user && user.token);
-            const res = await axios.post('http://localhost:8000/api/coupons/validate/', {
+            const storedToken = token || localStorage.getItem('token') || (user && user.token);
+            
+            // ✅ Send items for strict validation (Flash Sale Conflict Check)
+            const payload = {
                 code: code,
-                total_amount: subtotal
-            }, {
+                total_amount: baseSubtotal, // Send Base Total for validation
+                items: checkoutItems.map(item => ({
+                    id: item.id,
+                    quantity: item.quantity,
+                    price: item.price // Send base price
+                }))
+            };
+
+            const res = await axios.post('http://localhost:8000/api/coupons/validate/', payload, {
                 headers: { Authorization: `Token ${storedToken}` }
             });
 
@@ -405,7 +436,7 @@ function CheckoutPage() {
                 Swal.fire({
                     icon: 'success', 
                     title: 'ใช้คูปองสำเร็จ', 
-                    text: `ลดไป ฿${res.data.discount_amount}`,
+                    text: `ลดไป ฿${res.data.discount_amount.toLocaleString()}`,
                     timer: 1500,
                     showConfirmButton: false,
                     toast: true,
@@ -415,10 +446,15 @@ function CheckoutPage() {
         } catch (error) {
             setDiscount(0);
             setCouponData(null);
+            setCouponCode('');
+            
+            // ✅ Handle Strict Backend Errors (e.g. Flash Sale Conflict)
+            const errorMsg = error.response?.data?.error || 'คูปองไม่ถูกต้อง';
+            
             Swal.fire({
                 icon: 'error',
-                title: 'ใช้คูปองไม่ได้',
-                text: error.response?.data?.error || 'คูปองไม่ถูกต้อง',
+                title: 'ไม่สามารถใช้คูปองได้',
+                text: errorMsg,
                 confirmButtonColor: '#1a4d2e'
             });
         }
@@ -433,7 +469,7 @@ function CheckoutPage() {
     useEffect(() => {
         setTransferAmount(finalTotal);
         if (finalTotal > 0) {
-            const storedToken = localStorage.getItem('token') || (user && user.token);
+            const storedToken = token || localStorage.getItem('token') || (user && user.token);
             if (storedToken) {
                 axios.post('http://localhost:8000/api/payment/promptpay_payload/', { amount: finalTotal }, {
                     headers: { Authorization: `Token ${storedToken}` }
@@ -493,7 +529,7 @@ function CheckoutPage() {
 
         setLoading(true);
         try {
-            let storedToken = localStorage.getItem('token');
+            let storedToken = token || localStorage.getItem('token');
             if (!storedToken && user?.token) storedToken = user.token;
 
             if (!storedToken) {
@@ -922,47 +958,97 @@ function CheckoutPage() {
                                                     <p className="text-[10px] text-white/50">x{item.quantity}</p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className={`font-black text-sm ${isFlashSale ? 'text-orange-400' : ''}`}>{formatPrice(price * item.quantity)}</p>
+                                                    {isFlashSale ? (
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[10px] text-gray-400 line-through decoration-red-400">{formatPrice(item.price * item.quantity)}</span>
+                                                            <span className="font-black text-sm text-red-500 animate-pulse">{formatPrice(price * item.quantity)}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="font-black text-sm">{formatPrice(price * item.quantity)}</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
                                 
-                                <div className={`mb-6 transition-opacity ${hasFlashSaleItem ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <div className="mb-6">
                                     <label className="text-[10px] font-bold text-white/60 mb-2 block uppercase tracking-widest flex justify-between">
                                         โค้ดส่วนลด
-                                        {hasFlashSaleItem ? 
-                                            <span className="text-orange-400 flex items-center gap-1"><Zap size={10} /> Flash Sale</span> : 
+                                        {hasFlashSaleItem && <span className="text-orange-400 flex items-center gap-1 text-[10px]"><Zap size={10} /> มีสินค้า Flash Sale</span>}
+                                        {!hasFlashSaleItem && !couponData && (
                                             <button type="button" onClick={() => setShowCouponModal(true)} className="text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"><Tag size={10} /> เลือกคูปอง ({availableCoupons.length})</button>
-                                        }
+                                        )}
                                     </label>
-                                    <div className="flex bg-white/10 rounded-xl p-1 border border-white/10 focus-within:border-white/50 transition-colors">
-                                        <div className="pl-3 flex items-center text-white/50"><Tag size={16} /></div>
-                                        <input 
-                                            value={couponCode}
-                                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                                            disabled={!!couponData || hasFlashSaleItem}
-                                            placeholder={hasFlashSaleItem ? "งดร่วมรายการ" : "กรอกโค้ด"}
-                                            className="bg-transparent w-full p-2 text-sm font-bold text-white placeholder-white/30 outline-none disabled:opacity-50"
-                                        />
+                                    <div className="flex bg-black/20 rounded-2xl p-2 border border-white/5 focus-within:border-indigo-500/50 transition-all items-center">
+                                        <div className="pl-3 text-gray-500"><Tag size={20} /></div>
                                         {couponData ? (
-                                             <button type="button" onClick={removeCoupon} className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">ลบ</button>
+                                            <div className="flex-1 px-3 py-2 flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-black text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-lg border border-indigo-500/20">{couponData.code}</span>
+                                                    <span className="text-[10px] font-bold text-white/50 truncate max-w-[120px]"> applied</span>
+                                                </div>
+                                                <button type="button" onClick={removeCoupon} className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-2xl text-sm font-black transition-all shadow-lg active:scale-95">ลบ</button>
+                                            </div>
                                         ) : (
-                                             <button type="button" onClick={() => handleApplyCoupon(couponCode)} disabled={hasFlashSaleItem} className="bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-600 transition disabled:bg-gray-400 disabled:text-gray-200">ใช้</button>
+                                            <>
+                                                <input 
+                                                    value={couponCode}
+                                                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                                    placeholder="กรอกโค้ดส่วนลด"
+                                                    className="bg-transparent w-full px-3 py-2 text-sm font-bold text-white placeholder-gray-500 outline-none"
+                                                />
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => handleApplyCoupon(couponCode)} 
+                                                    disabled={!couponCode} 
+                                                    className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl text-sm font-black hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20 disabled:bg-gray-700 disabled:text-gray-500 disabled:shadow-none active:scale-95"
+                                                >
+                                                    ใช้
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                     {couponData && <p className="text-[10px] text-indigo-300 mt-2 flex items-center gap-1"><Check size={10} /> ลด {formatPrice(discount)}</p>}
                                 </div>
 
-                                <div className="border-t border-white/10 pt-4 space-y-2">
-                                    <div className="flex justify-between text-xs font-bold text-white/60"><span>ยอดรวม</span><span>{formatPrice(subtotal)}</span></div>
-                                    {discount > 0 && <div className="flex justify-between text-xs font-bold text-green-300"><span>ส่วนลด</span><span>- {formatPrice(discount)}</span></div>}
-                                    <div className="flex justify-between items-end pt-2 border-t border-white/10 mt-2">
-                                        <span className="text-2xl font-black">ยอดสุทธิ</span>
-                                        <span className="text-3xl font-black">{formatPrice(finalTotal)}</span>
+                                <div className="space-y-3 border-t border-white/10 pt-6">
+                                    <div className="flex justify-between items-center text-sm font-medium text-white/60">
+                                        <span>ยอดรวมสินค้า (Base)</span>
+                                        <span>{formatPrice(baseSubtotal)}</span>
+                                    </div>
+                                    
+                                    {flashSavings > 0 && (
+                                        <div className="flex justify-between items-center text-sm font-bold text-orange-400">
+                                            <span className="flex items-center gap-1"><Zap size={12} /> ส่วนลด Flash Sale</span>
+                                            <span>-{formatPrice(flashSavings)}</span>
+                                        </div>
+                                    )}
+
+                                    {discount > 0 && (
+                                        <div className="flex justify-between items-center text-sm font-bold text-indigo-400">
+                                            <span className="flex items-center gap-1"><Tag size={12} /> คูปองส่วนลด</span>
+                                            <span>-{formatPrice(discount)}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center text-sm font-medium text-white/60">
+                                        <span>ค่าจัดส่ง</span>
+                                        <span>{formatPrice(SHIPPING_COST)}</span>
                                     </div>
                                 </div>
+
+                                <div className="border-t-2 border-dashed border-white/10 mt-6 pt-6 mb-8">
+                                    <div className="flex justify-between items-end">
+                                        <span className="font-bold text-white/80">ยอดชำระสุทธิ</span>
+                                        <span className="text-3xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                                            {formatPrice(finalTotal)}
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-white/30 text-right mt-1 font-medium tracking-wide">รวมภาษีมูลค่าเพิ่มแล้ว</p>
+                                </div>
+
+
                                 
                                 {step === 1 ? (
                                     <button
@@ -1002,7 +1088,7 @@ function CheckoutPage() {
                                     </div>
                                 ) : 
                                 availableCoupons.map(coupon => (
-                                    <div key={coupon.id} onClick={() => handleSelectCoupon(coupon.code)} className="border border-indigo-100 rounded-xl p-4 hover:bg-indigo-50 cursor-pointer transition relative group overflow-hidden">
+                                    <div key={coupon.id} onClick={() => handleSelectCoupon(coupon)} className="border border-indigo-100 rounded-xl p-4 hover:bg-indigo-50 cursor-pointer transition relative group overflow-hidden">
                                         <div className="absolute top-0 right-0 bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded-bl-lg">CODE: {coupon.code}</div>
                                         <p className="font-black text-indigo-900">{coupon.description || `ส่วนลด ${coupon.discount_value}`}</p>
                                         <p className="text-xs text-indigo-400">ขั้นต่ำ {formatPrice(coupon.min_spend)}</p>

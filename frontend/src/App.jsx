@@ -32,6 +32,8 @@ import CouponManagement from './components/CouponManagement';
 import MarketingPopup from './components/MarketingPopup'; // ✅ Global Popup
 // ... existing imports ...
 import FlashSaleManagement from './components/FlashSaleManagement'; // ✅ Flash Sale Management
+import FlashSalePage from './components/FlashSalePage'; // ✅ Flash Sale Page
+import MyCoupons from './components/MyCoupons'; // ✅ My Coupons Page
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -85,12 +87,16 @@ const AppContent = () => {
 
               <Route path="/shop" element={<ProductList />} />
               <Route path="/coupons" element={<CouponCenter />} />
+              <Route path="/coupon-center" element={<CouponCenter />} /> {/* Alias */}
+              <Route path="/my-coupons" element={<ProtectedRoute><MyCoupons /></ProtectedRoute>} /> {/* ✅ Protected */}
 
               {/* ✅ จุดสำคัญ: เส้นทางต้องตรงกับ Link ใน ProductList */}
               <Route path="/product/:id" element={<ProductDetail />} />
 
               <Route path="/cart" element={<CartPage />} />
-              <Route path="/cart" element={<CartPage />} />
+              <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/payment" element={<PaymentPage />} /> {/* This was previously protected, now public */}
+              <Route path="/flash-sale" element={<FlashSalePage />} /> {/* ✅ Flash Sale Page */}
 
               {/* --- 🔐 Auth Routes (ยังไม่ Login เท่านั้น) --- */}
               <Route path="/login" element={

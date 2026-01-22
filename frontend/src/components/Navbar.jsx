@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingCart, Heart, User, LogOut, Menu, X, ChevronDown, Sparkles, LayoutDashboard, Store, ClipboardList, ChevronsLeft, Search, Bell, BellOff, Truck } from 'lucide-react';
+import { ShoppingCart, Heart, User, LogOut, Menu, X, ChevronDown, Sparkles, LayoutDashboard, Store, ClipboardList, ChevronsLeft, Search, Bell, BellOff, Truck, Tag, Ticket } from 'lucide-react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
@@ -46,15 +46,9 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const handleNotificationClick = (noti) => {
       setShowNotifications(false); // Close dropdown
 
-      // 1. Flash Sale -> Home + Scroll
+      // 1. Flash Sale -> Flash Sale Page
       if (noti.type === 'flash_sale') {
-          navigate('/');
-          setTimeout(() => {
-              const element = document.getElementById('flash-sale');
-              if (element) {
-                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-          }, 100); 
+          navigate('/flash-sale');
       }
       // 2. Coupon -> Coupon Center
       else if (noti.type === 'promotion') {
@@ -118,7 +112,9 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                       if (activeCoupons.length > 0) {
                           // Check if we already have this notification
                           const hasCouponNoti = notifs.some(n => n.id === 'coupon-alert');
-                          if (!hasCouponNoti) {
+                          const hasSeen = localStorage.getItem('seen_coupon_count') === String(activeCoupons.length);
+
+                          if (!hasCouponNoti && !hasSeen) {
                               notifs.unshift({
                                   id: 'coupon-alert',
                                   title: '🎉 คูปองใหม่มาแล้ว!',
@@ -486,6 +482,10 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                          <div className="p-2 space-y-1">
                              {!isAdmin && (
                                  <>
+
+                                    <Link to="/my-coupons" className="flex items-center gap-3 px-3 py-2 text-xs font-bold text-gray-600 hover:text-[#1a4d2e] hover:bg-green-50 rounded-xl transition-colors">
+                                        <Tag size={16} /> คูปองของฉัน
+                                    </Link>
                                     <Link to="/order-history" className="flex items-center gap-3 px-3 py-2 text-xs font-bold text-gray-600 hover:text-[#1a4d2e] hover:bg-green-50 rounded-xl transition-colors">
                                         <ClipboardList size={16} /> ประวัติการสั่งซื้อ
                                     </Link>
@@ -510,15 +510,20 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                </div>
 
             </div>
+          ) : loading ? (
+            // 🆕 Loading Skeleton - แสดงขณะกำลังโหลด
+            <div className="flex gap-3 animate-pulse">
+              <div className="w-20 h-10 bg-gray-200 rounded-2xl"></div>
+              <div className="w-28 h-10 bg-gray-200 rounded-2xl"></div>
+            </div>
           ) : (
-            (!loading && !localStorage.getItem('token')) && (
+            // แสดงปุ่ม Login/Register เมื่อไม่มี user และโหลดเสร็จแล้ว
             <div className="flex gap-4">
               <Link to="/login" className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-[#1a4d2e] transition-all">เข้าสู่ระบบ</Link>
               <Link to="/register" className="px-8 py-2.5 text-sm font-bold text-white bg-[#1a4d2e] hover:bg-[#143d24] rounded-2xl shadow-xl shadow-green-100 transition-all transform hover:-translate-y-1 active:scale-95">
                 สมัครสมาชิก
               </Link>
             </div>
-            )
           )}
         </div>
 

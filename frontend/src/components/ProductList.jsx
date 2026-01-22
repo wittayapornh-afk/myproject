@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
 import { 
   ShoppingCart, Search, Eye, ChevronLeft, ChevronRight, 
   CheckCircle, Heart, Star, SlidersHorizontal, XCircle, Filter, X, ShoppingBag, Zap
@@ -27,6 +27,7 @@ function ProductList() {
   const { addToCart, cartItems } = useCart(); 
   // Wishlist removed
   const { user } = useAuth(); // Need to check role manually
+  const navigate = useNavigate(); // ✅ Added for URL updates
   
   // ✅ Restriction for Admin/Seller
   const isRestricted = ['admin', 'super_admin', 'seller'].includes(user?.role?.toLowerCase());
@@ -51,6 +52,7 @@ function ProductList() {
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('ทั้งหมด');
   const [showInStockOnly, setShowInStockOnly] = useState(false);
+  const [activeFlashSales, setActiveFlashSales] = useState({}); // Map: productId -> { sale_price, limit, sold }
 
   const API_BASE_URL = "http://localhost:8000";
 
@@ -63,6 +65,66 @@ function ProductList() {
         setCategories(uniqueCats);
       })
       .catch(err => console.error(err));
+  }, []);
+  
+  // ✅ 1.0.5 Initialize Filter from URL (e.g. ?category=Sofa&page=2)
+  const location = useLocation();
+
+  useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      const catParam = params.get('category');
+      const pageParam = params.get('page');
+      
+      if (catParam) {
+          setSelectedCategory(catParam);
+      }
+      
+      // 🔖 ลองกลับมาจาก sessionStorage ก่อน (ถ้ามี)
+      const savedPage = sessionStorage.getItem('shopCurrentPage');
+      
+      if (savedPage && !pageParam) {
+          // มีหน้าที่บันทึกไว้ และไม่มี page ใน URL -> กลับไปหน้าเดิม
+          const pageNum = parseInt(savedPage, 10);
+          if (!isNaN(pageNum) && pageNum > 0) {
+              setCurrentPage(pageNum);
+          }
+          sessionStorage.removeItem('shopCurrentPage'); // ลบหลังใช้แล้ว
+      } else if (pageParam) {
+          // มี page ใน URL -> ใช้เลย
+          const pageNum = parseInt(pageParam, 10);
+          if (!isNaN(pageNum) && pageNum > 0) {
+              setCurrentPage(pageNum);
+          }
+      }
+  }, [location.search]);
+
+  // 1.1 โหลด Flash Sales ที่ Active
+  useEffect(() => {
+    const fetchActiveFlashSales = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/flash-sales/active/`);
+            if (res.ok) {
+                const data = await res.json();
+                // Flatten all products from all active flash sales
+                const flashSaleMap = {};
+                data.forEach(sale => {
+                    sale.products.forEach(p => {
+                        flashSaleMap[p.product_id] = {
+                            sale_price: p.sale_price,
+                            limit: p.limit, // or quantity
+                            sold: p.sold,
+                            start_time: sale.start_time,
+                            end_time: sale.end_time
+                        };
+                    });
+                });
+                setActiveFlashSales(flashSaleMap);
+            }
+        } catch (err) {
+            console.error("Failed to fetch flash sales:", err);
+        }
+    };
+    fetchActiveFlashSales();
   }, []);
 
   // 1.2 โหลดแบรนด์
@@ -122,6 +184,14 @@ function ProductList() {
   };
 
 
+  // ✅ Helper: Update page in URL
+  const updatePage = (newPage) => {
+      const params = new URLSearchParams(location.search);
+      params.set('page', newPage);
+      navigate(`?${params.toString()}`, { replace: true });
+      setCurrentPage(newPage);
+  };
+
   const clearFilters = () => {
       setSelectedCategory('ทั้งหมด');
       setSelectedBrand('ทั้งหมด');
@@ -131,7 +201,7 @@ function ProductList() {
       setMaxPrice('');
       setMinRating(0);
       setSortOption('newest');
-      setCurrentPage(1);
+      updatePage(1); // ✅ ใช้ updatePage แทน setCurrentPage
   };
 
   const isInCart = (id) => cartItems.some(item => item.id === id);
@@ -146,19 +216,7 @@ function ProductList() {
                    <div className="w-10 h-10 bg-[#1a4d2e] rounded-xl flex items-center justify-center text-white shadow-lg shadow-green-900/20">
                        <ShoppingBag size={20} />
                    </div>
-                   <h1 className="text-2xl font-black text-[#263A33] tracking-tight uppercase hidden md:block">Shop All</h1>
-               </div>
-               
-               {/* Search Bar */}
-               <div className="flex-1 max-w-xl">
-                   <div className="relative group">
-                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
-                       <input 
-                           type="text" placeholder="ค้นหาสินค้าที่ต้องการ..." 
-                           value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                           className="w-full pl-12 pr-4 py-2.5 rounded-xl bg-gray-100/50 border border-transparent focus:bg-white focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all font-bold text-sm"
-                       />
-                   </div>
+                   <h1 className="text-2xl font-black text-[#263A33] tracking-tight uppercase">Shop All</h1>
                </div>
 
                {/* Mobile Filter Toggle */}
@@ -191,7 +249,7 @@ function ProductList() {
                                     {selectedCategory === cat && <div className="w-2.5 h-2.5 bg-[#1a4d2e] rounded-full" />}
                                 </div>
                                 <span className={`text-sm font-bold ${selectedCategory === cat ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>{cat}</span>
-                                <input type="radio" name="category" className="hidden" checked={selectedCategory === cat} onChange={() => { setSelectedCategory(cat); setCurrentPage(1); }} />
+                                <input type="radio" name="category" className="hidden" checked={selectedCategory === cat} onChange={() => { setSelectedCategory(cat); updatePage(1); }} />
                             </label>
                         ))}
                     </div>
@@ -207,7 +265,7 @@ function ProductList() {
                                     {selectedBrand === brand && <div className="w-2.5 h-2.5 bg-[#1a4d2e] rounded-full" />}
                                 </div>
                                 <span className={`text-sm font-bold ${selectedBrand === brand ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>{brand}</span>
-                                <input type="radio" name="brand" className="hidden" checked={selectedBrand === brand} onChange={() => { setSelectedBrand(brand); setCurrentPage(1); }} />
+                                <input type="radio" name="brand" className="hidden" checked={selectedBrand === brand} onChange={() => { setSelectedBrand(brand); updatePage(1); }} />
                             </label>
                         ))}
                     </div>
@@ -221,7 +279,7 @@ function ProductList() {
                              {showInStockOnly && <CheckCircle size={14} className="text-white" />}
                         </div>
                         <span className={`text-sm font-bold ${showInStockOnly ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>เฉพาะสินค้าพร้อมส่ง</span>
-                        <input type="checkbox" className="hidden" checked={showInStockOnly} onChange={(e) => { setShowInStockOnly(e.target.checked); setCurrentPage(1); }} />
+                        <input type="checkbox" className="hidden" checked={showInStockOnly} onChange={(e) => { setShowInStockOnly(e.target.checked); updatePage(1); }} />
                     </label>
                 </div>
 
@@ -261,7 +319,7 @@ function ProductList() {
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Found <span className="text-[#1a4d2e] font-black text-base mx-1">{products.length}</span> items</p>
                 <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
                     <span className="text-xs font-bold text-gray-500">Sort by:</span>
-                    <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); setCurrentPage(1); }} className="bg-transparent text-sm font-black text-[#1a4d2e] outline-none cursor-pointer">
+                    <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); updatePage(1); }} className="bg-transparent text-sm font-black text-[#1a4d2e] outline-none cursor-pointer">
                         <option value="newest">Newest</option>
                         <option value="price_asc">Price: Low - High</option>
                         <option value="price_desc">Price: High - Low</option>
@@ -276,14 +334,24 @@ function ProductList() {
             ) : products.length > 0 ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
                 {products.map((product) => {
-                  const flashSale = product.flash_sale;
+                  // ✅ Check if in active flash sale
+                  const flashSaleItem = activeFlashSales[product.id];
+                  // Prioritize the frontend fetched flash sale data, fallback to product.flash_sale if backend already populated it (optional, but map is fresher)
+                  const flashSale = flashSaleItem || product.flash_sale;
+
                   return (
                   <div key={product.id} className={`group bg-white rounded-[2.5rem] p-4 shadow-sm hover:shadow-2xl hover:shadow-green-900/10 transition-all duration-300 relative border border-gray-100/50 hover:border-[#1a4d2e]/20 flex flex-col hover:-translate-y-2 ${flashSale ? 'ring-2 ring-red-500/10' : ''}`}>
                     
                     {/* Flash Sale Badge */}
                     {flashSale && (
-                        <div className="absolute top-4 left-4 z-30 bg-red-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg animate-pulse">
-                            <Zap size={12} fill="currentColor" /> FLASH SALE
+                        <div className="absolute top-4 left-4 z-30 flex flex-col items-start gap-1">
+                             <div className="bg-red-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg animate-pulse">
+                                <Zap size={12} fill="currentColor" /> FLASH SALE
+                            </div>
+                            {/* Calculate Discount % */}
+                            <div className="bg-orange-500 text-white text-[9px] font-bold px-2 py-1 rounded-lg shadow-md">
+                                -{Math.round((1 - (flashSale.sale_price || flashSale.price) / product.price) * 100)}%
+                            </div>
                         </div>
                     )}
 
@@ -294,7 +362,11 @@ function ProductList() {
                         </Link>
                     </div>
 
-                    <Link to={`/product/${product.id}`} className="block relative aspect-square mb-5 bg-[#F8F9FA] rounded-[2rem] overflow-hidden p-6 group-hover:bg-[#f0fdf4] transition-colors">
+                    <Link 
+                        to={`/product/${product.id}`} 
+                        onClick={() => sessionStorage.setItem('shopCurrentPage', currentPage)} // 🔖 บันทึกหน้าปัจจุบัน
+                        className="block relative aspect-square mb-5 bg-[#F8F9FA] rounded-[2rem] overflow-hidden p-6 group-hover:bg-[#f0fdf4] transition-colors"
+                    >
                        <img src={getImageUrl(product.thumbnail || product.image)} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500 mix-blend-multiply" alt={product.title} />
                        {product.stock <= 0 && <span className="absolute inset-0 bg-white/60 flex items-center justify-center text-red-600 font-black text-xs uppercase tracking-widest rotate-[-12deg] border-4 border-red-600 rounded-[2rem] m-6">Out of Stock</span>}
                     </Link>
@@ -345,7 +417,7 @@ function ProductList() {
             {/* Pagination */}
             {totalPages > 1 && (
                 <div className="flex justify-center items-center gap-4 mt-16 pb-12">
-                    <button onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo(0,0); }} disabled={currentPage === 1} className="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm hover:-translate-x-1"><ChevronLeft size={24} className="text-gray-600"/></button>
+                    <button onClick={() => { updatePage(Math.max(1, currentPage - 1)); window.scrollTo(0,0); }} disabled={currentPage === 1} className="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm hover:-translate-x-1"><ChevronLeft size={24} className="text-gray-600"/></button>
                     
                     <div className="flex items-center gap-2 bg-white px-6 py-3 rounded-2xl border border-gray-100 shadow-sm">
                         <span className="font-black text-[#1a4d2e] text-xl">{currentPage}</span>
@@ -353,7 +425,7 @@ function ProductList() {
                         <span className="font-bold text-gray-400 text-sm">{totalPages}</span>
                     </div>
 
-                    <button onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0,0); }} disabled={currentPage === totalPages} className="w-12 h-12 rounded-2xl bg-[#1a4d2e] text-white flex items-center justify-center hover:bg-[#143d24] disabled:opacity-50 disabled:hover:bg-[#1a4d2e] transition-all shadow-lg hover:translate-x-1"><ChevronRight size={24}/></button>
+                    <button onClick={() => { updatePage(Math.min(totalPages, currentPage + 1)); window.scrollTo(0,0); }} disabled={currentPage === totalPages} className="w-12 h-12 rounded-2xl bg-[#1a4d2e] text-white flex items-center justify-center hover:bg-[#143d24] disabled:opacity-50 disabled:hover:bg-[#1a4d2e] transition-all shadow-lg hover:translate-x-1"><ChevronRight size={24}/></button>
                 </div>
             )}
           </main>

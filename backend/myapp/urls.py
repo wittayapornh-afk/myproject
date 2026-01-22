@@ -67,6 +67,11 @@ urlpatterns = [
     path('api/admin/flash-sales/', views.admin_flash_sale_api, name='admin_flash_sale'),
     path('api/admin/flash-sales/<int:fs_id>/', views.admin_flash_sale_api, name='admin_flash_sale_detail'),
     path('api/flash-sales/active/', views.get_active_flash_sales_api, name='active_flash_sales'),
+    
+    # ✅ NEW: Flash Sale Campaigns
+    path('api/admin/campaigns/', views.admin_campaign_api, name='admin_campaign'),
+    path('api/admin/campaigns/<int:campaign_id>/', views.admin_campaign_api, name='admin_campaign_detail'),
+    path('api/admin/campaigns/<int:campaign_id>/flash-sales/', views.get_campaign_flash_sales, name='campaign_flash_sales'),
 
     # --- Coupons ---
     path('api/admin/coupons/', views.admin_coupon_api, name='admin_coupon'),
@@ -74,9 +79,14 @@ urlpatterns = [
     path('api/coupons/validate/', views.validate_coupon_api, name='validate_coupon'),
     path('api/coupons-public/', views.get_public_coupons, name='public_coupons'),
     
+    # ✅ Coupon Collection System
+    path('api/coupons/<int:coupon_id>/collect/', views.collect_coupon_api, name='collect_coupon'),
+    path('api/user-coupons/', views.get_my_coupons_api, name='my_coupons'),
+    
     # --- Django Admin ---
     path('admin/', admin.site.urls),
 ]
+# Force Reload Fix
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
