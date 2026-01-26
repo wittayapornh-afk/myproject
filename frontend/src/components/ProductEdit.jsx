@@ -152,7 +152,7 @@ function ProductEdit() {
           });
           
           // Refresh data
-          navigate('/admin/product/list'); 
+          navigate('/admin/dashboard?tab=products'); 
           
       } catch (error) {
           console.error('Update error:', error);
@@ -195,8 +195,12 @@ function ProductEdit() {
                     <input 
                         type="number" 
                         name="price" 
+                        min="0"
                         value={formData.price} 
-                        onChange={handleChange} 
+                        onChange={e => {
+                            const val = Math.max(0, e.target.value);
+                            setFormData({ ...formData, price: val });
+                        }} 
                         onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
                         className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#1a4d2e]/20 font-black text-[#1a4d2e]" 
                         required 
@@ -218,8 +222,12 @@ function ProductEdit() {
                     <input 
                         type="number" 
                         name="stock" 
+                        min="0"
                         value={formData.stock} 
-                        onChange={handleChange} 
+                        onChange={e => {
+                            const val = Math.max(0, e.target.value);
+                            setFormData({ ...formData, stock: val });
+                        }} 
                         onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
                         className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-[#1a4d2e]/20 font-bold text-gray-700" 
                         required 

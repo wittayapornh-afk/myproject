@@ -4,25 +4,48 @@ import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
 const FlashSaleSection = ({ flashSale }) => {
-    const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+    const [status, setStatus] = useState('active'); // 'active' | 'upcoming' | 'ended'
+    const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, days: 0 });
 
     useEffect(() => {
-        if (!flashSale || !flashSale.end_time) {
-            setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
-            return;
-        }
+        if (!flashSale || !flashSale.end_time) return;
 
         const calculateTimeLeft = () => {
-            const difference = new Date(flashSale.end_time).getTime() - new Date().getTime();
+            const now = new Date().getTime();
+            const start = new Date(flashSale.start_time).getTime();
+            const end = new Date(flashSale.end_time).getTime();
+            
+            let target = end;
+            let currentStatus = 'active';
+
+            if (now < start) {
+                target = start;
+                currentStatus = 'upcoming';
+            } else if (now > end) {
+                currentStatus = 'ended';
+                setTimeLeft({ hours: 0, minutes: 0, seconds: 0, days: 0 });
+                setStatus('ended');
+                return;
+            }
+
+            const difference = target - now;
             
             if (difference > 0) {
-                setTimeLeft({
-                    hours: Math.floor((difference / (1000 * 60 * 60))),
-                    minutes: Math.floor((difference / 1000 / 60) % 60),
-                    seconds: Math.floor((difference / 1000) % 60),
-                });
+                const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+                const minutes = Math.floor((difference / 1000 / 60) % 60);
+                const seconds = Math.floor((difference / 1000) % 60);
+
+                setTimeLeft({ days, hours, minutes, seconds });
+                setStatus(currentStatus);
             } else {
-                setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+                // Time reached (Start or End)
+                if (currentStatus === 'upcoming') {
+                     // Transition to active
+                     calculateTimeLeft(); // Recalculate immediately
+                } else {
+                    setStatus('ended');
+                }
             }
         };
 
@@ -48,17 +71,21 @@ const FlashSaleSection = ({ flashSale }) => {
                     <div className="flex items-center gap-4">
                         {/* Title with Icon */}
                         <div className="flex items-center gap-1">
-                            <Zap className="fill-orange-500 text-orange-500" size={24} />
-                            <h2 className="text-2xl font-black text-orange-500 uppercase italic tracking-tighter">FLASH SALE</h2>
+                            <Zap className={`${status === 'upcoming' ? 'fill-blue-500 text-blue-500' : 'fill-orange-500 text-orange-500'}`} size={24} />
+                            <h2 className={`text-2xl font-black ${status === 'upcoming' ? 'text-blue-500' : 'text-orange-500'} uppercase italic tracking-tighter`}>
+                                {status === 'upcoming' ? 'UPCOMING SALE' : 'FLASH SALE'}
+                            </h2>
                         </div>
 
-                        {/* Countdown Timer (Black Boxes) */}
+                        {/* Countdown Timer */}
                         <div className="flex items-center gap-1">
-                            <TimerBox value={String(timeLeft.hours).padStart(2, '0')} />
+                            {status === 'upcoming' && <span className="text-gray-500 text-xs font-bold mr-1">เริ่มใน:</span>}
+                            {timeLeft.days > 0 && <><TimerBox value={timeLeft.days} bg={status === 'upcoming' ? 'bg-blue-600' : 'bg-black'} /><span className="font-bold text-gray-800">:</span></>}
+                            <TimerBox value={String(timeLeft.hours).padStart(2, '0')} bg={status === 'upcoming' ? 'bg-blue-600' : 'bg-black'} />
                             <span className="font-bold text-gray-800">:</span>
-                            <TimerBox value={String(timeLeft.minutes).padStart(2, '0')} />
+                            <TimerBox value={String(timeLeft.minutes).padStart(2, '0')} bg={status === 'upcoming' ? 'bg-blue-600' : 'bg-black'} />
                             <span className="font-bold text-gray-800">:</span>
-                            <TimerBox value={String(timeLeft.seconds).padStart(2, '0')} />
+                            <TimerBox value={String(timeLeft.seconds).padStart(2, '0')} bg={status === 'upcoming' ? 'bg-blue-600' : 'bg-black'} />
                         </div>
                     </div>
 
@@ -208,8 +235,8 @@ const FlashSaleSection = ({ flashSale }) => {
 };
 
 // Helper Component for Timer
-const TimerBox = ({ value }) => (
-    <div className="bg-black text-white text-sm font-bold w-6 h-5 rounded-sm flex items-center justify-center leading-none">
+const TimerBox = ({ value, bg = 'bg-black' }) => (
+    <div className={`${bg} text-white text-sm font-bold px-1.5 h-5 rounded-sm flex items-center justify-center leading-none min-w-[24px]`}>
         {value}
     </div>
 );

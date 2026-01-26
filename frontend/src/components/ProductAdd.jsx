@@ -66,12 +66,17 @@ function ProductAdd() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+        if (!formData.category) {
+            Swal.fire('Warning', 'กรุณาเลือกหมวดหมู่สินค้า', 'warning');
+            return;
+        }
+
         const data = new FormData();
         data.append('title', formData.title || "");
         data.append('price', formData.price || 0);
         data.append('stock', formData.stock || 0);
         data.append('brand', formData.brand || "");
-        data.append('category', formData.category || "");
+        data.append('category', formData.category);
         data.append('description', formData.description || "");
         
         if (thumbnailFile) data.append('thumbnail', thumbnailFile);
@@ -89,7 +94,7 @@ function ProductAdd() {
         });
 
         if (response.ok) {
-            Swal.fire('Success', 'เพิ่มสินค้าเรียบร้อย!', 'success').then(() => navigate('/shop'));
+            Swal.fire('Success', 'เพิ่มสินค้าเรียบร้อย!', 'success').then(() => navigate('/admin/dashboard?tab=products'));
         } else {
             const errData = await response.json();
             Swal.fire('Error', errData.error || 'Failed to add product', 'error');
@@ -136,8 +141,9 @@ function ProductAdd() {
                         <label className={styles.label}>ราคา</label>
                         <input 
                             type="number" 
+                            min="0"
                             className={styles.input} 
-                            onChange={e => setFormData({...formData, price: e.target.value})} 
+                            onChange={e => setFormData({...formData, price: Math.max(0, e.target.value)})} 
                             onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
                             required 
                         />
@@ -150,8 +156,9 @@ function ProductAdd() {
                         <label className={styles.label}>จำนวน</label>
                         <input 
                             type="number" 
+                            min="0"
                             className={styles.input} 
-                            onChange={e => setFormData({...formData, stock: e.target.value})} 
+                            onChange={e => setFormData({...formData, stock: Math.max(0, e.target.value)})} 
                             onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
                         />
                     </div>
@@ -163,9 +170,13 @@ function ProductAdd() {
                             defaultValue=""
                         >
                             <option value="" disabled>-- เลือกหมวดหมู่ --</option>
-                            {categories.map((cat, index) => (
-                                <option key={index} value={cat}>{cat}</option>
-                            ))}
+                            {categories.map((cat, index) => {
+                                const catName = typeof cat === 'object' ? cat.name : cat;
+                                const catValue = typeof cat === 'object' ? (cat.name || '') : cat;
+                                return (
+                                    <option key={index} value={catName}>{catName}</option>
+                                );
+                            })}
                         </select>
                     </div>
                 </div>

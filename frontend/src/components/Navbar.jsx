@@ -54,9 +54,13 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
       else if (noti.type === 'promotion') {
           navigate('/coupons');
       }
-      // 3. Order -> Order History
+      // 3. Order -> Order History (User) or Admin Orders (Admin)
       else if (noti.type === 'order' || noti.type === 'success' || noti.type === 'info') {
-          navigate('/order-history'); // ✅ Corrected Route
+          if (isAdmin) {
+              navigate('/admin/dashboard?tab=orders');
+          } else {
+              navigate('/order-history');
+          }
       }
       // 4. Default -> Show Popup
       else {
@@ -367,7 +371,20 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                        )}
                   </div>
                   <div className="p-2 border-t border-gray-50 bg-gray-50">
-                      <button className="w-full py-2 text-[10px] font-bold text-gray-500 hover:text-[#1a4d2e] uppercase tracking-wider transition-colors">
+                      <button 
+                        onClick={async () => {
+                            setNotifications([]);
+                            // Reset Local flags
+                            localStorage.setItem('seen_coupon_count', '9999'); // Mark as seen all
+                            try {
+                                // Attempt backend clear if exists
+                                await axios.post(`${API_BASE_URL}/api/notifications/mark_all_read/`, {}, {
+                                    headers: { Authorization: `Token ${token}` }
+                                });
+                            } catch(e) {}
+                        }}
+                        className="w-full py-2 text-[10px] font-bold text-gray-500 hover:text-[#1a4d2e] uppercase tracking-wider transition-colors"
+                      >
                           ล้างการแจ้งเตือนทั้งหมด
                       </button>
                   </div>

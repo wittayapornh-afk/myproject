@@ -23,12 +23,7 @@ const ViewToggle = ({ activeView, onViewChange }) => {
             icon: Calendar,
             color: 'orange'
         },
-        { 
-            id: 'campaigns', 
-            label: 'Campaigns', 
-            icon: FolderKanban,
-            color: 'purple'
-        }
+
     ];
 
     return (
