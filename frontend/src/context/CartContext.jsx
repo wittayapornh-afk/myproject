@@ -20,9 +20,13 @@ export const CartProvider = ({ children }) => {
   useEffect(() => {
     const key = getCartKey();
     const savedCart = localStorage.getItem(key);
+    console.log(`🛍️ [CartContext] Loading cart for key: ${key}`);
     if (savedCart) {
-      setCartItems(JSON.parse(savedCart));
+      const parsed = JSON.parse(savedCart);
+      console.log(`✅ [CartContext] Restored ${parsed.length} items from localStorage`);
+      setCartItems(parsed);
     } else {
+      console.warn(`⚠️ [CartContext] No saved cart found for key: ${key}`);
       setCartItems([]);
     }
   }, [user]); // ทำงานเมื่อ user เปลี่ยน
@@ -30,6 +34,7 @@ export const CartProvider = ({ children }) => {
   // 2. บันทึกข้อมูลลงเครื่องเมื่อตะกร้าเปลี่ยน
   useEffect(() => {
     const key = getCartKey();
+    console.log(`💾 [CartContext] Saving ${cartItems.length} items to localStorage`);
     localStorage.setItem(key, JSON.stringify(cartItems));
   }, [cartItems, user]);
 
@@ -85,6 +90,7 @@ export const CartProvider = ({ children }) => {
 
   // ✅ แก้ไข: ลบ key ตาม User ปัจจุบัน (ไม่ใช่ลบมั่ว)
   const clearCart = () => {
+    console.warn(`🛡️ [CartContext] clearCart() called - removing all items`);
     setCartItems([]);
     const key = getCartKey();
     localStorage.removeItem(key);

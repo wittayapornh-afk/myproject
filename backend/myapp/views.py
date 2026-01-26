@@ -2002,6 +2002,26 @@ def admin_campaign_api(request, campaign_id=None):
             start_date = parse_datetime(data.get('campaign_start'))
             end_date = parse_datetime(data.get('campaign_end'))
 
+            # 🔥 ตรวจสอบ Campaign ที่ทับซ้อนกัน (Overlap Detection)
+            from django.db.models import Q
+            overlapping_campaigns = FlashSaleCampaign.objects.filter(
+                Q(campaign_start__lte=end_date, campaign_end__gte=start_date)
+            )
+            
+            if overlapping_campaigns.exists():
+                # ❌ มี Campaign ทับซ้อน → ห้ามสร้าง
+                overlap_list = [{
+                    "id": c.id,
+                    "name": c.name,
+                    "start": c.campaign_start.isoformat(),
+                    "end": c.campaign_end.isoformat()
+                } for c in overlapping_campaigns]
+                
+                return Response({
+                    "error": "มี Campaign อยู่แล้วในช่วงเวลานี้ (ทับซ้อนไม่ได้)",
+                    "overlapping_campaigns": overlap_list
+                }, status=400)
+
             # ✅ สร้าง Campaign Object ใหม่
             campaign = FlashSaleCampaign.objects.create(
                 name=data.get('name'),
@@ -2048,11 +2068,37 @@ def admin_campaign_api(request, campaign_id=None):
             # ✅ Update ทุก field (ถ้าไม่ส่งมา                
             # ✅ Parse Dates if provided
             from django.utils.dateparse import parse_datetime
+            new_start = campaign.campaign_start
+            new_end = campaign.campaign_end
+            
             if 'campaign_start' in data:
-                campaign.campaign_start = parse_datetime(data['campaign_start'])
+                new_start = parse_datetime(data['campaign_start'])
             if 'campaign_end' in data:
-                 campaign.campaign_end = parse_datetime(data['campaign_end'])
-
+                new_end = parse_datetime(data['campaign_end'])
+            
+            # 🔥 ตรวจสอบ Campaign ที่ทับซ้อนกัน (ยกเว้นตัวเอง)
+            from django.db.models import Q
+            overlapping_campaigns = FlashSaleCampaign.objects.filter(
+                Q(campaign_start__lte=new_end, campaign_end__gte=new_start)
+            ).exclude(id=campaign_id)  # ยกเว้นตัวเอง
+            
+            if overlapping_campaigns.exists():
+                # ❌ มี Campaign ทับซ้อน → ห้ามแก้ไข
+                overlap_list = [{
+                    "id": c.id,
+                    "name": c.name,
+                    "start": c.campaign_start.isoformat(),
+                    "end": c.campaign_end.isoformat()
+                } for c in overlapping_campaigns]
+                
+                return Response({
+                    "error": "การแก้ไขนี้จะทำให้ทับซ้อนกับ Campaign อื่น (ทับซ้อนไม่ได้)",
+                    "overlapping_campaigns": overlap_list
+                }, status=400)
+            
+            # ✅ Apply changes if validation passed
+            campaign.campaign_start = new_start
+            campaign.campaign_end = new_end
             campaign.name = data.get('name', campaign.name)
             campaign.description = data.get('description', campaign.description)
             campaign.theme_color = data.get('theme_color', campaign.theme_color)
@@ -2276,6 +2322,12 @@ def add_product_api(request):
         return Response(status=403)
     try:
         data = request.data
+        
+        # ✅ Resolve Category FIRST (to avoid null error on create)
+        category_obj = None
+        if 'category' in data and data['category']:
+            category_obj, _ = Category.objects.get_or_create(name=data['category'])
+            
         product = Product.objects.create(
             title=data.get('title'),
             description=data.get('description', ''),
@@ -2284,12 +2336,9 @@ def add_product_api(request):
             stock=data.get('stock', 0),
             brand=data.get('brand', ''),
             sku=data.get('sku'),
+            category=category_obj, # ✅ Pass immediately
             is_active=True
         )
-        if 'category' in data and data['category']:
-            cat, _ = Category.objects.get_or_create(name=data['category'])
-            product.category = cat
-            product.save()
             
         if 'thumbnail' in request.FILES:
             product.thumbnail = request.FILES['thumbnail']

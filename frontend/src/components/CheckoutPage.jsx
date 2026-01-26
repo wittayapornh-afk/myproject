@@ -85,15 +85,41 @@ function CheckoutPage() {
     const navigate = useNavigate();
     const location = useLocation(); // ✅ Hook for State
 
+    // 🔒 Security: Prevent Admin/Seller from Checkout
+    useEffect(() => {
+        if (user && ['admin', 'super_admin', 'seller'].includes(user.role?.toLowerCase())) {
+            Swal.fire({
+                icon: 'error',
+                title: 'ไม่สามารถทำรายการได้',
+                text: 'ผู้ดูแลระบบและผู้ขายไม่สามารถทำการสั่งซื้อได้',
+                background: '#fff',
+                confirmButtonColor: '#1a4d2e'
+            });
+            navigate('/admin/dashboard');
+        }
+    }, [user, navigate]);
+
     // ✅ Initialize state from LocalStorage to prevent "No Items" flash on refresh
     const [checkoutItems, setCheckoutItems] = useState(() => {
         // 1. Priority: Direct Buy (from Product Detail)
         if (location.state?.directBuyItem) {
+            console.log('📦 Direct Buy Item:', location.state.directBuyItem);
             return [{ ...location.state.directBuyItem, quantity: location.state.quantity || 1 }];
         }
         // 2. Fallback: Load from LocalStorage
         const saved = localStorage.getItem('checkout_items_persist');
-        return saved ? JSON.parse(saved) : [];
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                console.log('✅ Restored checkout items from localStorage:', parsed);
+                return parsed.length > 0 ? parsed : [];
+            } catch (e) {
+                console.error('❌ Error parsing saved checkout items:', e);
+                localStorage.removeItem('checkout_items_persist'); // Clear corrupted data
+            }
+        }
+        console.warn('⚠️ No checkout items found in localStorage');
+        return [];
     });
 
     useEffect(() => {
@@ -1014,7 +1040,7 @@ function CheckoutPage() {
                             </div>
 
                             <div className="border-t border-white/10 pt-4 space-y-2">
-                                <div className="flex justify-between text-xs font-bold text-white/60"><span>ยอดรวม</span><span>{formatPrice(subtotal)}</span></div>
+                                <div className="flex justify-between text-xs font-bold text-white/60"><span>ยอดรวม</span><span>{formatPrice(baseSubtotal)}</span></div>
                                 {discount > 0 && <div className="flex justify-between text-xs font-bold text-green-300"><span>ส่วนลด</span><span>- {formatPrice(discount)}</span></div>}
                                 <div className="flex justify-between items-end pt-2 border-t border-white/10 mt-2">
                                     <span className="text-2xl font-black">ยอดสุทธิ</span>
