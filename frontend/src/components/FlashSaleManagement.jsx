@@ -1572,11 +1572,7 @@ const FlashSaleManagement = () => {
                                                                 dateFormat="eee d MMM yyyy"
                                                                 popperPlacement="bottom-start"
                                                             >
-                                                                <div className="p-2 border-t border-gray-100 mt-2">
-                                                                    <div className="w-full bg-orange-500 text-white font-black text-sm py-3 rounded-xl text-center cursor-pointer hover:bg-orange-600 transition-all shadow-lg shadow-orange-200">
-                                                                        ยืนยัน
-                                                                    </div>
-                                                                </div>
+
                                                             </DatePicker>
                                                         </div>
                                                         
@@ -1665,11 +1661,7 @@ const FlashSaleManagement = () => {
                                                                 dateFormat="eee d MMM yyyy"
                                                                 popperPlacement="bottom-start"
                                                             >
-                                                                <div className="p-2 border-t border-gray-100 mt-2">
-                                                                    <div className="w-full bg-orange-500 text-white font-black text-sm py-3 rounded-xl text-center cursor-pointer hover:bg-orange-600 transition-all shadow-lg shadow-orange-200">
-                                                                        ยืนยัน
-                                                                    </div>
-                                                                </div>
+
                                                             </DatePicker>
                                                         </div>
 
