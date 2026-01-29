@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingCart, Heart, User, LogOut, Menu, X, ChevronDown, Sparkles, LayoutDashboard, Store, ClipboardList, ChevronsLeft, Search, Bell, BellOff, Truck, Tag, Ticket } from 'lucide-react';
+import { ShoppingCart, Heart, User, LogOut, Menu, X, ChevronDown, Sparkles, LayoutDashboard, Store, ClipboardList, ChevronsLeft, Search, Bell, BellOff, Truck, Tag, Ticket, Zap } from 'lucide-react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
@@ -41,6 +41,31 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
+
+  // ✅ State for Real-time Flash Sale Check (Navbar)
+  const [flashSaleItems, setFlashSaleItems] = useState({});
+
+  useEffect(() => {
+    // Fetch Active Flash Sales for Mini Cart Badge
+    axios.get(`${API_BASE_URL}/api/flash-sales/active/`)
+        .then(res => {
+            const map = {};
+            res.data.forEach(fs => {
+                 fs.products.forEach(p => {
+                     map[p.product] = { price: p.sale_price, end_time: fs.end_time };
+                 });
+            });
+            setFlashSaleItems(map);
+        })
+        .catch(err => console.error("Error fetching active flash sales", err));
+  }, []);
+
+  const getEffectivePrice = (item) => {
+      if (flashSaleItems[item.id || item.product_id]) {
+          return flashSaleItems[item.id || item.product_id].price;
+      }
+      return item.price;
+  };
 
   // ✅ Dynamic Notification Click Handler
   const handleNotificationClick = (noti) => {
@@ -96,37 +121,83 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
 
       const fetchNotifications = async () => {
           try {
-              // 1. Fetch Real Notifications
+              // 🕒 Check Last Cleared Timestamp
+              const lastCleared = localStorage.getItem('notifications_cleared_at');
+              const clearedTime = lastCleared ? new Date(lastCleared).getTime() : 0;
+
+              // 1. Fetch Real Notifications with 'Since' Filter
               const res = await axios.get(`${API_BASE_URL}/api/notifications/`, {
-                   headers: { Authorization: `Token ${token || localStorage.getItem('token')}` }
+                   headers: { Authorization: `Token ${token || localStorage.getItem('token')}` },
+                   params: { since: lastCleared } // ✅ Send since param
               });
               let notifs = res.data || [];
+
+              // ✅ Filter out old notifications based on timestamp
+              // This is crucial because the backend generates notifications dynamically.
+              if (clearedTime > 0) {
+                  notifs = notifs.filter(n => {
+                      let t = 0;
+                      const timeRaw = n.timestamp || n.created_at;
+                      
+                      if (timeRaw) {
+                           t = new Date(timeRaw).getTime();
+                      } else if (n.time) {
+                           // Fallback for old backend response "DD/MM HH:MM" (e.g. "27/01 13:00")
+                           // This handles cases where backend hasn't updated yet to send 'timestamp'
+                           try {
+                               const [dPart, tPart] = n.time.split(' ');
+                               const [day, month] = dPart.split('/');
+                               const [hour, minute] = tPart.split(':');
+                               const now = new Date();
+                               t = new Date(now.getFullYear(), parseInt(month)-1, parseInt(day), parseInt(hour), parseInt(minute)).getTime();
+                           } catch (e) { t = 0; }
+                      }
+                      
+                      return t > clearedTime;
+                  });
+              }
 
               // 2. Check for Active Public Coupons
               try {
                   const couponsRes = await axios.get(`${API_BASE_URL}/api/coupons-public/`);
-                  console.log("🔍 Coupon Response:", couponsRes.data); // ✅ Debugging
-
-                  const couponData = Array.isArray(couponsRes.data) ? couponsRes.data : [];
                   
+                  const couponData = Array.isArray(couponsRes.data) ? couponsRes.data : [];
                   if (couponData.length > 0) {
                       const activeCoupons = couponData.filter(c => c.active);
-                      console.log("🔍 Active Coupons:", activeCoupons); // ✅ Debugging
                       
                       if (activeCoupons.length > 0) {
-                          // Check if we already have this notification
-                          const hasCouponNoti = notifs.some(n => n.id === 'coupon-alert');
-                          const hasSeen = localStorage.getItem('seen_coupon_count') === String(activeCoupons.length);
+                          // ✅ Stable Notification Logic: Use stored timestamp to persist suppression
+                          let alertTime = localStorage.getItem('coupon_alert_time');
+                          const lastCount = parseInt(localStorage.getItem('coupon_last_count') || '0');
+                          
+                          // Detect Change in Coupons -> Update Time (Bring back notification)
+                          if (activeCoupons.length !== lastCount) {
+                              alertTime = new Date().toISOString();
+                              localStorage.setItem('coupon_alert_time', alertTime);
+                              localStorage.setItem('coupon_last_count', activeCoupons.length);
+                          }
+                          
+                          // First Run Init
+                          if (!alertTime) {
+                              alertTime = new Date().toISOString();
+                              localStorage.setItem('coupon_alert_time', alertTime);
+                              localStorage.setItem('coupon_last_count', activeCoupons.length);
+                          }
 
-                          if (!hasCouponNoti && !hasSeen) {
-                              notifs.unshift({
-                                  id: 'coupon-alert',
-                                  title: '🎉 คูปองใหม่มาแล้ว!',
-                                  message: `มีคูปองส่วนลด ${activeCoupons.length} ใบรอคุณอยู่ เก็บเลย!`,
-                                  type: 'promotion', 
-                                  is_read: false, 
-                                  created_at: new Date().toISOString()
-                              });
+                          // Only show if Alert Time is NEWER than Clear Time
+                          const alertTimestamp = new Date(alertTime).getTime();
+                          if (alertTimestamp > clearedTime) {
+                               const hasCouponNoti = notifs.some(n => n.id === 'coupon-alert');
+                               if (!hasCouponNoti) {
+                                   notifs.unshift({
+                                       id: 'coupon-alert',
+                                       title: '🎉 คูปองใหม่มาแล้ว!',
+                                       message: `มีคูปองส่วนลด ${activeCoupons.length} ใบรอคุณอยู่ เก็บเลย!`,
+                                       type: 'promotion', 
+                                       is_read: false, 
+                                       created_at: alertTime
+                                   });
+                               }
                           }
                       }
                   }
@@ -135,25 +206,24 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
               // 3. Check for Active Flash Sale
               try {
                   const flashRes = await axios.get(`${API_BASE_URL}/api/flash-sales/active/`);
-                  console.log("🔍 Flash Sale Response:", flashRes.data); // ✅ Debugging
 
                   if (Array.isArray(flashRes.data) && flashRes.data.length > 0) {
-                       // Sort by ID descending to show newest created? Or by start_time?
-                       // User complains about "Old" ones showing.
-                       // Let's try to pick the one that started MOST RECENTLY active?
-                       // Or just stick to first one but log it.
                        const activeFS = flashRes.data[0]; 
                        if (activeFS.is_active) {
-                            const hasFlashNoti = notifs.some(n => n.id === `flash-alert-${activeFS.id}`);
-                            if (!hasFlashNoti) {
-                                notifs.unshift({
-                                    id: `flash-alert-${activeFS.id}`,
-                                    title: '⚡ Flash Sale เริ่มแล้ว!',
-                                    message: `ลดกระหน่ำกับแคมเปญ "${activeFS.name}" ห้ามพลาด!`,
-                                    type: 'flash_sale', 
-                                    is_read: false,
-                                    created_at: activeFS.start_time
-                                });
+                            const fsTime = new Date(activeFS.start_time).getTime();
+                            // Only show if FS started AFTER last clear
+                            if (fsTime > clearedTime) {
+                                const hasFlashNoti = notifs.some(n => n.id === `flash-alert-${activeFS.id}`);
+                                if (!hasFlashNoti) {
+                                    notifs.unshift({
+                                        id: `flash-alert-${activeFS.id}`,
+                                        title: '⚡ Flash Sale เริ่มแล้ว!',
+                                        message: `ลดกระหน่ำกับแคมเปญ "${activeFS.name}" ห้ามพลาด!`,
+                                        type: 'flash_sale', 
+                                        is_read: false,
+                                        created_at: activeFS.start_time
+                                    });
+                                }
                             }
                        }
                   }
@@ -374,10 +444,12 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                       <button 
                         onClick={async () => {
                             setNotifications([]);
-                            // Reset Local flags
-                            localStorage.setItem('seen_coupon_count', '9999'); // Mark as seen all
+                            // ✅ Persist Clear Action
+                            localStorage.setItem('notifications_cleared_at', new Date().toISOString());
+                            localStorage.setItem('active_coupon_dismissed', 'true');
+                            localStorage.setItem('seen_coupon_count', '9999'); 
+
                             try {
-                                // Attempt backend clear if exists
                                 await axios.post(`${API_BASE_URL}/api/notifications/mark_all_read/`, {}, {
                                     headers: { Authorization: `Token ${token}` }
                                 });
@@ -392,6 +464,10 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
           </div>
 
 
+
+
+
+
           {/* ✅ Cart & Wishlist */}
           {!isRestricted && (
             <div className="relative group/cart border-r border-gray-100 pr-6 mr-2">
@@ -399,9 +475,9 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                     to={location.pathname === '/cart' ? '/' : '/cart'} 
                     className="relative block p-2.5 text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50 rounded-2xl transition-all duration-300"
                 >
-                    <ShoppingCart size={22} />
+                    <ShoppingCart size={22} className={cartItems.some(item => flashSaleItems[item.id]) ? "animate-pulse text-orange-500" : ""} />
                     {cartItems.length > 0 && (
-                        <span className="absolute top-1 right-1 w-5 h-5 bg-[#1a4d2e] text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                        <span className={`absolute top-1 right-1 w-5 h-5 ${cartItems.some(item => flashSaleItems[item.id]) ? 'bg-orange-500' : 'bg-[#1a4d2e]'} text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce`}>
                             {cartItems.length}
                         </span>
                     )}
@@ -410,25 +486,43 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                 <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden opacity-0 invisible group-hover/cart:opacity-100 group-hover/cart:visible transition-all duration-300 z-[1100] translate-y-2 group-hover/cart:translate-y-0">
                     <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">ตะกร้าสินค้า ({cartItems.length})</span>
-                        <span className="text-xs font-bold text-[#1a4d2e]">฿{cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}</span>
+                        <span className="text-xs font-bold text-[#1a4d2e]">฿{cartItems.reduce((acc, item) => acc + (getEffectivePrice(item) * item.quantity), 0).toLocaleString()}</span>
                     </div>
                     
                     <div className="max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                        {cartItems.length > 0 ? cartItems.slice(0, 5).map((item, idx) => (
-                            <div key={idx} className="flex gap-3 p-2 hover:bg-gray-50 rounded-xl transition-colors">
-                                <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden shrink-0 border border-gray-100">
+                        {cartItems.length > 0 ? cartItems.slice(0, 5).map((item, idx) => {
+                            const prodId = String(item.id || item.product_id);
+                            const isFlashSale = !!flashSaleItems[prodId];
+                            const price = getEffectivePrice(item);
+                            
+                            return (
+                            <div key={idx} className={`flex gap-3 p-2.5 rounded-2xl transition-all duration-300 ${isFlashSale ? 'bg-orange-50 hover:bg-orange-100 hover:scale-[1.02] border border-orange-200/50 shadow-sm shadow-orange-100' : 'hover:bg-gray-50'}`}>
+                                <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden shrink-0 border border-gray-100 relative shadow-inner">
                                     {(item.thumbnail || item.image) ? (
-                                        <img src={API_BASE_URL + (item.thumbnail || item.image)} alt={item.title} className="w-full h-full object-cover" />
+                                        <img src={API_BASE_URL + (item.thumbnail || item.image)} alt={item.title} className="w-full h-full object-cover mix-blend-multiply" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-400 font-bold bg-gray-50">NO IMG</div>
                                     )}
+                                    {isFlashSale && (
+                                        <div className="absolute top-0 right-0 bg-red-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded-bl-lg shadow-md animate-pulse">
+                                            FLASH
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <h5 className="text-xs font-bold text-gray-800 truncate">{item.title}</h5>
-                                    <p className="text-[10px] text-gray-500">x{item.quantity} · ฿{item.price.toLocaleString()}</p>
+                                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                                    <h5 className="text-[11px] font-black text-gray-800 truncate flex items-center gap-1">
+                                        {item.title}
+                                        {isFlashSale && <Zap size={10} className="text-orange-500 fill-orange-500 animate-bounce" />}
+                                    </h5>
+                                    <div className="flex items-center gap-2">
+                                        <p className={`text-[10px] font-black ${isFlashSale ? 'text-orange-600' : 'text-gray-500'}`}>
+                                            x{item.quantity} · ฿{price.toLocaleString()}
+                                        </p>
+                                        {isFlashSale && <span className="text-[8px] text-gray-400 line-through font-bold opacity-50">฿{item.price.toLocaleString()}</span>}
+                                    </div>
                                 </div>
                             </div>
-                        )) : (
+                        )}) : (
                             <div className="py-8 text-center">
                                 <ShoppingCart size={32} className="mx-auto text-gray-200 mb-2 opacity-50" />
                                 <p className="text-xs text-gray-400">ยังไม่มีสินค้าในตะกร้า</p>

@@ -15,28 +15,39 @@ export const CartProvider = ({ children }) => {
   const getCartKey = () => user ? `cart_user_${user.id}` : 'cart_guest';
 
   const [cartItems, setCartItems] = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false); // ✅ ป้องกัน Save ทับข้อมูลตอนโหลด
 
   // 1. โหลดข้อมูลเมื่อ User เปลี่ยน (Login/Logout)
   useEffect(() => {
+    setIsInitialized(false); // Reset ก่อนโหลดใหม่
     const key = getCartKey();
     const savedCart = localStorage.getItem(key);
     console.log(`🛍️ [CartContext] Loading cart for key: ${key}`);
+    
     if (savedCart) {
-      const parsed = JSON.parse(savedCart);
-      console.log(`✅ [CartContext] Restored ${parsed.length} items from localStorage`);
-      setCartItems(parsed);
+      try {
+          const parsed = JSON.parse(savedCart);
+          console.log(`✅ [CartContext] Restored ${parsed.length} items from localStorage`);
+          setCartItems(parsed);
+      } catch (e) {
+          console.error("❌ Link Cart Parse Error", e);
+          setCartItems([]);
+      }
     } else {
       console.warn(`⚠️ [CartContext] No saved cart found for key: ${key}`);
       setCartItems([]);
     }
+    setIsInitialized(true); // ✅ โหลดเสร็จแล้ว อนุญาตให้บันทึกได้
   }, [user]); // ทำงานเมื่อ user เปลี่ยน
 
   // 2. บันทึกข้อมูลลงเครื่องเมื่อตะกร้าเปลี่ยน
   useEffect(() => {
+    if (!isInitialized) return; // 🛑 ถ้ายังโหลดไม่เสร็จ ห้ามบันทึก (ป้องกัน Bug ตะกร้าหาย)
+
     const key = getCartKey();
     console.log(`💾 [CartContext] Saving ${cartItems.length} items to localStorage`);
     localStorage.setItem(key, JSON.stringify(cartItems));
-  }, [cartItems, user]);
+  }, [cartItems, user, isInitialized]);
 
   // ✅ ฟังก์ชันเพิ่มสินค้า (ลบอันที่ซ้ำออกแล้วเหลืออันเดียว)
   const addToCart = (product, quantity = 1) => {

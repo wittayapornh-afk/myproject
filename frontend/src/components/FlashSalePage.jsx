@@ -119,25 +119,37 @@ const FlashSalePage = () => {
                     </div>
                 ) : (
                     // ✅ มี Flash Sale - แสดงทีละแคมเปญ
-                    flashSales.map(sale => (
+                    flashSales.map(sale => {
+                        const now = new Date();
+                        const startTime = new Date(sale.start_time);
+                        const endTime = new Date(sale.end_time);
+                        const isUpcoming = now < startTime;
+                        const isLive = now >= startTime && now <= endTime;
+                        
+                        return (
                         <div key={sale.id} className="mb-16">
                             {/* ========================================
                                 📋 Header แคมเปญ: ชื่อ + นับถอยหลัง
                                 ======================================== */}
                             <div className="flex flex-col md:flex-row items-end md:items-center justify-between mb-8 gap-4 border-b border-gray-200 pb-4">
                                 <div>
-                                    {/* Badge "Active Now" */}
-                                    <div className="flex items-center gap-2 text-orange-600 mb-1">
+                                    {/* Badge Status */}
+                                    <div className={`flex items-center gap-2 mb-1 ${isUpcoming ? 'text-blue-600' : 'text-orange-600'}`}>
                                         <Zap size={20} fill="currentColor" />
-                                        <span className="font-black tracking-widest uppercase text-sm">Active Now</span>
+                                        <span className="font-black tracking-widest uppercase text-sm">
+                                            {isUpcoming ? 'Upcoming (เร็วๆ นี้)' : 'Active Now'}
+                                        </span>
                                     </div>
                                     {/* ชื่อแคมเปญ */}
                                     <h2 className="text-3xl font-black text-gray-800">{sale.name || "Flash Sale Campaign"}</h2>
                                     {/* คำอธิบายแคมเปญ */}
                                     <p className="text-gray-500 mt-1">{sale.description}</p>
                                 </div>
-                                {/* ⏰ นับถอยหลัง */}
-                                <CountdownTimer endTime={sale.end_time} />
+                                {/* ⏰ นับถอยหลัง (ถ้ายังไม่เริ่ม ให้นับถอยหลังถึงเวลาเริ่ม) */}
+                                <CountdownTimer 
+                                    targetTime={isUpcoming ? sale.start_time : sale.end_time} 
+                                    label={isUpcoming ? "Starts in" : "Ending in"}
+                                />
                             </div>
 
                             {/* ========================================
@@ -172,84 +184,104 @@ const FlashSalePage = () => {
                                 {/* ========================================
                                     🔄 Loop แสดงสินค้าแต่ละรายการ
                                     ======================================== */}
-                                {sale.products.map(item => {
-                                    // 💰 คำนวณ % ส่วนลด
-                                    const percentDiscount = Math.round(((item.original_price - item.sale_price) / item.original_price) * 100);
-                                    // 📊 คำนวณ % ที่ขายไปแล้ว
-                                    const soldPercent = (item.sold_count / item.quantity_limit) * 100;
+                                {sale.products.length > 0 ? (
+                                    sale.products.map(item => {
+                                        // 💰 คำนวณ % ส่วนลด
+                                        const percentDiscount = Math.round(((item.original_price - item.sale_price) / item.original_price) * 100);
+                                        // 📊 คำนวณ % ที่ขายไปแล้ว
+                                        const soldPercent = (item.sold_count / item.quantity_limit) * 100;
 
-                                    return (
-                                        <SwiperSlide key={item.id}>
-                                            {/* ========================================
-                                                🎫 การ์ดสินค้า Flash Sale แต่ละใบ
-                                                ======================================== */}
-                                            <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group border border-transparent hover:border-orange-100 flex flex-col h-full">
-                                                {/* 📸 ส่วนรูปภาพสินค้า */}
-                                                <div className="aspect-square bg-gray-50 relative p-4">
-                                                    {/* 🏷️ Badge ส่วนลด (มุมขวาบน) */}
-                                                    <div className="absolute top-0 right-0 bg-yellow-400 text-red-900 font-black text-xs px-2 py-1 rounded-bl-lg z-10 shadow-sm">
-                                                        -{percentDiscount}%
-                                                    </div>
-                                                    
-                                                    {/* รูปสินค้า */}
-                                                    <img 
-                                                        src={item.product_image ? `${API_BASE_URL}${item.product_image}` : '/placeholder.png'} 
-                                                        alt={item.title}
-                                                        className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500"
-                                                    />
-                                                </div>
-
-                                                {/* 📝 ส่วนข้อมูลสินค้า */}
-                                                <div className="p-4 flex-1 flex flex-col">
-                                                    {/* ชื่อสินค้า (แสดง 2 บรรทัด) */}
-                                                    <h3 className="font-bold text-gray-800 text-sm line-clamp-2 mb-2 min-h-[40px]" title={item.product_name}>
-                                                        {item.product_name}
-                                                    </h3>
-
-                                                    <div className="mt-auto">
-                                                        {/* 💰 ราคา: ราคาขาย + ราคาเดิม */}
-                                                        <div className="flex items-baseline gap-2 mb-2">
-                                                            <span className="text-lg font-black text-orange-600">฿{parseFloat(item.sale_price).toLocaleString()}</span>
-                                                            <span className="text-xs text-gray-400 line-through">฿{parseFloat(item.original_price).toLocaleString()}</span>
+                                        return (
+                                            <SwiperSlide key={item.id}>
+                                                {/* ========================================
+                                                    🎫 การ์ดสินค้า Flash Sale แต่ละใบ
+                                                    ======================================== */}
+                                                <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group border border-transparent hover:border-orange-100 flex flex-col h-full">
+                                                    {/* 📸 ส่วนรูปภาพสินค้า */}
+                                                    <div className="aspect-square bg-gray-50 relative p-4">
+                                                        {/* 🏷️ Badge ส่วนลด (มุมขวาบน) */}
+                                                        <div className="absolute top-0 right-0 bg-yellow-400 text-red-900 font-black text-xs px-2 py-1 rounded-bl-lg z-10 shadow-sm">
+                                                            -{percentDiscount}%
                                                         </div>
-
-                                                        {/* 📊 Progress Bar: แสดงจำนวนที่ขายไป */}
-                                                        <div className="bg-orange-100 rounded-full h-3 w-full relative overflow-hidden mb-4">
-                                                            {/* แถบเติม (สีส้ม-แดง) */}
-                                                            <div 
-                                                                className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-red-500"
-                                                                style={{ width: `${Math.min(soldPercent, 100)}%` }}
-                                                            ></div>
-                                                            {/* ข้อความจำนวนที่ขาย */}
-                                                            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-orange-900 uppercase">
-                                                                {item.sold_count >= item.quantity_limit ? 'Sold Out' : `Sold ${item.sold_count}`}
-                                                            </span>
-                                                        </div>
-
-                                                        {/* 🛒 ปุ่ม Action */}
-                                                        {isAdmin ? (
-                                                            // Admin: ปุ่ม Disabled
-                                                            <button disabled className="w-full bg-gray-100 text-gray-400 font-bold py-2 rounded-lg cursor-not-allowed text-xs">
-                                                                สงวนสิทธิ์ Admin
-                                                            </button>
-                                                        ) : (
-                                                            // ลูกค้า: ลิงก์ไปหน้าสินค้า
-                                                            <Link 
-                                                                to={`/product/${item.product}`}
-                                                                className="block w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg text-center transition-colors text-sm shadow-lg shadow-orange-200"
-                                                            >
-                                                                ซื้อเลย
-                                                            </Link>
+                                                        
+                                                        {/* รูปสินค้า */}
+                                                        <img 
+                                                            src={item.product_image ? `${API_BASE_URL}${item.product_image}` : '/placeholder.png'} 
+                                                            alt={item.title}
+                                                            className={`w-full h-full object-contain mix-blend-multiply transition-transform duration-500 ${isUpcoming ? 'grayscale' : 'group-hover:scale-110'}`}
+                                                        />
+                                                        
+                                                        {/* Overlay ถ้าเป็น Upcoming */}
+                                                        {isUpcoming && (
+                                                            <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                                                                <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-sm">
+                                                                    Coming Soon
+                                                                </span>
+                                                            </div>
                                                         )}
                                                     </div>
+
+                                                    {/* 📝 ส่วนข้อมูลสินค้า */}
+                                                    <div className="p-4 flex-1 flex flex-col">
+                                                        {/* ชื่อสินค้า (แสดง 2 บรรทัด) */}
+                                                        <h3 className="font-bold text-gray-800 text-sm line-clamp-2 mb-2 min-h-[40px]" title={item.product_name}>
+                                                            {item.product_name}
+                                                        </h3>
+
+                                                        <div className="mt-auto">
+                                                            {/* 💰 ราคา: ราคาขาย + ราคาเดิม */}
+                                                            <div className="flex items-baseline gap-2 mb-2">
+                                                                <span className={`text-lg font-black ${isUpcoming ? 'text-gray-400' : 'text-orange-600'}`}>฿{parseFloat(item.sale_price).toLocaleString()}</span>
+                                                                <span className="text-xs text-gray-400 line-through">฿{parseFloat(item.original_price).toLocaleString()}</span>
+                                                            </div>
+
+                                                            {/* 📊 Progress Bar: แสดงจำนวนที่ขายไป */}
+                                                            <div className="bg-orange-100 rounded-full h-3 w-full relative overflow-hidden mb-4">
+                                                                {/* แถบเติม (สีส้ม-แดง) */}
+                                                                <div 
+                                                                    className={`absolute top-0 left-0 h-full ${isUpcoming ? 'bg-gray-300' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}
+                                                                    style={{ width: `${Math.min(soldPercent, 100)}%` }}
+                                                                ></div>
+                                                                {/* ข้อความจำนวนที่ขาย */}
+                                                                <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-orange-900 uppercase">
+                                                                    {isUpcoming ? 'Not Started' : (item.sold_count >= item.quantity_limit ? 'Sold Out' : `Sold ${item.sold_count}`)}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* 🛒 ปุ่ม Action */}
+                                                            {isAdmin ? (
+                                                                // Admin: ปุ่ม Disabled
+                                                                <button disabled className="w-full bg-gray-100 text-gray-400 font-bold py-2 rounded-lg cursor-not-allowed text-xs">
+                                                                    สงวนสิทธิ์ Admin
+                                                                </button>
+                                                            ) : (
+                                                                // ลูกค้า: ลิงก์ไปหน้าสินค้า
+                                                                <button 
+                                                                    onClick={() => !isUpcoming && (window.location.href = `/product/${item.product}`)}
+                                                                    disabled={isUpcoming}
+                                                                    className={`block w-full font-bold py-2 rounded-lg text-center transition-colors text-sm shadow-lg 
+                                                                        ${isUpcoming 
+                                                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' 
+                                                                            : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-200'}`}
+                                                                >
+                                                                    {isUpcoming ? 'รอเริ่มจำหน่าย' : 'ซื้อเลย'}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </SwiperSlide>
-                                    );
-                                })}
+                                            </SwiperSlide>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="col-span-full py-10 text-center text-gray-400">
+                                        ยังไม่มีสินค้าในแคมเปญนี้
+                                    </div>
+                                )}
                             </Swiper>
                         </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>
@@ -260,14 +292,14 @@ const FlashSalePage = () => {
 // ⏰ Component: CountdownTimer
 // แสดงนับถอยหลังเวลา Flash Sale
 // ========================================
-const CountdownTimer = ({ endTime }) => {
+const CountdownTimer = ({ targetTime, label = "Ending in" }) => {
     // 📊 State: เก็บเวลาที่เหลือ (ชั่วโมง, นาที, วินาที)
     const [timeLeft, setTimeLeft] = useState({ h: 0, m: 0, s: 0 });
 
     useEffect(() => {
         // 🧮 Function คำนวณเวลาที่เหลือ
         const calculate = () => {
-            const diff = new Date(endTime).getTime() - new Date().getTime();
+            const diff = new Date(targetTime).getTime() - new Date().getTime();
             if (diff > 0) {
                 setTimeLeft({
                     h: Math.floor((diff / (1000 * 60 * 60))),     // ชั่วโมง
@@ -275,18 +307,18 @@ const CountdownTimer = ({ endTime }) => {
                     s: Math.floor((diff / 1000) % 60),            // วินาที
                 });
             } else {
-                setTimeLeft({ h: 0, m: 0, s: 0 }); // หมดเวลา
+                setTimeLeft({ h: 0, m: 0, s: 0 }); // หมดเวลา/ถึงเวลา
             }
         };
         
         calculate(); // คำนวณครั้งแรก
         const timer = setInterval(calculate, 1000); // อัพเดตทุก 1 วินาที
         return () => clearInterval(timer); // ล้าง Timer เมื่อ Component ถูกลบ
-    }, [endTime]);
+    }, [targetTime]);
 
     return (
         <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">Ending in</span>
+            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{label}</span>
             {/* แสดงนาฬิกานับถอยหลัง */}
             <div className="flex gap-1 text-white font-black text-lg">
                 <div className="bg-gray-800 px-2 py-1 rounded">{String(timeLeft.h).padStart(2, '0')}</div>

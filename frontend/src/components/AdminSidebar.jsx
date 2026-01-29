@@ -3,7 +3,7 @@ import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, ChevronsLeft, Us
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext'; 
 import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
 
 const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
@@ -106,13 +106,13 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
         {/* HEADER AREA: "Menu" */}
         <div className="pt-8 px-8 pb-6 flex items-center justify-between">
              {/* Title on Left */}
-             {/* Brand Logo */}
-             <div className={`flex items-center gap-2 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+             {/* Brand Logo - Click to Home */}
+             <Link to="/" className={`flex items-center gap-2 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden pointer-events-none'}`}>
                  <div className="w-8 h-8 bg-[#1a4d2e] rounded-lg flex items-center justify-center text-white shadow-sm">
                      <Sparkles size={16} />
                  </div>
                  <span className="text-xl font-black text-[#1a4d2e] tracking-tighter uppercase">Shop.</span>
-             </div>
+             </Link>
              
              {/* Action Icons (Right) */}
              <div className="flex items-center gap-4">

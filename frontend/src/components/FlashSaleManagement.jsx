@@ -39,33 +39,39 @@ const DatePickerStyles = () => (
         .react-datepicker {
             font-family: 'Inter', 'Sarabun', sans-serif;
             border: none;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            border-radius: 1.5rem;
-            padding: 1rem;
-            background-color: #ffffff !important; /* Pure white */
-            width: 100%;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+            border-radius: 1rem;
+            padding: 0.75rem;
+            background-color: #ffffff !important;
+            width: 290px; /* ✅ Compact Fixed Width */
+            font-size: 0.75rem; /* Smaller Font */
         }
         .react-datepicker__header {
-            background-color: #ffffff !important; /* Pure white */
+            background-color: #ffffff !important;
             border-bottom: none;
-            padding-bottom: 1rem;
+            padding-bottom: 0.5rem;
         }
         .react-datepicker__month-container {
             width: 100%;
             background-color: #ffffff !important;
+            float: none;
         }
         .react-datepicker__month {
             background-color: #ffffff !important;
             margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
         }
         .react-datepicker__day-names, .react-datepicker__week {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             justify-items: center;
+            width: 100%;
         }
         .react-datepicker__day-name, .react-datepicker__day {
-            width: 2.5rem;
-            height: 2.5rem;
+            width: 2rem; /* Compact Cell */
+            height: 2rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -76,13 +82,13 @@ const DatePickerStyles = () => (
         .react-datepicker__day-name {
             color: #9ca3af;
             text-transform: uppercase;
-            font-size: 0.75rem;
+            font-size: 0.65rem; /* Smaller day names */
             font-weight: 900;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.05em;
         }
         .react-datepicker__day {
             color: #374151;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             transition: all 0.2s;
         }
         .react-datepicker__day:hover {
@@ -97,7 +103,7 @@ const DatePickerStyles = () => (
             background-color: transparent;
             color: #374151;
         }
-        /* 🚫 Disabled Dates (Past) */
+        /* 🚫 Disabled Dates (Past) - KEPT but styled */
         .react-datepicker__day--disabled {
             color: #e5e7eb !important;
             opacity: 0.3 !important;
@@ -140,7 +146,7 @@ const CustomDateInput = React.forwardRef(({ value, onClick, label, icon: Icon, o
                         }}
                         className="text-[9px] font-black px-2.5 py-1 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all border border-blue-100 uppercase tracking-wider"
                     >
-                        Tomorrow
+                        Tmrw
                     </button>
                     <button 
                         type="button"
@@ -188,7 +194,14 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
         } else {
             newDate.setHours(newDate.getHours() + direction);
         }
-        if (newDate < new Date()) return; // Block past selection
+
+        // ✅ V3 Validation: Allow Future Adjustments, Block Past (Minute Precision)
+        const now = new Date();
+        const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
+        const targetMinute = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), newDate.getHours(), newDate.getMinutes());
+
+        if (targetMinute < currentMinute) return; // Block strictly past minutes
+
         onDateChange(newDate);
     };
 
@@ -214,7 +227,12 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
             newDate.setMinutes(val);
         }
         
-        if (newDate < new Date()) {
+        // ✅ V3 Validation: Allow Future Adjustments, Block Past (Minute Precision)
+        const now = new Date();
+        const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
+        const targetMinute = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), newDate.getHours(), newDate.getMinutes());
+
+        if (targetMinute < currentMinute) {
              // Rollback if invalid past time
              setHInput(dateValue.getHours().toString().padStart(2, '0'));
              setMInput(dateValue.getMinutes().toString().padStart(2, '0'));
@@ -240,10 +258,7 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
     const applyQuickSlot = (h, m) => {
         const newDate = new Date(dateValue);
         newDate.setHours(h, m, 0, 0);
-        if (newDate < new Date()) {
-            // If setting today's time to early hour, move to tomorrow
-            newDate.setDate(newDate.getDate() + 1);
-        }
+        // ✅ Relaxed Validation: Removed automatic push to tomorrow if past
         onDateChange(newDate);
     };
 
@@ -1766,7 +1781,7 @@ const FlashSaleManagement = () => {
                                                                     <tr>
                                                                         <th className="px-6 py-4">รายละเอียดสินค้า</th>
                                                                         <th className="px-6 py-4 text-center">ราคาปกติ</th>
-                                                                        <th className="px-4 py-3 w-[200px]">ราคา Flash Sale</th>
+                                                                        <th className="px-4 py-3 w-[200px] text-center">ราคา FLASH SALE</th>
                                                                         <th className="px-4 py-3 text-center w-32">โควต้า</th>
                                                                         <th className="px-4 py-3 text-center w-10"></th>
                                                                     </tr>
@@ -1795,7 +1810,7 @@ const FlashSaleManagement = () => {
                                                                             <td className="px-6 py-5">
                                                                                 <div className="relative group/price w-[180px]">
                                                                                     {/* 🛠️ Improved Price Visibility: pl-10 for icon space, text-right for alignment */}
-                                                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500 font-black text-sm z-10 pointer-events-none">฿</span>
+                                                                                    <span className="absolute left-10 top-1/2 -translate-y-1/2 text-orange-500 font-black text-sm z-10 pointer-events-none">฿</span>
                                                                                     
                                                                                     {/* ➕➖ Stepper Controls */}
                                                                                     <div className="flex items-center">

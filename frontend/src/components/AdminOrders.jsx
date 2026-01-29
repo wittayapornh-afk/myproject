@@ -104,7 +104,9 @@ export default function AdminOrderList() {
             <option value="all">สถานะทั้งหมด</option>
             <option value="pending">รอตรวจสอบ</option>
             <option value="paid">ชำระแล้ว</option>
+            <option value="processing">กำลังเตรียมพัสดุ</option>
             <option value="shipped">จัดส่งแล้ว</option>
+            <option value="completed">จัดส่งสำเร็จ</option>
             <option value="cancelled">ยกเลิก</option>
           </select>
         </div>
@@ -138,7 +140,9 @@ export default function AdminOrderList() {
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => updateStatus(order.id, e.target.value)}
                       className={`px-3 py-1.5 rounded-full text-xs font-black outline-none border-none cursor-pointer ${
+                        order.status === 'Completed' ? 'bg-green-100 text-green-700' :
                         order.status === 'Shipped' ? 'bg-blue-50 text-blue-700' : 
+                        order.status === 'Processing' ? 'bg-orange-50 text-orange-700' :
                         order.status === 'Paid' ? 'bg-green-50 text-green-700' :
                         order.status === 'Cancelled' ? 'bg-red-50 text-red-700' :
                         'bg-yellow-50 text-yellow-700'
@@ -146,7 +150,9 @@ export default function AdminOrderList() {
                     >
                       <option value="Pending">รอตรวจสอบ</option>
                       <option value="Paid">ชำระแล้ว</option>
+                      <option value="Processing">กำลังเตรียมพัสดุ</option>
                       <option value="Shipped">จัดส่งแล้ว</option>
+                      <option value="Completed">จัดส่งสำเร็จ</option>
                       <option value="Cancelled">ยกเลิก</option>
                     </select>
                   </td>
@@ -225,12 +231,17 @@ export default function AdminOrderList() {
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm font-bold text-gray-500">สถานะ:</span>
                                             <span className={`px-3 py-1 rounded-full text-xs font-black ${
+                                                selectedOrder.status === 'Completed' ? 'bg-green-100 text-green-700' :
                                                 selectedOrder.status === 'Shipped' ? 'bg-blue-100 text-blue-700' : 
+                                                selectedOrder.status === 'Processing' ? 'bg-orange-100 text-orange-700' :
                                                 selectedOrder.status === 'Paid' ? 'bg-green-100 text-green-700' :
                                                 selectedOrder.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
                                                 'bg-yellow-100 text-yellow-700'
                                             }`}>
-                                                {selectedOrder.status}
+                                                {selectedOrder.status === 'Processing' ? 'กำลังเตรียมพัสดุ' : 
+                                                 selectedOrder.status === 'Shipped' ? 'จัดส่งแล้ว' :
+                                                 selectedOrder.status === 'Completed' ? 'จัดส่งสำเร็จ' :
+                                                 selectedOrder.status}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center pt-2 border-t border-gray-200">

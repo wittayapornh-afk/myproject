@@ -19,6 +19,7 @@ import SuccessModal from './components/SuccessModal';
 import CategoryRow from './components/CategoryRow';
 import PageTransition from './components/PageTransition'; // ✅ Import PageTransition
 import TrackingPage from './components/TrackingPage'; // ✅ Import TrackingPage
+import OrderTrackingPage from './components/OrderTrackingPage'; // ✅ NEW: Order Tracking Page
 // Admin Components
 import AdminDashboard from './components/AdminDashboard'; // ✅ Admin Dashboard
 import ProductAdd from './components/ProductAdd';
@@ -132,6 +133,12 @@ const AppContent = () => {
               <Route path="/tracking" element={
                 <ProtectedRoute allowedRoles={['user', 'new_user', 'customer', 'admin', 'super_admin', 'seller']}>
                   <TrackingPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/order-tracking/:id" element={
+                <ProtectedRoute allowedRoles={['user', 'new_user', 'customer', 'admin', 'super_admin', 'seller']}>
+                  <OrderTrackingPage />
                 </ProtectedRoute>
               } />
 

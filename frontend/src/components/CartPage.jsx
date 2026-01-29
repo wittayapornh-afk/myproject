@@ -1,9 +1,9 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, ChevronLeft, ShieldCheck, Info, CheckSquare, Square, ShoppingCart } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, ChevronLeft, ShieldCheck, Info, CheckSquare, Square, ShoppingCart, Zap } from 'lucide-react';
 import Swal from 'sweetalert2';
-// ✅ Rule 59: เรียกใช้ Utility สำหรับจัดการราคาและรูปภาพ
+import axios from 'axios'; // ✅ Standard Import
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
 
 function CartPage() {
@@ -19,6 +19,25 @@ function CartPage() {
   } = useCart();
   
   const navigate = useNavigate();
+
+  // ✅ State for Real-time Flash Sale Check
+  const [flashSaleItems, setFlashSaleItems] = React.useState({});
+
+  React.useEffect(() => {
+    // ✅ Use standard axios directly
+    axios.get('http://localhost:8000/api/flash-sales/active/')
+        .then(res => {
+            const map = {};
+            res.data.forEach(fs => {
+                 // Map Flash Sale to Product ID
+                 fs.products.forEach(p => {
+                     map[p.product] = { price: p.sale_price, end_time: fs.end_time };
+                 });
+            });
+            setFlashSaleItems(map);
+        })
+        .catch(err => console.error("Error fetching active flash sales", err));
+  }, []);
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
@@ -72,9 +91,27 @@ function CartPage() {
                 <span className="text-gray-400 text-sm font-bold">เลือกแล้ว {selectedItems.length} รายการ</span>
             </div>
 
-            {cartItems.map((item) => (
-              <div key={item.id} className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex gap-4 transition-all hover:shadow-md group relative overflow-hidden">
+            {cartItems.map((item, index) => {
+               // ✅ Convert ID to string for robust matching with map keys
+               const prodId = String(item.id || item.product_id);
+               const isFlashSale = !!flashSaleItems[prodId];
+               const currentPrice = getEffectivePrice(item, flashSaleItems);
+               
+               return (
+              <div key={item.id ? item.id : `cart-item-${index}`} className={`p-5 rounded-[2.5rem] shadow-sm flex gap-5 transition-all hover:shadow-xl group relative overflow-hidden ${
+                  isFlashSale 
+                  ? "bg-gradient-to-br from-orange-50 via-white to-red-50/30 border-2 border-orange-400 shadow-orange-200/50 ring-8 ring-orange-500/5" 
+                  : "bg-white border border-gray-100"
+              }`}>
                 
+                {/* ⚡ High-Impact Flash Sale Badge */}
+                {isFlashSale && (
+                    <div className="absolute top-0 right-0 bg-gradient-to-l from-red-600 via-orange-500 to-orange-400 text-white text-[11px] font-black px-6 py-2 rounded-bl-[2rem] shadow-lg z-[20] flex items-center gap-2 animate-pulse">
+                        <Zap size={14} fill="white" className="drop-shadow-sm" /> 
+                        <span className="tracking-tighter">FLASH SALE เที่ยงคืนนี้!</span>
+                    </div>
+                )}
+
                 {/* Checkbox */}
                 <div className="flex items-center pl-2">
                     <button onClick={() => toggleSelection(item.id)} className="text-[#1a4d2e] hover:scale-110 transition-transform">
@@ -83,19 +120,39 @@ function CartPage() {
                 </div>
 
                 {/* Image */}
-                <div className="w-24 h-24 bg-gray-50 rounded-2xl flex-shrink-0 p-2">
+                <div className="w-24 h-24 bg-white rounded-2xl flex-shrink-0 p-2 relative shadow-inner">
                   <img 
                     src={getImageUrl(item.thumbnail)} 
                     alt={item.title} 
                     className="w-full h-full object-contain mix-blend-multiply transition-transform group-hover:scale-105 duration-500" 
                   />
+                  {isFlashSale && (
+                      <div className="absolute -bottom-2 -right-2 bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-sm border-2 border-white transform rotate-3">
+                          -{Math.round(((item.price - currentPrice) / item.price) * 100)}%
+                      </div>
+                  )}
                 </div>
 
                 {/* Details */}
                 <div className="flex-1 flex flex-col justify-between py-1">
                   <div>
                     <div className="flex justify-between items-start gap-2">
-                      <h3 className="font-bold text-[#263A33] line-clamp-1 text-lg group-hover:text-[#1a4d2e] transition-colors">{item.title}</h3>
+                      <div className="flex flex-col gap-1">
+                          {(item.id || item.product_id) ? (
+                              <Link to={`/product/${item.id || item.product_id}`} className="font-bold text-[#263A33] line-clamp-1 text-lg group-hover:text-[#1a4d2e] transition-colors">
+                                  {item.title}
+                              </Link>
+                          ) : (
+                              <span className="font-bold text-[#263A33] line-clamp-1 text-lg">{item.title}</span>
+                          )}
+                          
+                          {/* Flash Sale Timer / Label */}
+                          {isFlashSale && (
+                              <span className="text-[11px] text-orange-600 font-bold flex items-center gap-1 bg-orange-100/50 px-2 py-0.5 rounded-md w-fit border border-orange-100">
+                                  <Zap size={12} className="fill-orange-500" /> 🔥 Limited Time Offer!
+                              </span>
+                          )}
+                      </div>
                       <button 
                         onClick={() => removeFromCart(item.id)}
                         className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition-all"
@@ -107,7 +164,7 @@ function CartPage() {
                   </div>
                   
                   <div className="flex items-end justify-between mt-2">
-                    <div className="flex items-center bg-gray-50 rounded-xl p-1 border border-gray-100">
+                    <div className="flex items-center bg-gray-50 rounded-xl p-1 border border-gray-100 main-shadow">
                       <button 
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
                         className="p-2 hover:bg-white rounded-lg shadow-sm text-gray-600 hover:text-[#1a4d2e] transition-all disabled:opacity-30"
@@ -123,11 +180,21 @@ function CartPage() {
                         <Plus size={14} strokeWidth={3} />
                       </button>
                     </div>
-                    <p className="font-black text-xl text-[#1a4d2e]">{formatPrice(getEffectivePrice(item) * item.quantity)}</p>
+                    <div className="text-right flex flex-col items-end">
+                        {isFlashSale && (
+                             <p className="text-xs text-gray-400 line-through font-bold mb-0.5">
+                                  {formatPrice(item.price * item.quantity)}
+                             </p>
+                        )}
+                        <p className={`font-black text-xl ${isFlashSale ? 'text-red-600 drop-shadow-sm' : 'text-[#1a4d2e]'}`}>
+                            {formatPrice(currentPrice * item.quantity)}
+                        </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
 
           {/* Summary Sidebar */}
@@ -173,12 +240,12 @@ function CartPage() {
   );
 }
 
-// Helper for effective price (handling discount if existed) - simplified here as logical logic is in CartContext or Component
-// But since we use getEffectivePrice inside map, we need to define it or import it. 
-// Assuming getEffectivePrice is NOT exported from context (it usually isn't), we can use a local helper or just price.
-// Using simple price logic for now based on item structure.
-const getEffectivePrice = (item) => {
-    return item.price; // Simplified, assuming discount logic is handled or price key is final.
+// ✅ Helper for effective price (Now truly effective with Flash Sale check)
+const getEffectivePrice = (item, flashSaleMap) => {
+    if (flashSaleMap && flashSaleMap[item.id || item.product_id]) {
+        return flashSaleMap[item.id || item.product_id].price;
+    }
+    return item.price;
 };
 
 export default CartPage;

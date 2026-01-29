@@ -182,6 +182,13 @@ function ProductDetail() {
     setLoading(true);
     setQuantity(1); 
 
+    // ✅ Guard: Prevent fetch if id is undefined
+    if (!id || id === 'undefined') {
+        setLoading(false);
+        setProduct(null);
+        return;
+    }
+
     fetch(`${API_BASE_URL}/api/products/${id}/`) 
       .then(res => {
         if (!res.ok) throw new Error('Not Found');
@@ -228,7 +235,16 @@ function ProductDetail() {
 
   const handleAddToCart = () => {
     if (product) {
-      addToCart(product, quantity); 
+      const finalPrice = product.flash_sale ? product.flash_sale.sale_price : product.price;
+      const cartItem = {
+          ...product,
+          price: finalPrice, // ✅ Use Sale Price
+          original_price: product.price, // ✅ Store Original Price for Strikethrough
+          is_flash_sale: !!product.flash_sale,
+          flash_sale_data: product.flash_sale
+      };
+      
+      addToCart(cartItem, quantity); 
       Swal.fire({
         icon: 'success',
         title: 'เพิ่มลงตะกร้าแล้ว',
@@ -274,8 +290,15 @@ function ProductDetail() {
                          <ChevronLeft size={20} />
                      </button>
                  )}
-                 {(product.next_id || (relatedProducts.length > 0)) && (
-                     <button onClick={() => navigate(`/product/${product.next_id || (relatedProducts.length > 0 ? relatedProducts[0].id : id)}`)} className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 shadow-lg hover:shadow-indigo-900/20 transition-all hover:translate-x-0.5">
+                 {/* ✅ Safe Navigation Logic */}
+                 {(product.next_id || (relatedProducts.length > 0 && relatedProducts[0]?.id)) && (
+                     <button 
+                        onClick={() => {
+                            const nextId = product.next_id || (relatedProducts.length > 0 ? relatedProducts[0].id : null);
+                            if (nextId) navigate(`/product/${nextId}`);
+                        }} 
+                        className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 shadow-lg hover:shadow-indigo-900/20 transition-all hover:translate-x-0.5"
+                     >
                          <ChevronRight size={20} />
                      </button>
                  )}

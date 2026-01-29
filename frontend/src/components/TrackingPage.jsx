@@ -71,32 +71,7 @@ function TrackingPage() {
 
     const handlePaymentSuccess = () => fetchOrders();
 
-    // ✅ Handle Receive Product
-    const handleReceiveProduct = async (orderId) => {
-        try {
-            const result = await Swal.fire({
-                title: 'ยืนยันได้รับสินค้า?',
-                text: "ตรวจสอบสินค้าให้เรียบร้อยก่อนกดยืนยัน",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#1a4d2e',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'ยืนยัน, ได้รับแล้ว',
-                cancelButtonText: 'ยกเลิก'
-            });
 
-            if (result.isConfirmed) {
-                await axios.post(`http://localhost:8000/api/orders/${orderId}/confirm-received/`, {}, {
-                    headers: { 'Authorization': `Token ${token}` }
-                });
-                await Swal.fire('สำเร็จ!', 'สถานะคำสั่งซื้ออัปเดตเรียบร้อย', 'success');
-                fetchOrders(); // Refresh
-            }
-        } catch (error) {
-            console.error(error);
-            Swal.fire('Error', 'ไม่สามารถอัปเดตสถานะได้', 'error');
-        }
-    };
 
     // Tabs Configuration
     const TABS = [
@@ -240,8 +215,8 @@ function TrackingPage() {
                                                         <div className={`w-10 h-10 rounded-full border-4 flex items-center justify-center bg-white transition-all duration-500 z-10 ${
                                                             isActive ? 'border-[#1a4d2e] text-[#1a4d2e] scale-110 shadow-lg' : 'border-gray-200 text-gray-300'
                                                         } ${isCurrent ? 'animate-bounce-slight ring-4 ring-green-100' : ''}`}>
-                                                            {index === 0 && <Box size={16} />}
-                                                            {index === 1 && <Package size={16} />}
+                                                            {index === 0 && <Package size={16} />}
+                                                            {index === 1 && <Box size={16} />}
                                                             {index === 2 && <Truck size={16} />}
                                                             {index === 3 && <CheckCircle size={16} />}
                                                         </div>
@@ -303,11 +278,7 @@ function TrackingPage() {
                                                 <CreditCard size={18} /> ชำระเงินทันที
                                             </button>
                                         )}
-                                        {order.status === 'Shipped' && (
-                                            <button onClick={() => handleReceiveProduct(order.id)} className="px-8 py-3 bg-[#1a4d2e] text-white rounded-2xl text-sm font-bold hover:bg-[#143d23] shadow-lg shadow-green-200 transition-all hover:-translate-y-1 flex items-center gap-2">
-                                                <CheckCircle size={18} /> ฉันได้รับสินค้าแล้ว
-                                            </button>
-                                        )}
+
                                     </div>
                                 </div>
                             </div>
