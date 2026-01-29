@@ -33,7 +33,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         NEW_USER = 'new_user', 'New User'
         CUSTOMER = 'customer', 'Customer'
-        SELLER = 'seller', 'Seller'
         ADMIN = 'admin', 'Super Admin'
 
     username = models.CharField(max_length=150, unique=True)
@@ -66,7 +65,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Properties to map role to Django permissions
     @property
     def is_staff(self):
-        return self.role in ['admin', 'seller']
+        return self.role == 'admin'
 
     @property
     def is_superuser(self):
@@ -129,7 +128,7 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True) # สถานะสินค้า (True=ขาย, False=ปิดการขาย)
     created_at = models.DateTimeField(default=timezone.now) # DB has created_at
     updated_at = models.DateTimeField(auto_now=True)
-    seller = models.ForeignKey('User', on_delete=models.CASCADE, null=True, blank=True, related_name='products', db_column='seller_id')
+    admin = models.ForeignKey('User', on_delete=models.CASCADE, null=True, blank=True, related_name='products', db_column='admin_id')
 
     class Meta:
         db_table = 'products'
