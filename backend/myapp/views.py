@@ -381,8 +381,8 @@ def get_all_products_admin_api(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def manage_user_role(request):
-    # อนุญาตให้ admin และ super_admin จัดการได้
-    if request.user.role not in ['seller', 'admin']:
+    # อนุญาตให้ admin จัดการได้
+    if request.user.role != 'admin':
         return Response({"error": "Unauthorized"}, status=403)
     
     user_id = request.data.get('user_id')
@@ -416,8 +416,8 @@ def manage_user_role(request):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_user_api(request, user_id):
-    # อนุญาตให้ admin และ super_admin ลบผู้ใช้ได้
-    if request.user.role not in ['seller', 'admin']:
+    # อนุญาตให้ admin ลบผู้ใช้ได้
+    if request.user.role != 'admin':
         return Response({"error": "Unauthorized"}, status=403)
 
     try:
@@ -733,8 +733,8 @@ def create_system_user(request):
     """
     API สำหรับ Admin/SuperUser สร้าง System User ใหม่
     """
-    # ตรวจสอบสิทธิ์: ต้องเป็น Admin, SuperAdmin หรือ Seller
-    if request.user.role not in ['admin', 'super_admin', 'seller']:
+    # ตรวจสอบสิทธิ์: ต้องเป็น Admin เท่านั้น
+    if request.user.role != 'admin':
         return Response({"error": "Unauthorized: คุณไม่มีสิทธิ์สร้างผู้ใช้งาน"}, status=403)
     
     data = request.data
@@ -1865,7 +1865,7 @@ def admin_flash_sale_api(request, fs_id=None):
     # Debug Role
     print(f"DEBUG: Flash Sale Access - User: {request.user.username}, Role: {getattr(request.user, 'role', 'N/A')}, Superuser: {request.user.is_superuser}")
     
-    if request.user.role not in ['admin', 'super_admin', 'seller'] and not request.user.is_superuser and not request.user.is_staff:
+    if request.user.role != 'admin' and not request.user.is_superuser and not request.user.is_staff:
         print(f"DEBUG: Access Denied for {request.user.username}")
         return Response(status=403)
         
@@ -2416,7 +2416,7 @@ def get_admin_logs(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_all_users(request):
-    if request.user.role not in ['admin', 'super_admin', 'seller']:
+    if request.user.role != 'admin':
         return Response(status=403)
     users = User.objects.all().order_by('-id')
     data = [{
