@@ -317,6 +317,12 @@ def products_api(request):
         brand = request.query_params.get('brand')
         if brand and brand != "ทั้งหมด":
             products = products.filter(brand=brand)
+        
+        # ✅ Tag Filter - กรองสินค้าตาม Tag
+        tag = request.query_params.get('tag')
+        if tag:
+            # กรองสินค้าที่มี Tag นี้ (ค้นหาตามชื่อ Tag)
+            products = products.filter(tags__name__iexact=tag).distinct()
 
         # ✅ In Stock Filter
         in_stock = request.query_params.get('in_stock')
@@ -1674,6 +1680,168 @@ def bulk_update_orders_api(request):
         Order.objects.filter(id__in=order_ids).update(status=status)
         return Response({"message": "Updated"})
     return Response(status=400)
+
+
+# ==========================================
+# 🏷️ Tag System APIs
+# ==========================================
+
+@api_view(['GET', 'POST', 'DELETE'])
+@permission_classes([AllowAny])  # GET สามารถเข้าถึงได้ทุกคน, POST/DELETE ต้องเป็น Admin
+def tag_api(request, tag_id=None):
+    """
+    🏷️ API สำหรับจัดการ Tags
+    
+    ใช้สำหรับ:
+    - แสดงรายการ Tags ทั้งหมด (GET)
+    - สร้าง Tag ใหม่ (POST - Admin เท่านั้น)
+    - ลบ Tag (DELETE - Admin เท่านั้น)
+    
+    Methods:
+    --------
+    GET /api/tags/           # ดึง Tags ทั้งหมด
+    POST /api/tags/          # สร้าง Tag ใหม่ (Admin)
+    DELETE /api/tags/:id/    # ลบ Tag (Admin)
+    """
+    
+    # ==========================================
+    # 📖 GET - ดึงรายการ Tags ทั้งหมด
+    # ==========================================
+    if request.method == 'GET':
+        try:
+            from .models import Tag
+            from .serializers import TagSerializer
+            
+            # ดึง Tags ทั้งหมด เรียงตามชื่อ A-Z
+            tags = Tag.objects.all().order_by('name')
+            serializer = TagSerializer(tags, many=True)
+            
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+    
+    # ==========================================
+    # ➕ POST - สร้าง Tag ใหม่
+    # ==========================================
+    elif request.method == 'POST':
+        # ✅ ตรวจสอบสิทธิ์: เฉพาะ Admin เท่านั้น
+        if not request.user.is_authenticated or request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({"error": "Unauthorized"}, status=403)
+        
+        try:
+            from .models import Tag
+            from .serializers import TagSerializer
+            
+            # รับชื่อ Tag จาก request
+            tag_name = request.data.get('name', '').strip()
+            
+            # ตรวจสอบว่ามีชื่อส่งมาไหม
+            if not tag_name:
+                return Response({"error": "กรุณาระบุชื่อ Tag"}, status=400)
+            
+            # ตรวจสอบว่า Tag นี้มีอยู่แล้วหรือไม่
+            if Tag.objects.filter(name__iexact=tag_name).exists():
+                return Response({"error": f"Tag '{tag_name}' มีอยู่แล้ว"}, status=400)
+            
+            # สร้าง Tag ใหม่
+            tag = Tag.objects.create(name=tag_name)
+            serializer = TagSerializer(tag)
+            
+            return Response(serializer.data, status=201)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+    
+    # ==========================================
+    # 🗑️ DELETE - ลบ Tag
+    # ==========================================
+    elif request.method == 'DELETE':
+        # ✅ ตรวจสอบสิทธิ์: เฉพาะ Admin เท่านั้น
+        if not request.user.is_authenticated or request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({"error": "Unauthorized"}, status=403)
+        
+        if not tag_id:
+            return Response({"error": "ต้องระบุ Tag ID"}, status=400)
+        
+        try:
+            from .models import Tag
+            
+            # ค้นหา Tag
+            tag = Tag.objects.get(id=tag_id)
+            tag_name = tag.name
+            
+            # ลบ Tag (ความสัมพันธ์กับสินค้าจะถูกลบอัตโนมัติ)
+            tag.delete()
+            
+            return Response({"message": f"ลบ Tag '{tag_name}' สำเร็จ"})
+        except Tag.DoesNotExist:
+            return Response({"error": "ไม่พบ Tag นี้"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def product_tags_api(request, product_id):
+    """
+    🔗 API สำหรับกำหนด Tags ให้กับสินค้า
+    
+    ใช้สำหรับ:
+    - บันทึก/อัปเดต Tags ของสินค้าจาก Admin Panel
+    
+    Method:
+    -------
+    POST /api/products/:id/tags/
+    
+    Payload:
+    --------
+    {
+        "tag_ids": [1, 3, 5]  # รายการ Tag IDs ที่ต้องการกำหนด
+    }
+    """
+    
+    # ✅ ตรวจสอบสิทธิ์: เฉพาะ Admin เท่านั้น
+    if request.user.role not in ['admin', 'super_admin', 'seller']:
+        return Response({"error": "Unauthorized"}, status=403)
+    
+    try:
+        from .models import Product, Tag
+        
+        # ค้นหาสินค้า
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({"error": "ไม่พบสินค้านี้"}, status=404)
+        
+        # รับ Tag IDs จาก request
+        tag_ids = request.data.get('tag_ids', [])
+        
+        # ตรวจสอบว่าเป็น list
+        if not isinstance(tag_ids, list):
+            return Response({"error": "tag_ids ต้องเป็น array"}, status=400)
+        
+        # ลบ Tags เก่าทั้งหมด
+        product.tags.clear()
+        
+        # เพิ่ม Tags ใหม่
+        for tag_id in tag_ids:
+            try:
+                tag = Tag.objects.get(id=tag_id)
+                product.tags.add(tag)
+            except Tag.DoesNotExist:
+                # ถ้า Tag ไม่เจอ ข้ามไป (ไม่ error)
+                continue
+        
+        # ส่งผลลัพธ์กลับ
+        from .serializers import TagSerializer
+        updated_tags = TagSerializer(product.tags.all(), many=True)
+        
+        return Response({
+            "message": "บันทึก Tags สำเร็จ",
+            "tags": updated_tags.data
+        })
+        
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
 
 # ==========================================

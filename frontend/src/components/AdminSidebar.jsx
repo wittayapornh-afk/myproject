@@ -50,7 +50,8 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
       title: "ทั่วไป",
       items: [
         { id: 'flash-sales', label: 'Flash Sale', icon: <Zap size={20} />, path: '/admin/flash-sales' }, 
-        { id: 'coupons', label: 'คูปองส่วนลด', icon: <Tag size={20} />, path: '/admin/coupons' }, 
+        { id: 'coupons', label: 'คูปองส่วนลด', icon: <Tag size={20} />, path: '/admin/coupons' },
+        { id: 'tags', label: 'จัดการ Tags', icon: <Tag size={20} />, path: '/admin/tags' }, // 🏷️ เพิ่มเมนู Tags
         { id: 'history', label: 'ประวัติสต็อก', icon: <History size={20} /> },
       ]
     },

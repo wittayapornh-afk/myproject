@@ -44,6 +44,12 @@ urlpatterns = [
     path('api/categories/', views.categories_api, name='categories_api'),
     path('api/admin/categories-list/', views.get_categories, name='get_categories_list'), # ✅ New Endpoint for Dropdown
     path('api/brands/', views.brands_api, name='brands_api'),
+    
+    # --- Tags (🏷️ Tag System) ---
+    path('api/tags/', views.tag_api, name='tags_api'),  # GET: ดึง Tags ทั้งหมด, POST: สร้าง Tag ใหม่
+    path('api/tags/<int:tag_id>/', views.tag_api, name='tag_detail'),  # DELETE: ลบ Tag
+    path('api/products/<int:product_id>/tags/', views.product_tags_api, name='product_tags'),  # POST: กำหนด Tags ให้สินค้า
+    
     path('api/submit-review/', views.submit_review, name='submit_review'),
 
     # --- Orders & Checkout (สั่งซื้อ) ---

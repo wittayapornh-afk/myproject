@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, ProductImage, Order, OrderItem, User, Coupon, FlashSale, FlashSaleProduct, FlashSaleCampaign
+from .models import Product, ProductImage, Order, OrderItem, User, Coupon, FlashSale, FlashSaleProduct, FlashSaleCampaign, Tag, Category
 from django.utils import timezone
 from django.db import models
 
@@ -9,16 +9,39 @@ from django.db import models
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
-        fields = ['id', 'image_url'] 
+        fields = ['id', 'image_url']
+
+# ==========================================
+# 🏷️ Tag Serializer
+# ==========================================
+class TagSerializer(serializers.ModelSerializer):
+    """
+    Serializer สำหรับ Tag
+    
+    ใช้สำหรับ:
+    - แสดงรายการ Tags ทั้งหมด
+    - สร้าง Tag ใหม่
+    - แสดง Tags ที่เชื่อมกับสินค้า
+    """
+    product_count = serializers.SerializerMethodField(read_only=True)
+    
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'product_count']
+    
+    def get_product_count(self, obj):
+        """นับจำนวนสินค้าที่มี Tag นี้"""
+        return obj.products.count() 
 
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     flash_sale_info = serializers.SerializerMethodField()
     category = serializers.StringRelatedField() # ✅ Return Category Name instead of ID
+    tags = TagSerializer(many=True, read_only=True) # ✅ แสดง Tags ที่เชื่อมกับสินค้า
 
     class Meta:
         model = Product
-        fields = ['id', 'title', 'price', 'description', 'stock', 'thumbnail', 'brand', 'rating', 'images', 'flash_sale_info', 'category'] # Matches model fields
+        fields = ['id', 'title', 'price', 'description', 'stock', 'thumbnail', 'brand', 'rating', 'images', 'flash_sale_info', 'category', 'tags'] # ✅ เพิ่ม tags
 
     def get_flash_sale_info(self, obj):
         now = timezone.now()
