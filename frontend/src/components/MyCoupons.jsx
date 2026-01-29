@@ -176,10 +176,22 @@ const MyCoupons = () => {
                                 <div className={`w-full sm:w-32 bg-gradient-to-br p-4 flex flex-col items-center justify-center text-white relative overflow-hidden flex-shrink-0 ${
                                     filter !== 'active' 
                                     ? 'from-gray-500 to-gray-600' 
-                                    : 'from-blue-600 to-indigo-600'
+                                    : coupon.discount_type === 'free_shipping'
+                                        ? 'from-emerald-500 to-green-600' // Green for Free Shipping
+                                        : coupon.discount_type === 'percent'
+                                            ? 'from-purple-500 to-indigo-600' // Purple for Percent
+                                            : 'from-blue-500 to-cyan-500' // Blue for Fixed
                                 }`}>
-                                    <div className="text-2xl font-black">{coupon.discount_type === 'percent' ? `${Number(coupon.discount_value)}%` : `฿${Number(coupon.discount_value)}`}</div>
-                                    <div className="text-[10px] uppercase font-bold tracking-wider opacity-80">ส่วนลด</div>
+                                    <div className="text-2xl font-black">
+                                        {coupon.discount_type === 'free_shipping' ? (
+                                            <span className="text-xl">ส่งฟรี</span>
+                                        ) : (
+                                            coupon.discount_type === 'percent' ? `${Number(coupon.discount_value)}%` : `฿${Number(coupon.discount_value)}`
+                                        )}
+                                    </div>
+                                    <div className="text-[10px] uppercase font-bold tracking-wider opacity-80">
+                                        {coupon.discount_type === 'free_shipping' ? 'Free Shipping' : 'ส่วนลด'}
+                                    </div>
                                     
                                     {/* Circles */}
                                     <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-[#F0F2F5] rounded-full"></div>

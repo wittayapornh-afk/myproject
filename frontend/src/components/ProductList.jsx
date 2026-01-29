@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
 import { 
   ShoppingCart, Search, Eye, ChevronLeft, ChevronRight, 
-  CheckCircle, Heart, Star, SlidersHorizontal, XCircle, Filter, X, ShoppingBag, Zap
+  CheckCircle, Heart, Star, SlidersHorizontal, XCircle, Filter, X, ShoppingBag, Zap,
+  Flower2, Sofa, Utensils, Shirt, Footprints, Watch, Sparkles, Gem, Smartphone, Monitor, ShoppingBasket, Gift, Rocket, LayoutGrid, Glasses,
+  Tablet, Headphones, Bike, Car, Trophy, Laptop, CookingPot, Dumbbell, Pipette, Briefcase
 } from 'lucide-react'; 
 import { useCart } from '../context/CartContext';
 import Swal from 'sweetalert2';
@@ -204,6 +206,119 @@ function ProductList() {
       updatePage(1); // ✅ ใช้ updatePage แทน setCurrentPage
   };
 
+    // 🎓 Icon Mapping Helper (Enhanced with Thai & Modern Icons)
+    const getCategoryConfig = (catName) => {
+        if (!catName) return { icon: LayoutGrid, label: '', color: 'bg-gray-200' };
+        const lower = String(catName).toLowerCase();
+        // console.log("Matching Category:", lower); // 🔍 Debug
+
+        // 💄 Beauty & Health
+        if (lower.includes('beauty') && !lower.includes('health') && !lower.includes('skin')) return {
+            icon: Sparkles, label: 'เครื่องสำอาง / ความงาม', color: 'bg-pink-50 text-pink-600'
+        };
+        // 🧴 Skin Care
+        if (lower.includes('skin') || lower.includes('serum') || lower.includes('cream')) return {
+            icon: Pipette, label: 'ผลิตภัณฑ์ดูแลผิว', color: 'bg-blue-50 text-blue-400'
+        };
+        // 🌸 Fragrances
+        if (lower.includes('fragrance') || lower.includes('perfume') || lower.includes('น้ำหอม')) return {
+            icon: Gem, label: 'น้ำหอม', color: 'bg-purple-50 text-purple-600'
+        };
+
+        // 🛋️ Furniture
+        if (lower.includes('furniture') || lower.includes('sofa') || lower.includes('armchair')) return {
+            icon: Sofa, label: 'เฟอร์นิเจอร์', color: 'bg-orange-50 text-stone-600'
+        };
+        // 🏠 Home Decoration
+        if (lower.includes('decor') || lower.includes('home')) return {
+            icon: Flower2, label: 'ของตกแต่งบ้าน', color: 'bg-teal-50 text-teal-600'
+        };
+        // 🍳 Kitchen Accessories
+        if (lower.includes('kitchen') || lower.includes('pan') || lower.includes('knife')) return {
+            icon: CookingPot, label: 'อุปกรณ์ครัว', color: 'bg-gray-100 text-gray-800'
+        };
+
+        // 🥬 Groceries
+        if (lower.includes('grocery') || lower.includes('groceries') || lower.includes('vegetable') || lower.includes('food')) return {
+            icon: ShoppingBasket, label: 'สินค้าอุปโภคบริโภค', color: 'bg-green-50 text-green-700'
+        };
+
+        // 💻 Laptops
+        if (lower.includes('laptop')) return {
+            icon: Laptop, label: 'โน้ตบุ๊ก / แล็ปท็อป', color: 'bg-slate-100 text-blue-600'
+        };
+        // 📱 Smartphones
+        if (lower.includes('smartphone') || (lower.includes('phone') && !lower.includes('access'))) return {
+            icon: Smartphone, label: 'สมาร์ทโฟน', color: 'bg-gray-900 text-white'
+        };
+        // 📱 Tablets
+        if (lower.includes('tablet') || lower.includes('ipad')) return {
+            icon: Tablet, label: 'แท็บเล็ต', color: 'bg-gray-200 text-gray-700'
+        };
+        // 🎧 Mobile Accessories
+        if (lower.includes('mobile access') || lower.includes('earbud') || lower.includes('case')) return {
+            icon: Headphones, label: 'อุปกรณ์เสริมมือถือ', color: 'bg-cyan-50 text-cyan-500'
+        };
+
+        // 👔 Mens Shirts
+        if (lower.includes('mens shirt') || (lower.includes('shirt') && lower.includes('men'))) return {
+            icon: Shirt, label: 'เสื้อเชิ้ตผู้ชาย', color: 'bg-blue-50 text-blue-900'
+        };
+        // 👞 Mens Shoes
+        if (lower.includes('mens shoes') || (lower.includes('shoe') && lower.includes('men'))) return {
+            icon: Footprints, label: 'รองเท้าผู้ชาย', color: 'bg-amber-100 text-amber-800'
+        };
+        // ⌚ Mens Watches
+        if (lower.includes('mens watch') || (lower.includes('watch') && lower.includes('men'))) return {
+            icon: Watch, label: 'นาฬิกาผู้ชาย', color: 'bg-gray-100 text-slate-600'
+        };
+
+        // 👗 Tops (Women)
+        if (lower.includes('top') || lower.includes('t-shirt')) return {
+            icon: Shirt, label: 'เสื้อผ้าส่วนบน (ทั่วไป)', color: 'bg-sky-50 text-sky-400'
+        };
+        // 👜 Womens Bags
+        if (lower.includes('womens bag') || lower.includes('handbag')) return {
+            icon: ShoppingBag, label: 'กระเป๋าผู้หญิง', color: 'bg-rose-50 text-rose-800'
+        };
+        // 👗 Womens Dresses
+        if (lower.includes('dress')) return {
+            icon: Shirt, label: 'ชุดเดรสผู้หญิง', color: 'bg-orange-50 text-orange-400'
+        };
+        // 💍 Womens Jewellery
+        if (lower.includes('jewel') || lower.includes('ring') || lower.includes('necklace')) return {
+            icon: Gem, label: 'เครื่องประดับผู้หญิง', color: 'bg-slate-50 text-slate-400'
+        };
+        // 👠 Womens Shoes
+        if (lower.includes('womens shoes') || lower.includes('heels') || lower.includes('pumps')) return {
+            icon: Footprints, label: 'รองเท้าผู้หญิง', color: 'bg-red-50 text-red-600'
+        };
+        // ⌚ Womens Watches
+        if (lower.includes('womens watch')) return {
+            icon: Watch, label: 'นาฬิกาผู้หญิง', color: 'bg-rose-50 text-rose-500'
+        };
+
+        // 🏍️ Motorcycle
+        if (lower.includes('motorcycle') || lower.includes('helmet')) return {
+            icon: Bike, label: 'มอเตอร์ไซค์', color: 'bg-stone-900 text-orange-500'
+        };
+        // 🚗 Vehicle
+        if (lower.includes('vehicle') || lower.includes('car')) return {
+            icon: Car, label: 'ยานยนต์ / รถยนต์', color: 'bg-blue-50 text-blue-500'
+        };
+        
+        // 🏋️ Sports Accessories
+        if (lower.includes('sport') || lower.includes('dumbbell') || lower.includes('gym')) return {
+            icon: Dumbbell, label: 'อุปกรณ์กีฬา', color: 'bg-red-50 text-red-600'
+        };
+        // 🕶️ Sunglasses
+        if (lower.includes('sunglass') || lower.includes('glass')) return {
+            icon: Glasses, label: 'แว่นกันแดด', color: 'bg-yellow-50 text-yellow-800'
+        };
+
+        return { icon: LayoutGrid, label: catName, color: 'bg-gray-50 text-gray-600' }; // Default
+    };
+
   const isInCart = (id) => cartItems.some(item => item.id === id);
 
   return (
@@ -243,15 +358,25 @@ function ProductList() {
                         <SlidersHorizontal size={14} /> Categories
                     </h3>
                     <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                        {['ทั้งหมด', ...categories].filter((v, i, a) => a.indexOf(v) === i).map(cat => (
-                            <label key={cat} className="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-gray-50 transition-colors">
-                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${selectedCategory === cat ? 'border-[#1a4d2e]' : 'border-gray-200 group-hover:border-gray-300'}`}>
-                                    {selectedCategory === cat && <div className="w-2.5 h-2.5 bg-[#1a4d2e] rounded-full" />}
-                                </div>
-                                <span className={`text-sm font-bold ${selectedCategory === cat ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>{cat}</span>
-                                <input type="radio" name="category" className="hidden" checked={selectedCategory === cat} onChange={() => { setSelectedCategory(cat); updatePage(1); }} />
-                            </label>
-                        ))}
+                        {['ทั้งหมด', ...categories].filter((v, i, a) => a.indexOf(v) === i).map(cat => {
+                            const config = getCategoryConfig(cat);
+                            const isSelected = selectedCategory === cat;
+                            // ✅ Use config.label (Thai) if available, otherwise fallback to cat
+                            const label = config.label || (cat === 'ทั้งหมด' ? 'สินค้าทั้งหมด' : cat); 
+
+                            return (
+                                <label key={cat} className={`flex items-center gap-3 cursor-pointer group p-2 rounded-xl transition-all ${isSelected ? 'bg-green-50/80 shadow-sm' : 'hover:bg-gray-50'}`}>
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0 overflow-hidden ${isSelected ? 'bg-white shadow-sm ' /*+ config.color*/ : 'bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-gray-600'}`}>
+                                        <config.icon size={16} strokeWidth={2.5} className={isSelected ? config.color.replace('text-', '') : ''} />
+                                    </div>
+                                    <span className={`text-sm font-bold truncate flex-1 ${isSelected ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e] transition-colors`}>
+                                        {label}
+                                    </span>
+                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#1a4d2e] mr-2" />}
+                                    <input type="radio" name="category" className="hidden" checked={isSelected} onChange={() => { setSelectedCategory(cat); updatePage(1); }} />
+                                </label>
+                            );
+                        })}
                     </div>
                 </div>
 

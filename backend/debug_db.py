@@ -1,20 +1,32 @@
+
 import os
+import sys
 import django
-from django.utils import timezone
+from django.db import connection
+
+# Add the project directory to sys.path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'myproject'))
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myproject.settings')
 django.setup()
 
-from myapp.models import Coupon, FlashSale
+def inspect_db():
+    with connection.cursor() as cursor:
+        try:
+            print("--- Checking 'order_items' table ---")
+            cursor.execute("SHOW CREATE TABLE order_items;")
+            row = cursor.fetchone()
+            print(row[1])
 
-print("--- DEBUGGING COUPONS ---")
-coupons = Coupon.objects.all()
-print(f"Total Coupons: {coupons.count()}")
-for c in coupons:
-    print(f"ID: {c.id}, Code: {c.code}, Active: {c.active}, Start: {c.start_date}, End: {c.end_date}, Used: {c.used_count}/{c.usage_limit}")
+            print("\n--- Describe 'order_items' ---")
+            cursor.execute("DESCRIBE order_items;")
+            columns = cursor.fetchall()
+            for col in columns:
+                print(col)
+                
+        except Exception as e:
+            print(f"Error accessing DB: {e}")
 
-print("\n--- DEBUGGING FLASH SALES ---")
-flash_sales = FlashSale.objects.all()
-print(f"Total Flash Sales: {flash_sales.count()}")
-for f in flash_sales:
-    print(f"ID: {f.id}, Name: {f.name}, Active: {f.is_active}, Start: {f.start_time}, End: {f.end_time}")
+if __name__ == "__main__":
+    inspect_db()

@@ -6,16 +6,21 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
+import { useAuth } from '../context/AuthContext'; // 👤 ดึงข้อมูล User เพื่อเช็คสิทธิ์
 
-import { useAuth } from '../context/AuthContext'; // Import Auth
-
+// ========================================
+// 🎟️ CouponCenter Component
+// หน้าศูนย์รวมคูปองสำหรับลูกค้า (Customer Facing)
+// แสดงคูปองทั้งหมดที่ลูกค้าสามารถเก็บได้ พร้อมระบบกรองอัจฉริยะ
+// ========================================
 const CouponCenter = () => {
-    const { user, token } = useAuth(); // Get User & Token
-    const [coupons, setCoupons] = useState([]);
-    const [collectedIds, setCollectedIds] = useState([]); // Track collected coupons
-    const [loading, setLoading] = useState(true);
-    // const [copiedId, setCopiedId] = useState(null); // Unused for now
+    // 1. Hook & State
+    const { user, token } = useAuth(); // ดึง User Profile
+    const [coupons, setCoupons] = useState([]); // รายการคูปองทั้งหมดจาก API
+    const [collectedIds, setCollectedIds] = useState([]); // รายการ ID คูปองที่ user คนนี้เก็บไปแล้ว
+    const [loading, setLoading] = useState(true); // Loading State
 
+    // 2. Fetch Data on Mount
     useEffect(() => {
         fetchCoupons();
         if (token) {
@@ -23,47 +28,53 @@ const CouponCenter = () => {
         }
     }, [token]);
 
+    // 🔄 ฟังก์ชันดึงคูปองสาธารณะทั้งหมด
     const fetchCoupons = async () => {
         try {
+            // GET /api/coupons-public/ -> คืนค่าคูปองที่ active=True และ is_public=True
             const res = await axios.get(`${API_BASE_URL}/api/coupons-public/`);
             setCoupons(res.data);
         } catch (error) {
-            console.error("Error fetching coupons", error);
+            console.error("❌ Error fetching coupons", error);
         } finally {
             setLoading(false);
         }
     };
 
+    // 🔄 ฟังก์ชันดึงคูปองที่ User เก็บไปแล้ว (เพื่อซ่อนหรือปิดปุ่มเก็บ)
     const fetchCollectedCoupons = async () => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/user-coupons/`, {
                 headers: { Authorization: `Token ${token}` }
             });
-            // Map to Coupon IDs
+            // Map เอาเฉพาะ ID ของคูปองที่เก็บแล้ว
             setCollectedIds(res.data.map(uc => uc.id));
         } catch (error) {
-            console.error("Error fetching user coupons", error);
+            console.error("❌ Error fetching user coupons", error);
         }
     };
 
+    // 🎁 ฟังก์ชันกดเก็บคูปอง (Collect Action)
     const handleCollect = async (coupon) => {
+        // Validation 1: ต้อง Login ก่อน
         if (!user) {
             Swal.fire({
                 icon: 'warning',
                 title: 'กรุณาเข้าสู่ระบบ',
-                text: 'ต้องเข้าสู่ระบบสมาชิกก่อนเก็บคูปอง',
-                confirmButtonText: 'ตกลง',
-                confirmButtonColor: '#3085d6'
+                text: 'ต้องเข้าสู่ระบบสมาชิกก่อนเก็บคูปองครับ',
+                confirmButtonText: 'เข้าสู่ระบบ',
+                confirmButtonColor: '#1a4d2e'
             });
             return;
         }
 
         try {
+            // Call API POST /collect/
             await axios.post(`${API_BASE_URL}/api/coupons/${coupon.id}/collect/`, {}, {
                 headers: { Authorization: `Token ${token}` }
             });
             
-            // ✅ Animation & Update State
+            // ✅ Success Feedback (Toast)
             Swal.fire({
                 icon: 'success',
                 title: 'เก็บคูปองสำเร็จ!',
@@ -74,9 +85,11 @@ const CouponCenter = () => {
                 toast: true
             });
 
-            setCollectedIds(prev => [...prev, coupon.id]); // Add to collected list (Will hide automatically)
+            // Update State ทันที (เพื่อให้ปุ่มเปลี่ยนสถานะ หรือซ่อนคูปอง)
+            setCollectedIds(prev => [...prev, coupon.id]); 
             
         } catch (error) {
+            // Error Handling
             Swal.fire({
                 icon: 'error',
                 title: 'ไม่สามารถเก็บคูปองได้',
@@ -86,13 +99,38 @@ const CouponCenter = () => {
         }
     };
 
-    // Filter out collected coupons
-    const displayedCoupons = coupons.filter(c => !collectedIds.includes(c.id));
+    // ========================================
+    // 🧠 Smart Filter Logic (ระบบกรองอัจฉริยะ)
+    // ========================================
+    const displayedCoupons = coupons.filter(c => {
+        // 1. กรองคูปองที่เก็บไปแล้วออก (ซ่อนเลย หรือจะโชว์แต่ Disable ก็ได้ - ในที่นี้ซ่อน)
+        if (collectedIds.includes(c.id)) return false;
+
+        // 2. 🛡️ กรองคูปอง "สมาชิกใหม่" (New User Only)
+        // ถ้าคูปองระบุเงื่อนไข "สำหรับสมาชิกใหม่" (c.conditions.new_user)
+        if (c.conditions && c.conditions.new_user === true) {
+            // ถ้า User Login แล้ว -> เช็คว่าเป็น New User หรือไม่?
+            // (สมมติว่า backend ส่ง role หรือเราเช็คจาก order_count ถ้ามี)
+            if (user) {
+                // ถ้า Role ไม่ใช่ 'new_user' และไม่ใช่ admin -> ซ่อนคูปองนี้
+                // (เพื่อให้ลูกค้าเก่าไม่เห็นคูปองที่ตัวเองใช้ไม่ได้ให้เกะกะ)
+                const isNewUser = user.role === 'new_user' || (user.attributes && user.attributes.is_new_user);
+                
+                // ⚠️ Logic: ถ้าเป็นลูกค้าเก่า (Customer) ให้ซ่อนคูปอง New User
+                if (user.role === 'customer' || user.role === 'seller') {
+                    return false; 
+                }
+            }
+        }
+        
+        return true; // ผ่านเงื่อนไข แสดงผลได้
+    });
 
     return (
         <div className="min-h-screen bg-[#F9F9F7] font-sans selection:bg-blue-100 selection:text-blue-900 pb-20">
-            {/* Hero Header - Blue Theme */}
+            {/* 🎨 Hero Header - แบนเนอร์หัวเว็บสีน้ำเงินสวยๆ */}
             <div className="relative bg-gradient-to-r from-blue-700 to-indigo-800 text-white overflow-hidden py-16 md:py-24 mb-12">
+                 {/* ... (Animation Background) ... */}
                  <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500 rounded-full blur-[100px] opacity-30 -translate-y-1/2 translate-x-1/4 animate-pulse"></div>
                     <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-500 rounded-full blur-[100px] opacity-20 translate-y-1/2 -translate-x-1/4"></div>
@@ -114,19 +152,21 @@ const CouponCenter = () => {
                             Coupon <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-300">Zone</span>
                         </h1>
                         <p className="text-blue-100 text-lg md:text-xl font-medium max-w-2xl leading-relaxed">
-                            คลังคูปองส่วนลดสุดคุ้ม! เก็บโค้ดลดเพิ่ม ช้อปสบายใจ สบายกระเป๋า
+                            รวมคูปองส่วนลดสุดคุ้ม! เก็บโค้ดลดเพิ่ม ช้อปสบายใจ สบายกระเป๋า
                         </p>
                     </motion.div>
                  </div>
             </div>
 
-            {/* Content */}
+            {/* 📦 Content Area */}
             <div className="max-w-7xl mx-auto px-6">
                 {loading ? (
+                    // Loading State
                     <div className="flex justify-center py-20">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600"></div>
                     </div>
                 ) : displayedCoupons.length === 0 ? (
+                    // Empty State (ถ้าไม่มีคูปอง หรือเก็บหมดแล้ว)
                     <div className="text-center py-20 bg-white rounded-[3rem] shadow-sm border border-dashed border-gray-200">
                         <div className="bg-gray-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
                             <Ticket size={40} className="text-gray-300" />
@@ -135,6 +175,7 @@ const CouponCenter = () => {
                         <p className="text-gray-400 mt-2">โปรดกลับมาเช็คใหม่อีกครั้งเร็วๆ นี้ หรือตรวจสอบที่ "คูปองของฉัน"</p>
                     </div>
                 ) : (
+                    // 🎫 Coupon Grid Display
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                         <AnimatePresence>
                         {displayedCoupons.map((coupon, index) => (
@@ -149,18 +190,31 @@ const CouponCenter = () => {
                             >
                                 <div className="bg-white rounded-[1.5rem] shadow-lg hover:shadow-2xl transition-all duration-300 h-full flex flex-col overflow-hidden relative border border-transparent hover:border-blue-200">
                                     
-                                    {/* Flash Badge */}
+                                    {/* Badge: New User Only (ถ้ามี) */}
+                                    {coupon.conditions?.new_user && (
+                                        <div className="absolute top-0 left-0 bg-pink-500 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-br-xl z-20 shadow-md flex items-center gap-1">
+                                            <Sparkles size={10} fill="currentColor" /> สมาชิกใหม่เท่านั้น
+                                        </div>
+                                    )}
+
+                                    {/* Flash Badge (ขวาบน) */}
                                     <div className="absolute top-0 right-0 bg-gradient-to-bl from-blue-600 to-cyan-500 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-bl-xl z-20 shadow-md">
                                         Special Offer
                                     </div>
 
-                                    {/* Ticket Cutouts (Visual Effect) */}
+                                    {/* Ticket Cutouts (รอยบากตั๋ว) */}
                                     <div className="absolute top-1/2 -left-3 w-6 h-6 bg-[#F9F9F7] rounded-full z-10 box-content border-r border-gray-100"></div>
                                     <div className="absolute top-1/2 -right-3 w-6 h-6 bg-[#F9F9F7] rounded-full z-10 box-content border-l border-gray-100"></div>
 
-                                    {/* Top Section - Blue Gradient Background */}
-                                    <div className="p-6 bg-gradient-to-br from-blue-600 to-indigo-700 relative text-white overflow-hidden">
-                                        {/* Background Pattern */}
+                                    {/* 🎨 Top Section (ส่วนสีสดใส) - แยกสีตามประเภท */}
+                                    <div className={`p-6 bg-gradient-to-br relative text-white overflow-hidden ${
+                                        coupon.discount_type === 'free_shipping' 
+                                        ? 'from-emerald-500 to-green-600' // 💚 Green for Free Shipping
+                                        : coupon.discount_type === 'percent'
+                                            ? 'from-purple-500 to-indigo-600' // 💜 Purple for Percent
+                                            : 'from-blue-500 to-cyan-500' // 💙 Blue for Fixed
+                                    }`}>
+                                        {/* Pattern Background */}
                                         <div className="absolute inset-0 opacity-10">
                                             <svg width="100%" height="100%">
                                                 <pattern id="pattern-circles" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -172,27 +226,43 @@ const CouponCenter = () => {
                                         
                                         <div className="relative z-10 text-center pt-4">
                                             <div className="text-5xl font-black tracking-tighter mb-1 flex items-center justify-center gap-1 drop-shadow-md">
-                                                {coupon.discount_type === 'percent' ? (
-                                                    <>{Number(coupon.discount_value)}<span className="text-3xl text-cyan-300">%</span></>
+                                                {/* Logic แสดงตัวเลขส่วนลด */}
+                                                {coupon.discount_type === 'free_shipping' ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="text-4xl text-white">ส่งฟรี</span>
+                                                        <span className="text-sm font-bold uppercase tracking-widest mt-1 opacity-90">Free Shipping</span>
+                                                    </div>
                                                 ) : (
-                                                    <><span className="text-3xl text-cyan-300">฿</span>{Number(coupon.discount_value)}</>
+                                                    coupon.discount_type === 'percent' ? (
+                                                        <>{Number(coupon.discount_value)}<span className="text-3xl text-cyan-300">%</span></>
+                                                    ) : (
+                                                        <><span className="text-3xl text-cyan-300">฿</span>{Number(coupon.discount_value)}</>
+                                                    )
                                                 )}
-                                                <div className="flex flex-col items-start ml-2">
-                                                    <span className="text-xs font-bold bg-white/20 px-1.5 rounded uppercase tracking-wider">OFF</span>
-                                                </div>
+                                                {/* ป้าย OFF */}
+                                                {coupon.discount_type !== 'free_shipping' && (
+                                                    <div className="flex flex-col items-start ml-2">
+                                                        <span className="text-xs font-bold bg-white/20 px-1.5 rounded uppercase tracking-wider">OFF</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             <p className="text-white/90 font-medium text-sm line-clamp-1">{coupon.description}</p>
                                         </div>
                                     </div>
 
-                                    {/* Dashed Divider */}
+                                    {/* Dashed Line separator */}
                                     <div className="border-t-2 border-dashed border-gray-200 relative mx-6 my-0"></div>
 
-                                    {/* Bottom Section */}
+                                    {/* 👇 Bottom Section (รายละเอียดเงื่อนไข) */}
                                     <div className="p-6 flex-1 flex flex-col pt-4">
-                                        {/* Tags / Roles */}
+                                        
+                                        {/* Tags: แสดงสิทธิ์ผู้ใช้ */}
                                         <div className="flex flex-wrap gap-1 mb-4 justify-center">
-                                            {coupon.allowed_roles && coupon.allowed_roles.length > 0 ? (
+                                            {coupon.conditions?.new_user ? (
+                                                 <span className="text-[9px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-700 font-bold uppercase border border-pink-100">
+                                                     เฉพาะลูกค้าใหม่
+                                                 </span>
+                                            ) : coupon.allowed_roles && coupon.allowed_roles.length > 0 ? (
                                                 coupon.allowed_roles.map(role => (
                                                     <span key={role} className="text-[9px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold uppercase border border-blue-100">
                                                         {role === 'new_user' ? 'สมาชิกใหม่' : role === 'customer' ? 'สมาชิกทั่วไป' : role}
@@ -211,21 +281,35 @@ const CouponCenter = () => {
                                                     <ShoppingBag size={14} className="text-gray-400" />
                                                     <span className="text-gray-500 font-bold text-xs uppercase">ขั้นต่ำ</span>
                                                 </div>
-                                                <span className="font-bold text-gray-800 text-sm">฿{Number(coupon.min_spend || 0).toLocaleString()}</span>
+                                                <span className="font-bold text-gray-800 text-sm">
+                                                    {coupon.min_spend > 0 ? `฿${Number(coupon.min_spend).toLocaleString()}` : <span className="text-emerald-500">ไม่มีขั้นต่ำ</span>}
+                                                </span>
                                             </div>
                                         </div>
 
                                         <div className="mt-auto">
+                                            {/* Code & Collect Button */}
                                             <div className="bg-white rounded-xl p-1 flex items-center gap-2 border border-gray-200 group-hover:border-blue-200 transition-colors shadow-inner">
                                                 <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2.5 text-center relative overflow-hidden group-hover:bg-blue-50/30 transition-colors">
                                                     <span className="font-black text-gray-800 text-base tracking-widest uppercase select-all font-mono relative z-10">{coupon.code}</span>
                                                 </div>
-                                                <button 
-                                                    onClick={() => handleCollect(coupon)}
-                                                    className="p-2.5 rounded-lg transition-all font-bold text-sm flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 px-4 w-auto min-w-[30%] justify-center"
-                                                >
-                                                    เก็บ
-                                                </button>
+                                                {/* Button Logic: Disable for Admin/Seller */}
+                                                {(user && ['admin', 'super_admin', 'seller'].includes(user.role)) ? (
+                                                     <button 
+                                                        disabled
+                                                        className="p-2.5 rounded-lg font-bold text-sm flex items-center gap-2 bg-gray-300 text-gray-500 cursor-not-allowed px-4 w-auto min-w-[30%] justify-center"
+                                                        title="Admin ไม่สามารถเก็บคูปองได้"
+                                                    >
+                                                        Admin
+                                                    </button>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => handleCollect(coupon)}
+                                                        className="p-2.5 rounded-lg transition-all font-bold text-sm flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 px-4 w-auto min-w-[30%] justify-center"
+                                                    >
+                                                        เก็บ
+                                                    </button>
+                                                )}
                                             </div>
                                             <p className="text-center text-[10px] text-gray-300 font-bold mt-2 uppercase tracking-wider group-hover:text-blue-300 transition-colors">
                                                 Limited Redemption

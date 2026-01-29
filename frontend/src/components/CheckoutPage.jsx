@@ -402,8 +402,12 @@ function CheckoutPage() {
     };
 
     // ✅ Refactored Calculation for Clarity
-    const SHIPPING_COST = 50; 
+    const BASE_SHIPPING_COST = 50; 
+    const isFreeShipping = couponData?.discount_type === 'free_shipping'; // Restored for UI logic
     
+    // Fixed: Do not zero out shipping, let discount offset it.
+    const shippingCost = BASE_SHIPPING_COST;
+
     // 1. Calculate Base Subtotal (Full Price)
     const baseSubtotal = checkoutItems.reduce((total, item) => total + (item.price * item.quantity), 0);
     
@@ -417,20 +421,23 @@ function CheckoutPage() {
     }, 0);
 
     // 3. Final Total
-    // Base - Flash - Coupon + Shipping
-    const finalTotal = baseSubtotal - flashSavings - discount + SHIPPING_COST;
-    const hasFlashSaleItem = checkoutItems.some(item => flashSaleItems[item.id]);
+    // Base - Flash - Discount + Shipping
+    // Note: If Free Shipping, shippingCost is 0. If regular discount, discount > 0.
+    // 🛡️ Safety Clamp: Discount cannot exceed (Base - Flash)
+    const maxAllowedDiscount = Math.max(0, baseSubtotal - flashSavings);
+    const effectiveDiscount = Math.min(discount, maxAllowedDiscount);
+    
+    const finalTotal = Math.max(0, baseSubtotal - flashSavings - effectiveDiscount + shippingCost);
+    const hasFlashSaleItem = checkoutItems.some(item => flashSaleItems[String(item.id)]);
 
     useEffect(() => {
-        if (!hasFlashSaleItem) {
-            const storedToken = localStorage.getItem('token') || (user && user.token);
-            if (storedToken) {
-                axios.get('http://localhost:8000/api/coupons-public/', { headers: { Authorization: `Token ${storedToken}` } })
-                    .then(res => setAvailableCoupons(res.data))
-                    .catch(err => console.error("Error fetching coupons", err));
-            }
+        const storedToken = localStorage.getItem('token') || (user && user.token);
+        if (storedToken) {
+            axios.get('http://localhost:8000/api/coupons-public/', { headers: { Authorization: `Token ${storedToken}` } })
+                .then(res => setAvailableCoupons(res.data))
+                .catch(err => console.error("Error fetching coupons", err));
         }
-    }, [hasFlashSaleItem, user]);
+    }, [user]);
 
 
     const handleSelectCoupon = (coupon) => {
@@ -447,29 +454,35 @@ function CheckoutPage() {
         setCouponCode(coupon.code);
         setShowCouponModal(false);
         // Delay to allow state update then apply
-        setTimeout(() => handleApplyCoupon(code), 200);
+        setTimeout(() => handleApplyCoupon(coupon.code), 200);
 
     };
 
     const handleApplyCoupon = async (codeToUse) => {
         const code = codeToUse || couponCode;
-        if (hasFlashSaleItem) {
-            Swal.fire({ icon: 'warning', title: 'ใช้คูปองไม่ได้', text: 'สินค้า Flash Sale ไม่ร่วมรายการส่วนลด' });
-            removeCoupon();
-            return;
-        }
         if (!code) return;
+
+        // ⏳ Loading State (User Friendly)
+        Swal.fire({
+            title: 'กำลังตรวจสอบคูปอง...',
+            didOpen: () => { Swal.showLoading(); },
+            allowOutsideClick: false,
+            background: 'transparent',
+            color: 'white',
+            backdrop: 'rgba(0,0,0,0.5)',
+            timer: 0 // Prevent auto close
+        });
+
         try {
             const storedToken = token || localStorage.getItem('token') || (user && user.token);
             
-            // ✅ Send items for strict validation (Flash Sale Conflict Check)
             const payload = {
                 code: code,
-                total_amount: baseSubtotal, // Send Base Total for validation
+                total_amount: baseSubtotal,
                 items: checkoutItems.map(item => ({
                     id: item.id,
                     quantity: item.quantity,
-                    price: item.price // Send base price
+                    price: item.price
                 }))
             };
 
@@ -478,32 +491,42 @@ function CheckoutPage() {
             });
 
             if (res.data.valid) {
+                 // Close Loading
+                Swal.close();
+
                 setDiscount(res.data.discount_amount);
                 setCouponData(res.data);
+                
+                // Show Success
                 Swal.fire({
-
                     icon: 'success',
-                    title: 'ใช้คูปองสำเร็จ',
-                    text: `ลดไป ฿${res.data.discount_amount}`,
-                    timer: 1500,
+                    title: 'ลดราคาเรียบร้อย!',
+                    text: `ประหยัดไปอีก ฿${Number(res.data.discount_amount).toLocaleString()}`,
+                    timer: 2000,
                     showConfirmButton: false,
                     toast: true,
-                    position: 'top-end'
+                    position: 'top',
+                    background: '#ecfdf5',
+                    color: '#065f46',
+                    iconColor: '#10b981'
                 });
             }
         } catch (error) {
+            Swal.close(); // Close Loading first
+
             setDiscount(0);
             setCouponData(null);
             setCouponCode('');
             
-            // ✅ Handle Strict Backend Errors (e.g. Flash Sale Conflict)
-            const errorMsg = error.response?.data?.error || 'คูปองไม่ถูกต้อง';
+            // ✅ Handle Strict Backend Errors (Friendly Display)
+            const errorMsg = error.response?.data?.error || 'คูปองไม่ถูกต้อง หรือหมดอายุแล้ว';
             
             Swal.fire({
                 icon: 'error',
-                title: 'ไม่สามารถใช้คูปองได้',
+                title: 'ขออภัย',
                 text: errorMsg,
-                confirmButtonColor: '#1a4d2e'
+                confirmButtonText: 'ตกลง',
+                confirmButtonColor: '#333'
             });
         }
     };
@@ -846,8 +869,8 @@ function CheckoutPage() {
                                     วิธีการชำระเงิน
                                 </h2>
                                 <div className="grid grid-cols-3 gap-4 mb-6">
-                                    {['QR', 'Bank', 'COD'].map(method => (
-                                        <label key={method} className={`cursor-pointer border-2 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === method ? 'border-[#1a4d2e] bg-green-50/50 text-[#1a4d2e]' : 'border-gray-100 hover:border-gray-300 text-gray-400'}`}>
+                                    {['QR', 'Bank', 'COD'].map((method, idx) => (
+                                        <label key={`${method}-${idx}`} className={`cursor-pointer border-2 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === method ? 'border-[#1a4d2e] bg-green-50/50 text-[#1a4d2e]' : 'border-gray-100 hover:border-gray-300 text-gray-400'}`}>
                                             <input type="radio" name="payment" value={method} checked={paymentMethod === method} onChange={() => setPaymentMethod(method)} className="hidden" />
                                             {method === 'QR' && <QrCode size={24} />}
                                             {method === 'Bank' && <Landmark size={24} />}
@@ -932,9 +955,9 @@ function CheckoutPage() {
                                                     <div className="col-span-2 space-y-3 pt-2 border-t border-dashed border-gray-200 mt-2 animate-in fade-in">
                                                         <label className="text-xs font-bold text-gray-400 block mb-1">ธนาคารของคุณ (ที่ใช้โอน)</label>
                                                         <div className="flex flex-wrap gap-3">
-                                                            {BANKS.map(bank => (
+                                                            {BANKS.map((bank, idx) => (
                                                                 <div
-                                                                    key={bank.id}
+                                                                    key={`${bank.id}-${idx}`}
                                                                     onClick={() => { setBankName(bank.name); setSelectedBank(bank); }}
                                                                     style={{ borderColor: selectedBank.id === bank.id ? bank.color : '' }}
                                                                     className={`w-14 h-14 rounded-2xl cursor-pointer flex items-center justify-center transition-all relative overflow-hidden shadow-sm p-1 bg-white ${selectedBank.id === bank.id ? 'ring-4 ring-offset-1 scale-110 z-10 border-2' : 'hover:scale-105 opacity-80 hover:opacity-100 border border-gray-100'}`}
@@ -992,48 +1015,59 @@ function CheckoutPage() {
                         <div className="bg-gray-900 p-8 rounded-[3rem] text-white shadow-xl sticky top-28">
                             <h2 className="text-xl font-black mb-6 border-b border-white/10 pb-4">สรุปคำสั่งซื้อ</h2>
                             <div className="space-y-4 mb-8 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
-                                {checkoutItems.map((item) => {
-                                    const isFlashSale = !!flashSaleItems[item.id];
+                                {checkoutItems.map((item, idx) => {
+                                    const prodId = String(item.id);
+                                    const isFlashSale = !!flashSaleItems[prodId];
                                     const price = getEffectivePrice(item);
+                                    
                                     return (
-                                        <div key={item.id} className="flex gap-4 items-center">
-                                            <div className="w-12 h-12 rounded-xl bg-white/10 flex-shrink-0 p-1 relative">
-                                                <img src={getImageUrl(item.thumbnail)} className="w-full h-full object-contain" />
-                                                {isFlashSale && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1 rounded-full animate-pulse"><Zap size={8} fill="currentColor" /></div>}
+                                        <div key={`${item.id}-${idx}`} className={`flex gap-4 items-center p-3 rounded-2xl transition-all duration-300 ${isFlashSale ? 'bg-orange-500/10 border border-orange-500/40 shadow-sm shadow-orange-500/20 hover:scale-[1.02]' : 'bg-white/5 border border-white/5'}`}>
+                                            <div className="w-14 h-14 rounded-2xl bg-white/10 flex-shrink-0 p-1.5 relative border border-white/10 shadow-inner">
+                                                <img src={getImageUrl(item.thumbnail)} className="w-full h-full object-contain mix-blend-lighten" />
+                                                {isFlashSale && (
+                                                    <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-[8px] px-2 py-1 rounded-lg animate-pulse shadow-lg font-black border border-white/20">
+                                                        FLASH
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-bold truncate">{item.title}</p>
-                                                <p className="text-[10px] text-white/50">x{item.quantity}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs font-black truncate text-gray-100">{item.title}</p>
+                                                    {isFlashSale && <span className="text-[9px] bg-orange-500 text-white px-1.5 py-0.5 rounded-md flex items-center gap-1 font-black animate-bounce shadow-sm"><Zap size={8} fill="currentColor"/> SALE</span>}
+                                                </div>
+                                                <p className="text-[10px] text-white/40 font-bold uppercase tracking-tight">จำนวน {item.quantity} รายการ</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className={`font-black text-sm ${isFlashSale ? 'text-orange-400' : ''}`}>{formatPrice(price * item.quantity)}</p>
+                                                {isFlashSale && (
+                                                    <p className="text-[10px] text-white/30 line-through font-bold">{formatPrice(item.price * item.quantity)}</p>
+                                                )}
+                                                <p className={`font-black text-base tracking-tighter ${isFlashSale ? 'text-orange-400 drop-shadow-[0_2px_4px_rgba(251,146,60,0.4)] scale-110 origin-right' : 'text-white'}`}>
+                                                    {formatPrice(price * item.quantity)}
+                                                </p>
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
 
-                            <div className={`mb-6 transition-opacity ${hasFlashSaleItem ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="mb-6">
                                 <label className="text-[10px] font-bold text-white/60 mb-2 block uppercase tracking-widest flex justify-between">
                                     โค้ดส่วนลด
-                                    {hasFlashSaleItem ?
-                                        <span className="text-orange-400 flex items-center gap-1"><Zap size={10} /> Flash Sale</span> :
-                                        <button type="button" onClick={() => setShowCouponModal(true)} className="text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"><Tag size={10} /> เลือกคูปอง ({availableCoupons.length})</button>
-                                    }
+                                    <button type="button" onClick={() => setShowCouponModal(true)} className="text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"><Tag size={10} /> เลือกคูปอง ({availableCoupons.length})</button>
                                 </label>
                                 <div className="flex bg-white/10 rounded-xl p-1 border border-white/10 focus-within:border-white/50 transition-colors">
                                     <div className="pl-3 flex items-center text-white/50"><Tag size={16} /></div>
                                     <input
                                         value={couponCode}
                                         onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                                        disabled={!!couponData || hasFlashSaleItem}
-                                        placeholder={hasFlashSaleItem ? "งดร่วมรายการ" : "กรอกโค้ด"}
+                                        disabled={!!couponData}
+                                        placeholder="กรอกโค้ด"
                                         className="bg-transparent w-full p-2 text-sm font-bold text-white placeholder-white/30 outline-none disabled:opacity-50"
                                     />
                                     {couponData ? (
                                         <button type="button" onClick={removeCoupon} className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">ลบ</button>
                                     ) : (
-                                        <button type="button" onClick={() => handleApplyCoupon(couponCode)} disabled={hasFlashSaleItem} className="bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-600 transition disabled:bg-gray-400 disabled:text-gray-200">ใช้</button>
+                                        <button type="button" onClick={() => handleApplyCoupon(couponCode)} className="bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-600 transition disabled:bg-gray-400 disabled:text-gray-200">ใช้</button>
                                     )}
                                 </div>
                                 {couponData && <p className="text-[10px] text-indigo-300 mt-2 flex items-center gap-1"><Check size={10} /> ลด {formatPrice(discount)}</p>}
@@ -1041,7 +1075,14 @@ function CheckoutPage() {
 
                             <div className="border-t border-white/10 pt-4 space-y-2">
                                 <div className="flex justify-between text-xs font-bold text-white/60"><span>ยอดรวม</span><span>{formatPrice(baseSubtotal)}</span></div>
-                                {discount > 0 && <div className="flex justify-between text-xs font-bold text-green-300"><span>ส่วนลด</span><span>- {formatPrice(discount)}</span></div>}
+                                <div className="flex justify-between text-xs font-bold text-white/60">
+                                    <span>ค่าจัดส่ง</span>
+                                    <div className="flex gap-2">
+                                        {isFreeShipping && <span className="line-through opacity-50">{formatPrice(BASE_SHIPPING_COST)}</span>}
+                                        <span className={isFreeShipping ? 'text-green-300' : ''}>{isFreeShipping ? 'ฟรี' : formatPrice(shippingCost)}</span>
+                                    </div>
+                                </div>
+                                {effectiveDiscount > 0 && <div className="flex justify-between text-xs font-bold text-green-300"><span>ส่วนลด</span><span>- {formatPrice(effectiveDiscount)}</span></div>}
                                 <div className="flex justify-between items-end pt-2 border-t border-white/10 mt-2">
                                     <span className="text-2xl font-black">ยอดสุทธิ</span>
                                     <span className="text-3xl font-black">{formatPrice(finalTotal)}</span>
@@ -1085,11 +1126,33 @@ function CheckoutPage() {
                                     <p className="text-gray-500 font-bold">ไม่มีคูปองที่ใช้ได้ในขณะนี้</p>
                                 </div>
                             ) :
-                                availableCoupons.map(coupon => (
-                                    <div key={coupon.id} onClick={() => handleSelectCoupon(coupon)} className="border border-indigo-100 rounded-xl p-4 hover:bg-indigo-50 cursor-pointer transition relative group overflow-hidden">
-                                        <div className="absolute top-0 right-0 bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded-bl-lg">CODE: {coupon.code}</div>
-                                        <p className="font-black text-indigo-900">{coupon.description || `ส่วนลด ${coupon.discount_value}`}</p>
-                                        <p className="text-xs text-indigo-400">ขั้นต่ำ {formatPrice(coupon.min_spend)}</p>
+                                availableCoupons.map((coupon, idx) => (
+                                    <div key={`${coupon.id}-${idx}`} onClick={() => handleSelectCoupon(coupon)} className="border border-indigo-100 rounded-xl p-4 hover:bg-indigo-50 cursor-pointer transition relative group overflow-hidden bg-white shadow-sm hover:shadow-md">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider">
+                                                {coupon.code}
+                                            </span>
+                                            {coupon.max_discount_amount && coupon.discount_type === 'percent' && (
+                                                <span className="text-[9px] text-gray-400 font-bold border border-gray-100 px-1.5 py-0.5 rounded-md bg-gray-50">
+                                                    Max ฿{Number(coupon.max_discount_amount).toLocaleString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                        
+                                        <p className="font-black text-indigo-950 text-lg mb-1">
+                                            {coupon.discount_type === 'percent' ? `${Number(coupon.discount_value)}% OFF` : 
+                                             coupon.discount_type === 'free_shipping' ? 'ส่งฟรี (Free Shipping)' : 
+                                             `ส่วนลด ฿${Number(coupon.discount_value)}`}
+                                        </p>
+                                        
+                                        <div className="flex flex-wrap gap-2 text-xs text-gray-500 font-medium">
+                                            <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+                                                ขั้นต่ำ ฿{Number(coupon.min_spend).toLocaleString()}
+                                            </span>
+                                            <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+                                                หมดเขต {new Date(coupon.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                                            </span>
+                                        </div>
                                     </div>
                                 ))}
                         </div>

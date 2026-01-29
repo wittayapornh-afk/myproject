@@ -6,9 +6,9 @@ import CategoryRow from './CategoryRow';
 import CouponSection from './CouponSection'; // ✅ Import Coupon Section
 import { 
     ArrowRight, Star, Truck, ShieldCheck, RefreshCw, CreditCard, Rocket, RotateCcw, Headphones, Zap, 
-    Sofa, Armchair, Lamp, Bed, LayoutGrid, Watch, Monitor, Smartphone, Shirt, Footprints, ConciergeBell,
-    Table, Utensils, Gift, Flower2, Glasses, ShoppingBag, Sparkles, Gem, ShoppingBasket, Palette,
-    ChefHat, Frame // ✅ Import More Icons
+    Sofa, LayoutGrid, Watch, Monitor, Smartphone, Shirt, Footprints,
+    Utensils, Gift, Flower2, Glasses, ShoppingBag, Sparkles, Gem, ShoppingBasket,
+    Tablet, Bike, Car, Trophy, Laptop, CookingPot, Dumbbell, Pipette, Briefcase // ✅ Import More Icons
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { Link } from 'react-router-dom';
@@ -45,7 +45,15 @@ const HomePage = () => {
              try {
                  const fsRes = await axios.get(`${API_BASE_URL}/api/flash-sales/active/`);
                  if (fsRes.data && Array.isArray(fsRes.data)) {
-                     setActiveFlashSale(fsRes.data); // ✅ Store Array
+                     // ✅ Filter: Show only if active OR starts within 1 hour
+                     const now = Date.now();
+                     const oneHour = 60 * 60 * 1000;
+                     const filtered = fsRes.data.filter(sale => {
+                         const start = new Date(sale.start_time).getTime();
+                         if (start <= now) return true; // Started
+                         return (start - now) <= oneHour; // Coming soon (<= 1h)
+                     });
+                     setActiveFlashSale(filtered);
                  }
              } catch (err) { console.error("Flash Sale fetch error:", err); }
 
@@ -74,33 +82,115 @@ const HomePage = () => {
         fetchData();
     }, []);
 
-    // 🎓 Icon Mapping Helper
+    // 🎓 Icon Mapping Helper (Enhanced with Thai & Modern Icons)
     const getCategoryConfig = (catName) => {
-        // Specific Fixes for Duplicates/Renaming
-        if (catName === 'Home-Decoration') return { icon: Utensils, label: 'Kitchen', color: 'bg-red-50 text-red-600' };
-        if (catName === 'Home Decoration') return { icon: Flower2, label: 'Home Decor', color: 'bg-lime-50 text-lime-600' };
-
         const lower = catName.toLowerCase();
-        if (lower.includes('sofa') || lower.includes('โซฟา')) return { icon: Sofa, color: 'bg-orange-50 text-orange-600' };
-        if (lower.includes('lamp') || lower.includes('โคมไฟ')) return { icon: Lamp, color: 'bg-yellow-50 text-yellow-600' };
-        if (lower.includes('chair') || lower.includes('เก้าอี้')) return { icon: Armchair, color: 'bg-blue-50 text-blue-600' };
-        if (lower.includes('bed') || lower.includes('เตียง')) return { icon: Bed, color: 'bg-indigo-50 text-indigo-600' };
-        if (lower.includes('furniture') || lower.includes('เฟอร์นิเจอร์')) return { icon: Sofa, color: 'bg-orange-50 text-orange-600' }; // ✅ Furniture generic
-        if (lower.includes('beauty') || lower.includes('สวย') || lower.includes('cosmetic')) return { icon: Sparkles, color: 'bg-pink-50 text-pink-600' }; // ✅ Beauty
-        if (lower.includes('fragrance') || lower.includes('perfume') || lower.includes('น้ำหอม')) return { icon: Gem, color: 'bg-purple-50 text-purple-600' }; // ✅ Fragrances
-        if (lower.includes('grocery') || lower.includes('groceries') || lower.includes('ของชำ')) return { icon: ShoppingBasket, color: 'bg-green-50 text-green-600' }; // ✅ Groceries
-        if (lower.includes('table') || lower.includes('โต๊ะ')) return { icon: Table, color: 'bg-amber-50 text-amber-700' };
-        if (lower.includes('watch') || lower.includes('นาฬิกา')) return { icon: Watch, color: 'bg-gray-100 text-gray-700' };
-        if (lower.includes('phone') || lower.includes('โทรศัพท์')) return { icon: Smartphone, color: 'bg-purple-50 text-purple-600' };
-        if (lower.includes('screen') || lower.includes('จอ')) return { icon: Monitor, color: 'bg-teal-50 text-teal-600' };
-        if (lower.includes('cloth') || lower.includes('เสื้อ')) return { icon: Shirt, color: 'bg-pink-50 text-pink-600' };
-        if (lower.includes('shoe') || lower.includes('รองเท้า')) return { icon: Footprints, color: 'bg-rose-50 text-rose-600' };
-        if (lower.includes('bag') || lower.includes('กระเป๋า')) return { icon: ShoppingBag, color: 'bg-orange-100 text-orange-700' };
-        if (lower.includes('glass') || lower.includes('แว่น')) return { icon: Glasses, color: 'bg-emerald-50 text-emerald-600' };
-        if (lower.includes('kitchen') || lower.includes('ครัว') || lower.includes('food')) return { icon: Utensils, color: 'bg-red-50 text-red-600' };
-        if (lower.includes('gift') || lower.includes('ของขวัญ')) return { icon: Gift, color: 'bg-fuchsia-50 text-fuchsia-600' };
-        if (lower.includes('decor') || lower.includes('ตกแต่ง')) return { icon: Flower2, color: 'bg-lime-50 text-lime-600' };
-        return { icon: LayoutGrid, color: 'bg-green-50 text-[#1a4d2e]' }; // Default
+
+        // 💄 Beauty & Health
+        if (lower.includes('beauty') && !lower.includes('health') && !lower.includes('skin')) return {
+            icon: Sparkles, label: 'เครื่องสำอาง / ความงาม', color: 'bg-pink-50 text-pink-600'
+        };
+        // 🧴 Skin Care
+        if (lower.includes('skin') || lower.includes('serum') || lower.includes('cream')) return {
+            icon: Pipette, label: 'ผลิตภัณฑ์ดูแลผิว', color: 'bg-blue-50 text-blue-400'
+        };
+        // 🌸 Fragrances
+        if (lower.includes('fragrance') || lower.includes('perfume') || lower.includes('น้ำหอม')) return {
+            icon: Gem, label: 'น้ำหอม', color: 'bg-purple-50 text-purple-600'
+        };
+
+        // 🛋️ Furniture
+        if (lower.includes('furniture') || lower.includes('sofa') || lower.includes('armchair')) return {
+            icon: Sofa, label: 'เฟอร์นิเจอร์', color: 'bg-orange-50 text-stone-600'
+        };
+        // 🏠 Home Decoration
+        if (lower.includes('decor') || lower.includes('home')) return {
+            icon: Flower2, label: 'ของตกแต่งบ้าน', color: 'bg-teal-50 text-teal-600'
+        };
+        // 🍳 Kitchen Accessories
+        if (lower.includes('kitchen') || lower.includes('pan') || lower.includes('knife')) return {
+            icon: CookingPot, label: 'อุปกรณ์ครัว', color: 'bg-gray-100 text-gray-800'
+        };
+
+        // 🥬 Groceries
+        if (lower.includes('grocery') || lower.includes('groceries') || lower.includes('vegetable') || lower.includes('food')) return {
+            icon: ShoppingBasket, label: 'สินค้าอุปโภคบริโภค', color: 'bg-green-50 text-green-700'
+        };
+
+        // 💻 Laptops
+        if (lower.includes('laptop')) return {
+            icon: Laptop, label: 'โน้ตบุ๊ก / แล็ปท็อป', color: 'bg-slate-100 text-blue-600'
+        };
+        // 📱 Smartphones
+        if (lower.includes('smartphone') || (lower.includes('phone') && !lower.includes('access'))) return {
+            icon: Smartphone, label: 'สมาร์ทโฟน', color: 'bg-gray-900 text-white'
+        };
+        // 📱 Tablets
+        if (lower.includes('tablet') || lower.includes('ipad')) return {
+            icon: Tablet, label: 'แท็บเล็ต', color: 'bg-gray-200 text-gray-700'
+        };
+        // 🎧 Mobile Accessories
+        if (lower.includes('mobile access') || lower.includes('earbud') || lower.includes('case')) return {
+            icon: Headphones, label: 'อุปกรณ์เสริมมือถือ', color: 'bg-cyan-50 text-cyan-500'
+        };
+
+        // 👔 Mens Shirts
+        if (lower.includes('mens shirt') || (lower.includes('shirt') && lower.includes('men'))) return {
+            icon: Shirt, label: 'เสื้อเชิ้ตผู้ชาย', color: 'bg-blue-50 text-blue-900'
+        };
+        // 👞 Mens Shoes
+        if (lower.includes('mens shoes') || (lower.includes('shoe') && lower.includes('men'))) return {
+            icon: Footprints, label: 'รองเท้าผู้ชาย', color: 'bg-amber-100 text-amber-800'
+        };
+        // ⌚ Mens Watches
+        if (lower.includes('mens watch') || (lower.includes('watch') && lower.includes('men'))) return {
+            icon: Watch, label: 'นาฬิกาผู้ชาย', color: 'bg-gray-100 text-slate-600'
+        };
+
+        // 👗 Tops (Women)
+        if (lower.includes('top') || lower.includes('t-shirt')) return {
+            icon: Shirt, label: 'เสื้อผ้าส่วนบน (ทั่วไป)', color: 'bg-sky-50 text-sky-400'
+        };
+        // 👜 Womens Bags
+        if (lower.includes('womens bag') || lower.includes('handbag')) return {
+            icon: ShoppingBag, label: 'กระเป๋าผู้หญิง', color: 'bg-rose-50 text-rose-800'
+        };
+        // 👗 Womens Dresses
+        if (lower.includes('dress')) return {
+            icon: Shirt, label: 'ชุดเดรสผู้หญิง', color: 'bg-orange-50 text-orange-400'
+        };
+        // 💍 Womens Jewellery
+        if (lower.includes('jewel') || lower.includes('ring') || lower.includes('necklace')) return {
+            icon: Gem, label: 'เครื่องประดับผู้หญิง', color: 'bg-slate-50 text-slate-400'
+        };
+        // 👠 Womens Shoes
+        if (lower.includes('womens shoes') || lower.includes('heels') || lower.includes('pumps')) return {
+            icon: Footprints, label: 'รองเท้าผู้หญิง', color: 'bg-red-50 text-red-600'
+        };
+        // ⌚ Womens Watches
+        if (lower.includes('womens watch')) return {
+            icon: Watch, label: 'นาฬิกาผู้หญิง', color: 'bg-rose-50 text-rose-500'
+        };
+
+        // 🏍️ Motorcycle
+        if (lower.includes('motorcycle') || lower.includes('helmet')) return {
+            icon: Bike, label: 'มอเตอร์ไซค์', color: 'bg-stone-900 text-orange-500'
+        };
+        // 🚗 Vehicle
+        if (lower.includes('vehicle') || lower.includes('car')) return {
+            icon: Car, label: 'ยานยนต์ / รถยนต์', color: 'bg-blue-50 text-blue-500'
+        };
+        
+        // 🏋️ Sports Accessories
+        if (lower.includes('sport') || lower.includes('dumbbell') || lower.includes('gym')) return {
+            icon: Dumbbell, label: 'อุปกรณ์กีฬา', color: 'bg-red-50 text-red-600'
+        };
+        // 🕶️ Sunglasses
+        if (lower.includes('sunglass') || lower.includes('glass')) return {
+            icon: Glasses, label: 'แว่นกันแดด', color: 'bg-yellow-50 text-yellow-800'
+        };
+
+        return { icon: LayoutGrid, label: catName, color: 'bg-gray-50 text-gray-600' }; // Default
     };
 
     // ... handleInfoClick ...
@@ -217,34 +307,63 @@ const HomePage = () => {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-                    {newArrivals.map((product) => (
-                        <Link key={product.id} to={`/product/${product.id}`} className="group bg-white rounded-[2rem] p-4 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100/50">
-                            <div className="aspect-[1/1] bg-[#F5F5F3] rounded-[1.5rem] mb-4 overflow-hidden relative">
-                                {product.stock <= 0 && (
-                                    <span className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-md z-10">OUT OF STOCK</span>
-                                )}
-                                <img 
-                                    src={getImageUrl(product.thumbnail || product.image)} 
-                                    className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500" 
-                                    alt={product.title} 
-                                />
-                                {/* Add to Cart / Quick View actions could go here (hover) */}
-                            </div>
-                            
-                            <div className="px-2">
-                                <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{product.category}</p>
-                                <h3 className="font-bold text-[#263A33] text-lg mb-2 line-clamp-1 group-hover:text-[#1a4d2e] transition-colors">{product.title}</h3>
-                                <div className="flex justify-between items-center">
-                                    <div className="flex flex-col">
-                                        <span className="text-[#1a4d2e] font-black text-xl">{formatPrice(product.price)}</span>
-                                    </div>
-                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-[#1a4d2e] group-hover:text-white transition-colors">
-                                        <ArrowRight size={16} className="-rotate-45 group-hover:rotate-0 transition-transform"/>
+                    {newArrivals.map((product) => {
+                        // ⚡ Flash Sale Logic Check
+                        let flashPrice = null;
+                        if (activeFlashSale && Array.isArray(activeFlashSale)) {
+                            for (const sale of activeFlashSale) {
+                                // Ensure sale.items is an array before trying to find
+                                if (sale.items && Array.isArray(sale.items)) {
+                                    const item = sale.items.find(i => (i.product?.id || i.product) === product.id);
+                                    if (item) {
+                                        flashPrice = item.price;
+                                        break; // Found in one sale, no need to check others
+                                    }
+                                }
+                            }
+                        }
+
+                        return (
+                            <Link key={product.id} to={`/product/${product.id}`} className="group bg-white rounded-[2rem] p-4 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100/50">
+                                <div className="aspect-[1/1] bg-[#F5F5F3] rounded-[1.5rem] mb-4 overflow-hidden relative">
+                                    {product.stock <= 0 && (
+                                        <span className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-md z-10">OUT OF STOCK</span>
+                                    )}
+                                    {flashPrice && (
+                                        <div className="absolute top-3 right-3 bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-md z-10 animate-pulse shadow-sm">
+                                            ⚡ FLASH SALE
+                                        </div>
+                                    )}
+                                    <img 
+                                        src={getImageUrl(product.thumbnail || product.image)} 
+                                        className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500" 
+                                        alt={product.title} 
+                                    />
+                                    {/* Add to Cart / Quick View actions could go here (hover) */}
+                                </div>
+                                
+                                <div className="px-2">
+                                    <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{product.category}</p>
+                                    <h3 className="font-bold text-[#263A33] text-lg mb-2 line-clamp-1 group-hover:text-[#1a4d2e] transition-colors">{product.title}</h3>
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex flex-col">
+                                            {flashPrice ? (
+                                                <>
+                                                    <span className="text-[#1a4d2e] font-black text-xl">{formatPrice(flashPrice)}</span>
+                                                    <span className="text-gray-400 text-sm line-through">{formatPrice(product.price)}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-[#1a4d2e] font-black text-xl">{formatPrice(product.price)}</span>
+                                            )}
+                                        </div>
+                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-[#1a4d2e] group-hover:text-white transition-colors">
+                                            <ArrowRight size={16} className="-rotate-45 group-hover:rotate-0 transition-transform"/>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </Link>
-                    ))}
+                            </Link>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -279,6 +398,14 @@ const HomePage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* 🎁 Floating Coupon Button */}
+            <Link to="/coupons" className="fixed bottom-24 right-6 z-40 bg-gradient-to-r from-pink-500 to-rose-500 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform hover:shadow-pink-500/50 group animate-bounce-slow">
+                <Gift size={28} className="group-hover:rotate-12 transition-transform" />
+                <span className="absolute -top-2 -right-2 bg-yellow-400 text-[10px] font-black text-yellow-900 px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm animate-pulse">
+                    FREE
+                </span>
+            </Link>
         </div>
     );
 };

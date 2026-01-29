@@ -15,12 +15,12 @@ class Migration(migrations.Migration):
             # Forward SQL - แก้ไข id ให้เป็น AUTO_INCREMENT
             sql="""
                 ALTER TABLE flash_sale_campaigns 
-                MODIFY COLUMN id INT AUTO_INCREMENT PRIMARY KEY;
+                MODIFY COLUMN id INT AUTO_INCREMENT;
             """,
             # Reverse SQL - สำหรับ rollback (ถ้าต้องการ)
             reverse_sql="""
                 ALTER TABLE flash_sale_campaigns 
-                MODIFY COLUMN id INT PRIMARY KEY;
+                MODIFY COLUMN id INT;
             """
         ),
     ]

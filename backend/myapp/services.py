@@ -79,15 +79,15 @@ class CouponService:
             
         # 1. Basic Status
         if not coupon.active:
-            return False, "คูปองนี้ถูกใช้งานแล้วหรือถูกยกเลิก", None
+            return False, "ขออภัย คูปองนี้ถูกยกเลิกหรือหมดอายุการใช้งานแล้วครับ", None
         
         if not (coupon.start_date <= now <= coupon.end_date):
-            return False, "คูปองไม่อยู่ในช่วงเวลาที่กำหนด", None
+            return False, "คูปองนี้ยังไม่เปิดให้ใช้งาน หรือหมดเขตไปแล้วครับ", None
             
         # V2: Total Supply Check
         global_limit = max(coupon.total_supply, coupon.usage_limit)
         if coupon.used_count >= global_limit:
-            return False, "เสียใจด้วย สิทธิ์คูปองเต็มแล้ว (Fully Redeemed)", None
+            return False, "เสียใจด้วยครับ สิทธิ์ของคูปองนี้ถูกใช้จองเต็มหมดแล้ว (Fully Redeemed)", None
             
         # 2. User Quota
         if user and user.is_authenticated:
@@ -96,7 +96,10 @@ class CouponService:
             if allowed_roles:
                 user_role = getattr(user, 'role', 'customer')
                 if user_role not in allowed_roles:
-                     return False, "คุณไม่มีสิทธิ์ใช้คูปองนี้ (Role Restricted)", None
+                     # Friendly Message for New User
+                     if 'new_user' in allowed_roles:
+                         return False, "ขออภัยครับ คูปองนี้สำหรับสมาชิกใหม่เท่านั้น", None
+                     return False, "ขออภัย คุณไม่ได้รับสิทธิ์ในการใช้คูปองนี้", None
 
             # V2: Daily Limit
             if coupon.limit_per_user_per_day > 0:
@@ -130,6 +133,20 @@ class CouponService:
             valid_items_total = 0
             for item in cart_items:
                 product = item.get('product') if isinstance(item, dict) else item.product
+                
+                # ✅ V2 Fix: Resolve Product from ID if missing (API Payload uses 'id')
+                if not product and isinstance(item, dict):
+                    p_id = item.get('id')
+                    if not p_id: 
+                        continue # Add check to avoid id=None query
+                        
+                    try:
+                        product = Product.objects.get(id=p_id)
+                    except (Product.DoesNotExist, ValueError): # Catch ValueError too
+                        continue # Skip invalid item
+
+                if not product: continue # Safety check
+
                 price = item.get('price', product.price) # Handle dict or obj
                 qty = item.get('quantity', 1)
                 
@@ -145,13 +162,14 @@ class CouponService:
         return True, "คูปองใช้ได้", coupon
 
     @staticmethod
-    def calculate_discount(coupon, original_price):
+    def calculate_discount(coupon, original_price, shipping_cost=0):
         """
         Calculate discount amount based on type.
         Supports V2 Tiered Logic.
         """
         discount = Decimal(0)
         price = Decimal(original_price)
+        shipping = Decimal(shipping_cost)
         
         # V2: Tiered Discount Logic
         if coupon.discount_type == 'tiered':
@@ -167,16 +185,16 @@ class CouponService:
                     
         elif coupon.discount_type == 'fixed':
             discount = coupon.discount_value
-        elif coupon.discount_type == 'percent':
-            discount = (price * coupon.discount_value) / Decimal(100)
-        elif coupon.discount_type == 'capped_percent':
+        elif coupon.discount_type == 'percent' or coupon.discount_type == 'capped_percent':
             raw_discount = (price * coupon.discount_value) / Decimal(100)
+            # Apply Cap if exists (Universal for percent & capped_percent)
             if coupon.max_discount_amount and raw_discount > coupon.max_discount_amount:
                 discount = coupon.max_discount_amount
             else:
                 discount = raw_discount
         elif coupon.discount_type == 'free_shipping':
-            discount = Decimal(50) # Mock
+            discount = shipping # Discount equals shipping cost
+            return discount # Return immediately, do not cap at price (price usually exclude shipping)
             
         # Cap at price
         return min(discount, price)

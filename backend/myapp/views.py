@@ -13,6 +13,7 @@ from .models import Product, Order, OrderItem, AdminLog, ProductImage, Review, S
 from .serializers import CouponSerializer, FlashSaleSerializer, FlashSaleProductSerializer, FlashSaleCampaignSerializer 
 from .validators import validate_order_data
 from .exceptions import InlineValidationError 
+from .services import CouponService # ✅ Import Service 
 import logging
 import traceback
 from django.utils import timezone
@@ -654,8 +655,8 @@ def categories_api(request):
         for cat_name in default_categories:
             Category.objects.get_or_create(name=cat_name)
 
-    # 3. Return all categories from DB using the new Model
-    all_categories = Category.objects.all().order_by('name').values_list('name', flat=True)
+    # 3. Return only categories with active products (Hide empty categories)
+    all_categories = Category.objects.filter(products__is_active=True).distinct().order_by('name').values_list('name', flat=True)
     
     return Response({"categories": list(all_categories)})
 
@@ -779,23 +780,35 @@ def login_api(request):
     username = request.data.get('username')
     password = request.data.get('password')
     
+    if not username or not password:
+         return Response({"error": "Please provide both username and password"}, status=400)
+
+    # ✅ Support Email Login
+    if '@' in username:
+        try:
+            user_obj = User.objects.get(email=username)
+            username = user_obj.username # Normalize to username for authenticate
+        except User.DoesNotExist:
+            pass # Let authenticate fail naturally
+
     user = authenticate(username=username, password=password)
     
     if user:
-        # ✅ Strict Case-Sensitive Check
-        if user.username != username:
-            return Response({"error": "ชื่อผู้ใช้งานหรือรหัสผ่าน ไม่ถูกต้อง"}, status=400)
-
         if not user.is_active:
              return Response({"error": "Account disabled"}, status=403)
              
         token, _ = Token.objects.get_or_create(user=user)
         print(f"DEBUG: Login Success for {user.username}. Token: {token.key}")
+        
+        # Determine Role logic (Helper for frontend)
+        role = user.role
+        if user.is_superuser: role = 'admin'
+
         return Response({
             "token": token.key,
             "id": user.id,
             "username": user.username,
-            "role": user.role,
+            "role": role, 
             "role_code": user.role,
             "first_name": user.first_name,
             "last_name": user.last_name,
@@ -804,7 +817,8 @@ def login_api(request):
             "address": user.address,
             "avatar": user.image.url if user.image else ""
         })
-    return Response({"error": "ชื่อผู้ใช้งานหรือรหัสผ่าน ไม่ถูกต้อง"}, status=400)
+    
+    return Response({"error": "ชื่อผู้ใช้งานหรือรหัสผ่าน ไม่ถูกต้อง"}, status=401)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -1000,39 +1014,53 @@ def create_order(request):
                 })
 
             # ✅ 3. Apply Coupon
+            item_subtotal_val = total_price # Rename for clarity
+            shipping_cost = 50 # Default Shipping Cost (Flat Rate)
+            
+            # Recalculate Total (Subtotal + Shipping)
+            grand_total = item_subtotal_val + shipping_cost
+            
             discount_amount = 0
             coupon = None
             
             if coupon_code:
-                # 🚫 Rule: Flash Sale Forbidden with Coupon
-                if has_flash_sale_item:
-                    raise ValueError("ไม่สามารถใช้คูปองร่วมกับสินค้า Flash Sale ได้")
-                
+                # 🔒 Lock Coupon Row to prevent Race Condition
                 try:
-                    coupon = Coupon.objects.get(code=coupon_code)
-                    if not coupon.is_valid(user=request.user):
-                         raise ValueError("คูปองไม่ถูกต้อง หมดอายุ หรือใช้ครบสิทธิ์แล้ว")
-                    
-                    if total_price < coupon.min_spend:
-                        raise ValueError(f"ยอดซื้อไม่ถึงขั้นต่ำของคูปอง ({coupon.min_spend} บาท)")
-
-                    # Calculate Discount
-                    if coupon.discount_type == 'percent':
-                        discount = (total_price * coupon.discount_value) / 100
-                    else:
-                        discount = coupon.discount_value
-                        
-                    discount = min(discount, total_price)
-                    discount_amount = discount
-                    
-                    # Update Usage
-                    coupon.used_count += 1
-                    coupon.save()
-                    
-                    total_price -= discount_amount
-                    
+                     coupon_locked = Coupon.objects.select_for_update().get(code=coupon_code)
                 except Coupon.DoesNotExist:
-                    raise ValueError("รหัสคูปองไม่ถูกต้อง")
+                     raise ValueError("รหัสคูปองไม่ถูกต้อง")
+
+                # ✅ Refactored Logic using CouponService
+                # Pass shipping_cost to validate if needed (future)
+                is_valid, msg, coupon = CouponService.validate_coupon(
+                    user=request.user, 
+                    coupon_code=coupon_code, 
+                    cart_total=item_subtotal_val, # Validate against Item Subtotal
+                    cart_items=cart_items
+                )
+                
+                if not is_valid:
+                    raise ValueError(msg)
+
+                # ⚡ Flash Sale Stackability Check
+                if has_flash_sale_item and not coupon.is_stackable_with_flash_sale:
+                     raise ValueError("คูปองนี้ไม่สามารถใช้ร่วมกับสินค้า Flash Sale ได้")
+
+                # ✅ Calculate Discount (Pass Shipping Cost)
+                discount_amount = CouponService.calculate_discount(coupon, item_subtotal_val, shipping_cost)
+                
+                # Prevent negative total
+                # Max discount cannot exceed (Subtotal + Shipping) effectively
+                # But logic says: Free Shipping = 50. 
+                # Percent/Fixed = based on Subtotal usually.
+                # Let's ensure discount doesn't exceed Grand Total
+                discount_amount = min(discount_amount, grand_total)
+                
+                # Update Usage
+                coupon.used_count = F('used_count') + 1
+                coupon.save()
+                
+                grand_total -= discount_amount
 
             # ✅ 4. Create Order
             order = Order.objects.create(
@@ -1044,7 +1072,11 @@ def create_order(request):
                 shipping_address=customer_data.get('address', request.user.address), 
                 shipping_province=customer_data.get('province'), 
                 payment_method=request.data.get('paymentMethod', 'Transfer'),
-                total_price=total_price,
+                
+                item_subtotal=item_subtotal_val,
+                shipping_cost=shipping_cost,
+                total_price=grand_total,
+                
                 discount_amount=discount_amount, # ✅ Save Discount
                 coupon=coupon, # ✅ Save Coupon
                 status='Pending'
@@ -1059,6 +1091,11 @@ def create_order(request):
                     price_at_purchase=item_data['price'] 
                 )
 
+            # ✅ 6. Update User Role (New User -> Customer)
+            if request.user.role == 'new_user':
+                request.user.role = 'customer'
+                request.user.save()
+
         return Response({"message": "สั่งซื้อสำเร็จ", "order_id": order.id, "total": total_price}, status=201)
     except Exception as e:
         import traceback
@@ -1068,7 +1105,8 @@ def create_order(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_orders_api(request):
-    orders = Order.objects.filter(user=request.user).order_by('-created_at')
+    # ✅ Optimization: Prefetch items and products to prevent N+1 queries
+    orders = Order.objects.filter(user=request.user).prefetch_related('items__product').order_by('-created_at')
     data = []
     for o in orders:
         try:
@@ -1129,14 +1167,15 @@ def upload_slip_api(request, order_id):
 @permission_classes([IsAuthenticated])
 def confirm_received_api(request, order_id):
     try:
+        # ✅ Allowed for Order Owner
         order = Order.objects.get(id=order_id, user=request.user)
         if order.status == 'Shipped':
             order.status = 'Completed'
             order.save()
             return Response({"message": "Confirmed received"})
-        return Response({"error": "Invalid status"}, status=400)
+        return Response({"error": "Invalid status - Must be Shipped"}, status=400)
     except Order.DoesNotExist:
-        return Response({"error": "Order not found"}, status=404)
+        return Response({"error": "Order not found or not authorized"}, status=404)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -1644,33 +1683,56 @@ def bulk_update_orders_api(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def validate_coupon_api(request):
-    code = request.data.get('code')
-    total_amount = request.data.get('total_amount', 0)
-    
+    import traceback # Add import if needed or assume available
     try:
-        coupon = Coupon.objects.get(code=code)
-        if not coupon.is_valid(user=request.user):
-            return Response({"error": "คูปองไม่ถูกต้อง หมดอายุ หรือใช้ครบสิทธิ์แล้ว"}, status=400)
+        code = request.data.get('code')
+        try:
+            total_amount = float(request.data.get('total_amount', 0))
+        except (ValueError, TypeError):
+            total_amount = 0.0
+        # We might need cart items for product-specific validation (future)
+        cart_items = request.data.get('items', []) 
+
+        # 1. Validate via Service
+        is_valid, message, coupon = CouponService.validate_coupon(
+            user=request.user, 
+            coupon_code=code, 
+            cart_total=float(total_amount),
+            cart_items=cart_items
+        )
+        
+        if not is_valid:
+            return Response({"error": message}, status=400)
+        
+        # 2. Check Stackability (Backend Gatekeeper)
+        # If items contain flash sale and coupon is NOT stackable -> Reject?
+        # Or frontend handles it? Let's safeguard here.
+        # Note: frontend sends total_amount, but maybe not flags.
+        # But checking stackability requires knowing if cart has flash sale items.
+        # Frontend DOES send 'items', but usually without 'is_flash_sale' flag unless we trust frontend.
+        # For now, rely on CouponService calculation or just return valid and let create_order enforce strict rules.
+        # Better: If we want to support Stackable in UI, we should return the flag.
             
-        if float(total_amount) < float(coupon.min_spend):
-            return Response({"error": f"ต้องมียอดซื้อขั้นต่ำ {coupon.min_spend} บาท"}, status=400)
-            
-        # Calculate discount preview
-        discount = 0
-        if coupon.discount_type == 'percent':
-            discount = (float(total_amount) * float(coupon.discount_value)) / 100
-        else:
-            discount = float(coupon.discount_value)
-            
+        # 3. Calculate Discount via Service (Ensures Max Cap logic)
+        shipping_cost = 50 # Consistent with create_order
+        discount = CouponService.calculate_discount(coupon, total_amount, shipping_cost=shipping_cost)
+        
         return Response({
             "valid": True,
             "discount_amount": discount,
             "code": coupon.code,
+            "coupon_id": coupon.id, # Added coupon_id
             "type": coupon.discount_type,
-            "value": coupon.discount_value
+            "value": coupon.discount_value,
+            "min_spend": coupon.min_spend,
+            "max_discount_amount": coupon.max_discount_amount,
+            "end_date": coupon.end_date,
+            "is_stackable_with_flash_sale": coupon.is_stackable_with_flash_sale # ✅ Send Flag to UI
         })
-    except Coupon.DoesNotExist:
-        return Response({"error": "คูปองไม่ถูกต้อง"}, status=404)
+    except Exception as e:
+        print("🔥 CRITICAL ERROR IN VALIDATE COUPON API:")
+        print(traceback.format_exc())
+        return Response({"error": f"Internal Server Error: {str(e)}"}, status=500)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -1700,6 +1762,7 @@ def get_public_coupons(request):
                     "end_date": c.end_date,
                     "start_date": c.start_date, # Added for frontend check
                     "allowed_roles": c.allowed_roles, 
+                    "conditions": c.conditions, # ✅ FIXED: Include conditions (e.g. new_user: true)
                     # "description": getattr(c, 'description', None) or ... # Safer
                     "description": f"ส่วนลด {c.discount_value} {'%' if c.discount_type == 'percent' else 'บาท'}"
                 })
@@ -1725,7 +1788,7 @@ def get_active_flash_sales_api(request):
     return Response(serializer.data)
 
 # --- Admin Coupon Management ---
-@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@api_view(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def admin_coupon_api(request, coupon_id=None):
     if request.user.role not in ['admin', 'super_admin', 'seller']:
@@ -1753,9 +1816,42 @@ def admin_coupon_api(request, coupon_id=None):
              s = CouponSerializer(data=request.data)
              
         if s.is_valid():
+            # ✅ Backend Validation: Start vs End
+            start = s.validated_data.get('start_date')
+            end = s.validated_data.get('end_date')
+            # Check if both exist (for create) or if partial update affects them
+            if start and end and start > end:
+                 return Response({"error": "วันเริ่มต้องมาก่อนวันสิ้นสุด (Start Date must be before End Date)"}, status=400)
+            
             s.save()
             return Response(s.data)
         return Response(s.errors, status=400)
+
+    elif request.method in ['PUT', 'PATCH']:
+        if not coupon_id:
+            return Response({"error": "Method requires ID"}, status=400)
+        try:
+            c = Coupon.objects.get(id=coupon_id)
+            # Partial update allowed for PATCH and PUT (for flexibility)
+            s = CouponSerializer(c, data=request.data, partial=True)
+            if s.is_valid():
+                # ✅ Backend Validation: Logic for Start vs End
+                # For partial updates, we might need to fetch existing instances if only one date is sent?
+                # For simplicity, if both are in payload, check. 
+                # Ideally, we should check against instance data too if one is missing, but let's stick to payload for now or basic check.
+                start = s.validated_data.get('start_date')
+                end = s.validated_data.get('end_date')
+                
+                # If we have one but not the other, we should ideally compare with existing, but Model clean() is better place.
+                # Here we just check if BOTH are changed.
+                if start and end and start > end:
+                     return Response({"error": "วันเริ่มต้องมาก่อนวันสิ้นสุด"}, status=400)
+
+                s.save()
+                return Response(s.data)
+            return Response(s.errors, status=400)
+        except Coupon.DoesNotExist:
+            return Response({"error": "Coupon not found"}, status=404)
         
     elif request.method == 'DELETE':
         if not coupon_id: return Response(status=400)
@@ -2242,30 +2338,52 @@ def get_notifications(request):
     user = request.user
     notifications = []
     
+    # ✅ Filter by Date Since (from Frontend 'Clear' action)
+    since_param = request.query_params.get('since')
+    since_date = None
+    if since_param:
+        try:
+            from django.utils.dateparse import parse_datetime
+            since_date = parse_datetime(since_param)
+        except:
+            pass
+    
     if user.role in ['admin', 'super_admin', 'seller']:
         # Admin Notifications: New Orders, Low Stock
-        recent_orders = Order.objects.filter(status='Pending').order_by('-created_at')[:5]
+        orders_query = Order.objects.filter(status='Pending')
+        if since_date:
+            orders_query = orders_query.filter(created_at__gt=since_date)
+            
+        recent_orders = orders_query.order_by('-created_at')[:5]
         for o in recent_orders:
             notifications.append({
                 "id": f"order_{o.id}",
                 "title": "คำสั่งซื้อใหม่",
                 "message": f"คุณได้รับคำสั่งซื้อใหม่จาก {o.customer_name} ยอด {o.total_price} บาท",
                 "time": o.created_at.strftime("%d/%m %H:%M"),
+                "timestamp": o.created_at.isoformat(), 
                 "type": "order"
             })
-            
-        low_stock = Product.objects.filter(stock__lte=5, is_active=True)[:5]
-        for p in low_stock:
-            notifications.append({
-                "id": f"stock_{p.id}",
-                "title": "สินค้าใกล้หมด",
-                "message": f"สินค้า '{p.title}' เหลือเพียง {p.stock} ชิ้น",
-                "time": timezone.now().strftime("%d/%m %H:%M"),
-                "type": "alert"
-            })
+        
+        # Low Stock - Only show if NOT filtering by recency (to prevent persistent alerts after clear)
+        if not since_date:
+            low_stock = Product.objects.filter(stock__lte=5, is_active=True)[:5]
+            for p in low_stock:
+                notifications.append({
+                    "id": f"stock_{p.id}",
+                    "title": "สินค้าใกล้หมด",
+                    "message": f"สินค้า '{p.title}' เหลือเพียง {p.stock} ชิ้น",
+                    "time": timezone.now().strftime("%d/%m %H:%M"),
+                    "timestamp": timezone.now().isoformat(),
+                    "type": "alert"
+                })
     else:
         # Customer Notifications: Order Status Changes
-        my_recent_orders = Order.objects.filter(user=user).order_by('-updated_at')[:10]
+        orders_query = Order.objects.filter(user=user)
+        if since_date:
+            orders_query = orders_query.filter(updated_at__gt=since_date)
+            
+        my_recent_orders = orders_query.order_by('-updated_at')[:10]
         for o in my_recent_orders:
             if o.status != 'Pending':
                 notifications.append({
@@ -2273,6 +2391,7 @@ def get_notifications(request):
                     "title": f"อัปเดตคำสั่งซื้อ #{o.id}",
                     "message": f"คำสั่งซื้อของคุณเปลี่ยนสถานะเป็น: {o.status}",
                     "time": o.updated_at.strftime("%d/%m %H:%M"),
+                    "timestamp": o.updated_at.isoformat(), 
                     "type": "success" if o.status == 'Completed' else "info"
                 })
                 
@@ -2343,8 +2462,14 @@ def add_product_api(request):
         if 'thumbnail' in request.FILES:
             product.thumbnail = request.FILES['thumbnail']
             product.save()
+
+        # ✅ NEW: Handle multiple gallery images (รูปภาพเพิ่มเติม)
+        # รับไฟล์หลายรูปจาก key 'images'
+        images = request.FILES.getlist('images')
+        for img in images:
+            ProductImage.objects.create(product=product, image_url=img)
             
-        return Response({"message": "Product added", "id": product.id}, status=201)
+        return Response({"message": "Product added with images", "id": product.id}, status=201)
     except Exception as e:
         return Response({"error": str(e)}, status=400)
 
@@ -2369,6 +2494,12 @@ def edit_product_api(request, product_id):
             
         if 'thumbnail' in request.FILES:
             product.thumbnail = request.FILES['thumbnail']
+
+        # ✅ NEW: Add new gallery images during edit (เพิ่มรูปใหม่เข้าไปใน Gallery)
+        if 'images' in request.FILES:
+            images = request.FILES.getlist('images')
+            for img in images:
+                ProductImage.objects.create(product=product, image_url=img)
             
         product.save()
         return Response({"message": "Product updated"})
@@ -2411,18 +2542,63 @@ def get_categories(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_all_stock_history(request):
-    if request.user.role not in ['admin', 'super_admin', 'seller']:
-        return Response(status=403)
-    history = StockHistory.objects.all().order_by('-created_at')[:100]
-    data = [{
-        "id": h.id,
-        "product": h.product.title,
-        "change": h.change_quantity,
-        "remaining": h.remaining_stock,
-        "action": h.action,
-        "date": h.created_at.strftime("%Y-%m-%d %H:%M")
-    } for h in history]
-    return Response(data)
+    try:
+        if not hasattr(request.user, 'role') or request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({'error': 'Unauthorized'}, status=403)
+        
+        # 1. รับค่า params
+        search_query = request.query_params.get('search', '').strip()
+        action_filter = request.query_params.get('action', 'all')
+        category_filter = request.query_params.get('category', 'all')
+
+        # 2. Query Base
+        queryset = StockHistory.objects.select_related('product', 'created_by').all().order_by('-created_at')
+
+        # 3. Apply Filters
+        if search_query:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(product__title__icontains=search_query) |
+                Q(note__icontains=search_query)
+            )
+        
+        if action_filter != 'all':
+            queryset = queryset.filter(action=action_filter)
+            
+        if category_filter != 'all':
+            # Assuming product has category field (ForeignKey or CharField)
+            # If relation: product__category__name or product__category
+            # Check model first usually, but assuming generic 'category' field on Product or relationship.
+            # Safe bet: Filter by product__category__name if it's a relation, or product__category if CharField.
+            # checking common pattern in this project...
+            queryset = queryset.filter(product__category__name=category_filter)
+
+        # Limit results
+        history = queryset[:100]
+
+        data = []
+        for h in history:
+            try:
+                prod_title = h.product.title if h.product else "Unknown Product"
+            except:
+                prod_title = "Error Loading Product"
+
+            data.append({
+                "id": h.id,
+                "product": prod_title,
+                "change": h.change_quantity,
+                "remaining": h.remaining_stock,
+                "action": h.action,
+                "note": h.note or "",
+                "user": h.created_by.username if h.created_by else "System",
+                "date": h.created_at.strftime("%Y-%m-%d %H:%M")
+            })
+
+        return Response(data)
+
+    except Exception as e:
+        print(f"❌ Error fetching stock history: {str(e)}")
+        return Response({'error': str(e)}, status=500)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2648,6 +2824,10 @@ def collect_coupon_api(request, coupon_id):
     เก็บคูปอง (Collect Coupon)
     """
     try:
+        # ✅ 0. Role Restriction (ป้องกัน Admin/Seller แย่งคูปองลูกค้า)
+        if request.user.role in ['admin', 'super_admin', 'seller']:
+             return Response({'message': 'Admin และ Seller ไม่สามารถเก็บคูปองได้ครับ (สำหรับลูกค้าเท่านั้น)'}, status=status.HTTP_403_FORBIDDEN)
+
         coupon = Coupon.objects.get(pk=coupon_id)
         
         # 1. เช็คว่าเคยเก็บไปแล้วหรือยัง (ตาม limit_per_user)

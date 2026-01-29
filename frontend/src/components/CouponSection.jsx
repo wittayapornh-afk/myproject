@@ -120,7 +120,7 @@ const CouponSection = () => {
     if (loading) return null; // ถ้ายังโหลด ไม่แสดงอะไร
     if (coupons.length === 0) return null; // ถ้าไม่มีคูปอง ไม่แสดง Section นี้
 
-    const visibleCoupons = coupons; // คูปองทั้งหมด (อาจจะกรองเพิ่มได้)
+    const visibleCoupons = coupons.filter(c => !collectedIds.has(c.id));
 
     // ========================================
     // 🎨 Render UI
@@ -193,33 +193,60 @@ const CouponSection = () => {
                         ======================================== */}
                     {visibleCoupons.map((coupon) => (
                         <SwiperSlide key={coupon.id} className="h-auto">
-                            <div className="flex flex-col h-full rounded-2xl overflow-hidden shadow-sm bg-white border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative group">
+                            <div className={`flex flex-col h-full rounded-2xl overflow-hidden shadow-sm bg-white transition-all duration-300 relative group hover:-translate-y-1 hover:shadow-xl ${
+                                coupon.discount_type === 'free_shipping' 
+                                ? 'border-2 border-emerald-200 shadow-emerald-100/50'
+                                : coupon.discount_type === 'percent'
+                                    ? 'border border-purple-100'
+                                    : 'border border-blue-100'
+                            }`}>
                                 
-                                {/* ========================================
-                                    💙 ส่วนบน: แถบสีน้ำเงิน (Gradient)
-                                    ======================================== */}
-                                <div className="h-24 bg-gradient-to-r from-blue-600 to-indigo-600 relative overflow-hidden p-4 flex items-center justify-between">
-                                    {/* ลาย Pattern พื้นหลัง */}
-                                    <div className="absolute inset-0 opacity-10">
-                                         <svg width="100%" height="100%">
-                                            <pattern id="pattern-circles" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-                                                <circle cx="10" cy="10" r="2" fill="white" />
-                                            </pattern>
-                                            <rect x="0" y="0" width="100%" height="100%" fill="url(#pattern-circles)" />
-                                        </svg>
-                                    </div>
-                                    
-                                    {/* ข้อความ: ส่วนลด */}
-                                    <div className="relative z-10 text-white">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-0.5">Voucher</p>
-                                        <h3 className="font-black text-2xl tracking-tighter shadow-black/10 drop-shadow-md">
-                                            {/* แสดงส่วนลดตามประเภท: % หรือ ฿ */}
-                                            {coupon.discount_type === 'percent' 
-                                                ? `${Number(coupon.discount_value)}%` 
-                                                : `฿${Number(coupon.discount_value)}`
-                                            }
-                                        </h3>
-                                    </div>
+                                    {/* 🎨 ส่วนบน: แถบสีตามประเภท */}
+                                    <div className={`h-28 relative overflow-hidden p-4 flex items-center justify-between ${
+                                        coupon.discount_type === 'free_shipping' 
+                                        ? 'bg-gradient-to-r from-emerald-500 to-green-600' // Green for Free Shipping
+                                        : coupon.discount_type === 'percent'
+                                            ? 'bg-gradient-to-r from-purple-500 to-indigo-600' // Purple for Percent
+                                            : 'bg-gradient-to-r from-blue-500 to-cyan-500' // Blue for Fixed
+                                    }`}>
+                                        {/* ลาย Pattern พื้นหลัง */}
+                                        <div className="absolute inset-0 opacity-10">
+                                             <svg width="100%" height="100%">
+                                                <pattern id="pattern-circles" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                                                    <circle cx="10" cy="10" r="2" fill="white" />
+                                                </pattern>
+                                                <rect x="0" y="0" width="100%" height="100%" fill="url(#pattern-circles)" />
+                                            </svg>
+                                        </div>
+                                        
+                                        {/* ข้อความ: ส่วนลด */}
+                                        <div className="relative z-10 text-white">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-0.5">
+                                                {coupon.discount_type === 'free_shipping' ? 'Special Deal' : 'Voucher'}
+                                            </p>
+                                            <h3 className="font-black text-2xl tracking-tighter shadow-black/10 drop-shadow-md">
+                                                {/* แสดงส่วนลดตามประเภท: % หรือ ฿ หรือ ส่งฟรี */}
+                                                {coupon.discount_type === 'free_shipping' ? (
+                                                    <div className="flex flex-col leading-none">
+                                                        <span className="text-3xl">ส่งฟรี</span>
+                                                        <span className="text-[10px] opacity-90 font-bold tracking-widest uppercase mt-1">Free Shipping</span>
+                                                    </div>
+                                                ) : (
+                                                    coupon.discount_type === 'percent' 
+                                                        ? (
+                                                            <div className="flex flex-col items-start leading-tight">
+                                                                <span>{Number(coupon.discount_value)}%</span>
+                                                                {coupon.max_discount_amount && (
+                                                                    <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded backdrop-blur-md font-bold border border-white/10 mt-1">
+                                                                        max ฿{Number(coupon.max_discount_amount).toLocaleString()}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                        : `฿${Number(coupon.discount_value)}`
+                                                )}
+                                            </h3>
+                                        </div>
 
                                     {/* ไอคอนของขวัญ */}
                                     <div className="relative z-10 bg-white/20 p-2.5 rounded-full backdrop-blur-sm border border-white/10 shadow-inner">
@@ -239,12 +266,16 @@ const CouponSection = () => {
                                         {/* 🏷️ Badge: ประเภทคูปอง */}
                                         <div className="flex items-center gap-2 mb-3">
                                              {coupon.discount_type === 'free_shipping' ? (
-                                                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-green-50 text-green-700 border border-green-100">
+                                                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
                                                     <Truck size={10} /> ส่งฟรี
+                                                </span>
+                                            ) : coupon.discount_type === 'percent' ? (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100">
+                                                    ส่วนลด %
                                                 </span>
                                             ) : (
                                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                                                    ส่วนลด
+                                                    ส่วนลดบาท
                                                 </span>
                                             )}
                                         </div>
@@ -256,12 +287,16 @@ const CouponSection = () => {
 
                                         {/* 👥 Role Badges: ใครใช้ได้บ้าง */}
                                         <div className="flex flex-wrap gap-1.5 mb-4">
-                                            {coupon.allowed_roles && coupon.allowed_roles.map(role => (
+                                            {coupon.conditions?.new_user ? (
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-700 font-bold uppercase border border-pink-100">
+                                                    New User
+                                                </span>
+                                            ) : coupon.allowed_roles && coupon.allowed_roles.map(role => (
                                                 <span key={role} className="text-[9px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-600 font-bold uppercase border border-gray-200">
                                                     {role === 'new_user' ? 'New User' : role === 'customer' ? 'Member' : role}
                                                 </span>
                                             ))}
-                                             {(!coupon.allowed_roles || coupon.allowed_roles.length === 0) && (
+                                             {(!coupon.conditions?.new_user && (!coupon.allowed_roles || coupon.allowed_roles.length === 0)) && (
                                                 <span className="text-[9px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 font-bold uppercase border border-gray-200">
                                                     All Users
                                                 </span>
@@ -281,8 +316,8 @@ const CouponSection = () => {
                                             </span>
                                         </div>
 
-                                        {/* 🔐 ซ่อนปุ่มถ้าเป็น Admin/Superuser */}
-                                        {(!user || (!user.is_superuser && user?.role !== 'admin')) && (
+                                        {/* 🔐 ซ่อนปุ่มถ้าเป็น Admin/Superuser/Seller */}
+                                        {(!user || !['admin', 'super_admin', 'seller'].includes(user?.role)) && (
                                             <button 
                                                 onClick={() => {
                                                     // ✅ เช็คเงื่อนไข: เริ่มแล้ว + ยังไม่เก็บ
