@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: db:3306
--- Generation Time: Jan 29, 2026 at 02:09 AM
+-- Generation Time: Jan 29, 2026 at 02:00 AM
 -- Server version: 8.0.44
 -- PHP Version: 8.3.26
 
@@ -473,7 +473,7 @@ INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES
 (23, 'sessions', '0001_initial', '2025-12-25 02:48:50.982125'),
 (24, 'myapp', '0002_alter_review_options_alter_orderitem_product_and_more', '2025-12-29 16:29:34.437094'),
 (25, 'myapp', '0003_review_reply_comment_review_reply_timestamp', '2025-12-30 03:38:16.452884'),
-(26, 'myapp', '0004_product_admin', '2025-12-30 08:42:55.888267'),
+(26, 'myapp', '0004_product_seller', '2025-12-30 08:42:55.888267'),
 (27, 'myapp', '0005_order_payment_date_order_slip_image', '2026-01-05 02:40:57.461521'),
 (28, 'myapp', '0006_order_bank_name_order_transfer_amount_and_more', '2026-01-05 02:58:57.761280'),
 (29, 'myapp', '0007_order_transfer_account_number', '2026-01-05 04:00:59.718953'),
@@ -643,7 +643,7 @@ CREATE TABLE `myapp_review` (
   `user_id` bigint NOT NULL,
   `reply_comment` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `reply_timestamp` datetime(6) DEFAULT NULL,
-  `image` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `image` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -685,7 +685,7 @@ CREATE TABLE `orders` (
   `transfer_amount` decimal(12,2) DEFAULT NULL,
   `transfer_date` datetime(6) DEFAULT NULL,
   `transfer_account_number` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `shipping_province` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `shipping_province` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `discount_amount` decimal(10,2) NOT NULL,
   `coupon_id` bigint DEFAULT NULL,
   `dummyy` int DEFAULT NULL,
@@ -885,9 +885,9 @@ CREATE TABLE `products` (
   `is_active` tinyint(1) NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `updated_at` datetime(6) DEFAULT NULL,
-  `admin_id` bigint DEFAULT NULL,
+  `seller_id` bigint DEFAULT NULL,
   `original_price` decimal(10,2) DEFAULT NULL,
-  `sku` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sku` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `weight` decimal(10,2) DEFAULT NULL,
   `width` decimal(10,2) DEFAULT NULL,
   `height` decimal(10,2) DEFAULT NULL,
@@ -898,7 +898,7 @@ CREATE TABLE `products` (
 -- Dumping data for table `products`
 --
 
-INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `admin_id`, `original_price`, `sku`, `weight`, `width`, `height`, `depth`) VALUES
+INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `seller_id`, `original_price`, `sku`, `weight`, `width`, `height`, `depth`) VALUES
 (1, 'Essence Mascara Lash Princess', 'The Essence Mascara Lash Princess is a popular mascara known for its volumizing and lengthening effects. Achieve dramatic lashes with this long-lasting and cruelty-free formula.', 2, 9.99, 98, 'Essence', 'products/thumb_1.jpg', 2.56, 1, '2025-12-11 03:22:24.142868', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (2, 'Eyeshadow Palette with Mirror', 'The Eyeshadow Palette with Mirror offers a versatile range of eyeshadow shades for creating stunning eye looks. With a built-in mirror, it\'s convenient for on-the-go makeup application.', 2, 19.99, 34, 'Glamour Beauty', 'products/thumb_2.jpg', 2.86, 1, '2025-12-11 03:22:25.898452', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (3, 'Powder Canister', 'The Powder Canister is a finely milled setting powder designed to set makeup and control shine. With a lightweight and translucent formula, it provides a smooth and matte finish.', 2, 14.99, 88, 'Velvet Touch', 'products/thumb_3.jpg', 4.64, 1, '2025-12-11 03:22:27.331094', '2026-01-15 08:41:19.110830', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
@@ -1041,7 +1041,7 @@ INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `s
 (140, 'Basketball', 'The Basketball is a standard ball used in basketball games. It is designed for dribbling, shooting, and passing in the game of basketball, suitable for both indoor and outdoor play.', 29, 14.99, 75, 'Unknown', 'products/thumb_140_ZMh3w77.jpg', 4.66, 1, '2025-12-11 03:27:23.750703', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (141, 'Basketball Rim', 'The Basketball Rim is a sturdy hoop and net assembly mounted on a basketball backboard. It provides a target for shooting and scoring in the game of basketball.', 29, 39.99, 43, 'Unknown', 'products/thumb_141_9d5MUiT.jpg', 4.60, 1, '2025-12-11 03:27:25.406556', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (142, 'Cricket Ball', 'The Cricket Ball is a hard leather ball used in the sport of cricket. It is bowled and batted in the game, and its hardness and seam contribute to the dynamics of cricket play.', 29, 12.99, 30, 'Unknown', 'products/thumb_142_pt9l8NY.jpg', 3.53, 1, '2025-12-11 03:27:27.253468', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `admin_id`, `original_price`, `sku`, `weight`, `width`, `height`, `depth`) VALUES
+INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `seller_id`, `original_price`, `sku`, `weight`, `width`, `height`, `depth`) VALUES
 (143, 'Cricket Bat', 'The Cricket Bat is an essential piece of cricket equipment used by batsmen to hit the cricket ball. It is made of wood and comes in various sizes and designs.', 29, 29.99, 98, 'Unknown', 'products/thumb_143_sElCyxe.jpg', 3.17, 1, '2025-12-11 03:27:28.895604', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (144, 'Cricket Helmet', 'The Cricket Helmet is a protective headgear worn by cricket players, especially batsmen and wicketkeepers. It provides protection against fast bowling and bouncers.', 29, 44.99, 10, 'Unknown', 'products/thumb_144_YHgmE3j.jpg', 4.69, 1, '2025-12-11 03:27:30.536336', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (145, 'Cricket Wicket', 'The Cricket Wicket is a set of three stumps and two bails, forming a wicket used in the sport of cricket. Batsmen aim to protect the wicket while scoring runs.', 29, 29.99, 25, 'Unknown', 'products/thumb_145_lncHFW8.jpg', 4.73, 1, '2025-12-11 03:27:35.502952', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
@@ -1729,7 +1729,7 @@ CREATE TABLE `users` (
   `phone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `address` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `image` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `role` enum('admin','customer','new_user') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'new_user',
+  `role` enum('admin','seller','customer','new_user') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'new_user',
   `is_active` tinyint(1) NOT NULL,
   `date_joined` datetime(6) NOT NULL,
   `last_login` datetime(6) DEFAULT NULL,
@@ -1743,7 +1743,7 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `password`, `username`, `first_name`, `last_name`, `email`, `phone`, `address`, `image`, `role`, `is_active`, `date_joined`, `last_login`, `updated_at`) VALUES
 (1, 'pbkdf2_sha256$1000000$fO3zWGz0f5pSLK2auUroml$by0ySIFOjYjoBbaSqp7IKJho2Vnl0XdQZBJHoMQslw4=', 'admin', '', '', 'admin@gmail.com', '0999999998', 'แยกอุทยานสวรรค์, ถนนพหลโยธิน, นครสวรรค์, เทศบาลนครสวรรค์, อำเภอเมืองนครสวรรค์, จังหวัดนครสวรรค์, 60000, ประเทศไทย', 'avatars/Lego_Man.jpg', 'admin', 1, '2025-12-25 03:07:04.491326', '2026-01-27 01:45:48.413141', '2026-01-22 08:38:01.858220'),
 (2, 'pbkdf2_sha256$1000000$0wLYOu6zZXeKMcuZlaS24v$fNRMdKtF8aGrKu56EIxLGzZOoGBV60Hc/S4UyY1gWFU=', 'sa2020', 'sa', 'ds', 'sa2020@gmail.com', '02485', 'ถนนราชดำเนินกลาง, ชุมชนหลังวัดราชนัดดา, แขวงบวรนิเวศ, เขตพระนคร, กรุงเทพมหานคร, 10200, ประเทศไทย', 'avatars/Batman_NFT.jpg', 'customer', 1, '2025-12-25 05:33:35.993405', NULL, '2026-01-12 07:59:49.384657'),
-(3, 'pbkdf2_sha256$1000000$6xg06C3UThCuI9SYVTN0xK$KyULSKLa4XLWWAtXLZx7Usn5VVE5/I18lYPVp+vYeew=', 'seller', 'ss', 'dd', 'sa1234@gmail.com', '0987456123', 'ada', 'avatars/download.jpg', 'admin', 1, '2025-12-25 09:41:01.290523', NULL, '2026-01-05 02:17:18.204498'),
+(3, 'pbkdf2_sha256$1000000$6xg06C3UThCuI9SYVTN0xK$KyULSKLa4XLWWAtXLZx7Usn5VVE5/I18lYPVp+vYeew=', 'seller', 'ss', 'dd', 'sa1234@gmail.com', '0987456123', 'ada', 'avatars/download.jpg', 'seller', 1, '2025-12-25 09:41:01.290523', NULL, '2026-01-05 02:17:18.204498'),
 (5, 'pbkdf2_sha256$1000000$qGolOCyTkQ8YyaB0HmzI5Q$PT1E3OhCgdx7hqZ1vz9h8KDH0uhA1yiw3qkY9ug6EVQ=', 'sa2234', 'sa', '2234', 'sa2234@gmail.com', '08795464', NULL, '', 'new_user', 1, '2025-12-31 02:24:55.684430', NULL, '2025-12-31 02:24:55.958814'),
 (8, 'pbkdf2_sha256$1000000$4tK2Xd9ZNQGIdmBcCFNCWj$f17sC5mmqQcCDWz4SVOAUiH3kG9M0DTxXDwCTn2y5Zk=', 'admin_check', '', '', 'admin@check.com', '', '', '', 'admin', 1, '2026-01-06 09:26:27.787205', NULL, '2026-01-13 09:10:30.445664'),
 (9, 'pbkdf2_sha256$1000000$9L3B6QQUHp3kLdLxTAFbsg$3985t5AVIBa0V71Sa72b6sZgLYzQeAgGmE49IornFGA=', 'a', 'd', 'a', 'sa2779@gmail.com', '0123456789', 'ถนนราชดำเนินกลาง, ชุมชนหลังวัดราชนัดดา, แขวงบวรนิเวศ, เขตพระนคร, กรุงเทพมหานคร, 10200, ประเทศไทย', 'avatars/4f2ed4b8-d693-45c4-85c6-3f614f82f3c0.jpg', 'customer', 1, '2026-01-12 04:13:24.996043', NULL, '2026-01-27 09:13:20.726468'),
@@ -1947,7 +1947,7 @@ ALTER TABLE `order_items`
 ALTER TABLE `products`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `sku` (`sku`),
-  ADD KEY `products_admin_id_76e92f9e_fk_users_id` (`admin_id`),
+  ADD KEY `products_seller_id_76e92f9e_fk_users_id` (`seller_id`),
   ADD KEY `fk_products_category` (`category_id`);
 
 --

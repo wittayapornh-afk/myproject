@@ -74,8 +74,6 @@ export default function UserListAdmin() {
     // 1. Role Filter
     if (filterRole === 'admin') {
       if (user.role !== 'admin') return false;
-    } else if (filterRole === 'seller') {
-      if (user.role !== 'seller') return false;
     } else if (filterRole === 'customer') {
       if (user.role !== 'customer') return false;
     } else if (filterRole === 'new_user') {
@@ -240,7 +238,7 @@ export default function UserListAdmin() {
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-center">
         {/* Tabs */}
         <div className="flex bg-gray-100 p-1 rounded-2xl w-full md:w-auto overflow-x-auto">
-          {['ทั้งหมด', 'admin', 'seller', 'customer', 'new_user'].map(role => (
+          {['ทั้งหมด', 'admin', 'customer', 'new_user'].map(role => (
             <button
               key={role}
               onClick={() => { setFilterRole(role); setCurrentPage(1); }}
@@ -251,8 +249,7 @@ export default function UserListAdmin() {
             >
               {role === 'ทั้งหมด' ? 'ทั้งหมด' :
                 role === 'admin' ? 'ผู้ดูแลระบบ' :
-                  role === 'seller' ? 'ผู้ขาย' :
-                    role === 'customer' ? 'ลูกค้า' : 'สมาชิกใหม่'}
+                  role === 'customer' ? 'ลูกค้า' : 'สมาชิกใหม่'}
             </button>
           ))}
         </div>
@@ -311,13 +308,13 @@ export default function UserListAdmin() {
                     </td>
                     <td className="p-5">
                       <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${user.role === 'admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                        user.role === 'seller' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                          'bg-gray-100 text-gray-600 border-gray-200'
+                        user.role === 'customer' ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                          user.role === 'new_user' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                            'bg-gray-100 text-gray-600 border-gray-200'
                         }`}>
                         {user.role === 'admin' ? 'ผู้ดูแลระบบ' :
-                          user.role === 'seller' ? 'ผู้ขาย' :
-                            user.role === 'customer' ? 'ลูกค้าทั่วไป' :
-                              user.role === 'new_user' ? 'สมาชิกใหม่' : 'ลูกค้าทั่วไป'}
+                          user.role === 'customer' ? 'ลูกค้าทั่วไป' :
+                            user.role === 'new_user' ? 'สมาชิกใหม่' : 'ลูกค้าทั่วไป'}
                       </span>
                     </td>
                     <td className="p-5 text-center">
@@ -413,7 +410,6 @@ export default function UserListAdmin() {
                     <select name="role" onChange={handleInputChange} value={formData.role} className="input-field-custom cursor-pointer appearance-none bg-white">
                       <option value="new_user">สมาชิกใหม่ (New User)</option>
                       <option value="customer">ลูกค้าทั่วไป (Customer)</option>
-                      <option value="seller">ผู้ขาย (Seller)</option>
                       <option value="admin">ผู้ดูแลระบบ (Admin)</option>
                     </select>
                   </div>
