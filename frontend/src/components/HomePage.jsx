@@ -16,6 +16,8 @@ import { formatPrice, getImageUrl } from '../utils/formatUtils';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext'; // ✅ Import Auth
+import ProductBadge from './ProductBadge';
+
 
 
 const HomePage = () => {
@@ -197,8 +199,10 @@ const HomePage = () => {
 
     return (
         <div className="min-h-screen bg-[#F9F9F7] pb-20">
-            {/* Hero Section */}
-            <HeroBanner />
+            {/* 🍌 Top Section: Hero */}
+            <div className="bg-white shadow-sm border-b border-gray-200 relative z-20">
+                <HeroBanner />
+            </div>
 
             {/* Flash Sale Section - Login Required - Render All Active Sales */}
             {user ? (
@@ -326,11 +330,17 @@ const HomePage = () => {
                         return (
                             <Link key={product.id} to={`/product/${product.id}`} className="group bg-white rounded-[2rem] p-4 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100/50">
                                 <div className="aspect-[1/1] bg-[#F5F5F3] rounded-[1.5rem] mb-4 overflow-hidden relative">
-                                    {product.stock <= 0 && (
-                                        <span className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-md z-10">OUT OF STOCK</span>
+                                    {product.stock <= 0 ? (
+                                        <span className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-md z-30">OUT OF STOCK</span>
+                                    ) : (
+                                        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-20">
+                                            {product.tags && product.tags.map(tag => (
+                                                <ProductBadge key={tag.id} tag={tag} />
+                                            ))}
+                                        </div>
                                     )}
                                     {flashPrice && (
-                                        <div className="absolute top-3 right-3 bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-md z-10 animate-pulse shadow-sm">
+                                        <div className="absolute top-3 right-3 bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-md z-30 animate-pulse shadow-sm">
                                             ⚡ FLASH SALE
                                         </div>
                                     )}

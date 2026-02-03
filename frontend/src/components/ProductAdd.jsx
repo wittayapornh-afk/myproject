@@ -11,6 +11,8 @@ function ProductAdd() {
   // State
   const [formData, setFormData] = useState({});
   const [categories, setCategories] = useState([]); // ✅ State สำหรับเก็บหมวดหมู่
+  const [tags, setTags] = useState([]); // ✅ State สำหรับเก็บ Tags ทั้งหมด
+  const [selectedTags, setSelectedTags] = useState([]); // ✅ Tags ที่เลือก
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [galleryFiles, setGalleryFiles] = useState([]); 
   const [previewImage, setPreviewImage] = useState(null);
@@ -40,6 +42,20 @@ function ProductAdd() {
       }
     };
     fetchCategories();
+  }, []);
+
+  // 3. ดึงข้อมูล Tags
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/tags/');
+        const data = await response.json();
+        setTags(data);
+      } catch (error) {
+        console.error("Error fetching tags:", error);
+      }
+    };
+    fetchTags();
   }, []);
 
   // Handlers
@@ -94,6 +110,25 @@ function ProductAdd() {
         });
 
         if (response.ok) {
+            const result = await response.json();
+            const productId = result.id || result.product_id;
+            
+            // ✅ กำหนด Tags ให้สินค้า (ถ้ามีการเลือก Tags)
+            if (selectedTags.length > 0 && productId) {
+                try {
+                    await fetch(`http://localhost:8000/api/products/${productId}/tags/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Token ${token}`
+                        },
+                        body: JSON.stringify({ tag_ids: selectedTags })
+                    });
+                } catch (tagError) {
+                    console.error('Error assigning tags:', tagError);
+                }
+            }
+            
             Swal.fire('Success', 'เพิ่มสินค้าเรียบร้อย!', 'success').then(() => navigate('/admin/dashboard?tab=products'));
         } else {
             const errData = await response.json();
@@ -179,6 +214,43 @@ function ProductAdd() {
                             })}
                         </select>
                     </div>
+                </div>
+
+                {/* 🏷️ Tags Selector */}
+                <div>
+                    <label className={styles.label}>🏷️ Tags (เลือกได้หลายอัน)</label>
+                    <div className="flex flex-wrap gap-2 p-4 bg-gray-50 rounded-2xl border border-gray-200 min-h-[4rem]">
+                        {tags.length === 0 ? (
+                            <span className="text-gray-400 text-sm">กำลังโหลด Tags...</span>
+                        ) : tags.map((tag) => {
+                            const isSelected = selectedTags.includes(tag.id);
+                            return (
+                                <button
+                                    key={tag.id}
+                                    type="button"
+                                    onClick={() => {
+                                        if (isSelected) {
+                                            setSelectedTags(selectedTags.filter(id => id !== tag.id));
+                                        } else {
+                                            setSelectedTags([...selectedTags, tag.id]);
+                                        }
+                                    }}
+                                    className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                                        isSelected
+                                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
+                                            : 'bg-white text-gray-600 border border-gray-200 hover:border-purple-400'
+                                    }`}
+                                >
+                                    #{tag.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {selectedTags.length > 0 && (
+                        <p className="text-xs text-gray-500 mt-2 ml-1">
+                            เลือกแล้ว: {selectedTags.length} Tags
+                        </p>
+                    )}
                 </div>
 
                 {/* รายละเอียด */}

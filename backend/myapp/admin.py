@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Product, ProductImage, Order, OrderItem, Review, AdminLog, FlashSale, FlashSaleCampaign
+from .models import User, Product, ProductImage, Order, OrderItem, Review, AdminLog, FlashSale, FlashSaleCampaign, MegaMenuConfig
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -84,11 +84,16 @@ class FlashSaleAdmin(admin.ModelAdmin):
         }),
     )
 
+class MegaMenuConfigAdmin(admin.ModelAdmin):
+    list_display = ['category', 'promo_text', 'is_featured']
+    search_fields = ['category__name', 'promo_text']
+
 # Register updated models
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Product, ProductAdmin)
 admin.site.register(Order, OrderAdmin)
 admin.site.register(Review)
 admin.site.register(AdminLog)
-admin.site.register(FlashSaleCampaign, FlashSaleCampaignAdmin)  # ✅ New
-admin.site.register(FlashSale, FlashSaleAdmin)  # ✅ New
+admin.site.register(FlashSaleCampaign, FlashSaleCampaignAdmin)
+admin.site.register(FlashSale, FlashSaleAdmin)
+admin.site.register(MegaMenuConfig, MegaMenuConfigAdmin)

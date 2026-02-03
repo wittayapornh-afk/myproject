@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: db:3306
--- Generation Time: Jan 29, 2026 at 02:09 AM
+-- Generation Time: Feb 03, 2026 at 02:33 AM
 -- Server version: 8.0.44
 -- PHP Version: 8.3.26
 
@@ -259,7 +259,11 @@ INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALU
 (97, 'Can add flash sale campaign', 25, 'add_flashsalecampaign'),
 (98, 'Can change flash sale campaign', 25, 'change_flashsalecampaign'),
 (99, 'Can delete flash sale campaign', 25, 'delete_flashsalecampaign'),
-(100, 'Can view flash sale campaign', 25, 'view_flashsalecampaign');
+(100, 'Can view flash sale campaign', 25, 'view_flashsalecampaign'),
+(101, 'Can add Mega Menu Configuration', 26, 'add_megamenuconfig'),
+(102, 'Can change Mega Menu Configuration', 26, 'change_megamenuconfig'),
+(103, 'Can delete Mega Menu Configuration', 26, 'delete_megamenuconfig'),
+(104, 'Can view Mega Menu Configuration', 26, 'view_megamenuconfig');
 
 -- --------------------------------------------------------
 
@@ -368,7 +372,8 @@ INSERT INTO `coupons` (`id`, `code`, `discount_type`, `discount_value`, `min_spe
 (9, '545554', 'percent', 10.00, 100.00, 20, 2, '2026-01-27 09:38:55.000000', '2026-01-29 09:38:55.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
 (10, 'CODE', 'free_shipping', 0.00, 100.00, 1, 0, '2026-01-27 02:17:58.000000', '2026-01-28 02:17:58.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
 (11, '350Z', 'fixed', 120.00, 50.00, 100, 0, '2026-01-28 06:20:53.341000', '2026-01-28 08:19:54.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
-(12, 'CODE12345678999', 'percent', 50.00, 600.00, 1, 1, '2026-01-28 09:45:10.212000', '2026-02-04 09:45:10.000000', 1, '[]', 1, '{\"new_user\": true}', '', 1, 0, 1, 0, 200.00, '', 0, '[]', '[]', 1000000);
+(12, 'CODE12345678999', 'percent', 50.00, 600.00, 1, 1, '2026-01-28 09:45:10.212000', '2026-02-04 09:45:10.000000', 1, '[]', 1, '{\"new_user\": true}', '', 1, 0, 1, 0, 200.00, '', 0, '[]', '[]', 1000000),
+(14, 'QWEQEQEQWEQWEQE', 'free_shipping', 0.00, 0.00, 100, 0, '2026-01-31 01:40:10.546000', '2026-02-07 01:40:10.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000);
 
 -- --------------------------------------------------------
 
@@ -416,6 +421,7 @@ INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES
 (19, 'myapp', 'flashsale'),
 (25, 'myapp', 'flashsalecampaign'),
 (20, 'myapp', 'flashsaleproduct'),
+(26, 'myapp', 'megamenuconfig'),
 (11, 'myapp', 'order'),
 (12, 'myapp', 'orderitem'),
 (8, 'myapp', 'product'),
@@ -462,41 +468,44 @@ INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES
 (12, 'auth', '0010_alter_group_name_max_length', '2025-12-25 02:48:50.060214'),
 (13, 'auth', '0011_update_proxy_permissions', '2025-12-25 02:48:50.066222'),
 (14, 'auth', '0012_alter_user_first_name_max_length', '2025-12-25 02:48:50.070439'),
-(15, 'myapp', '0001_initial', '2025-12-25 02:48:50.714704'),
-(16, 'admin', '0001_initial', '2025-12-25 02:48:50.830300'),
-(17, 'admin', '0002_logentry_remove_auto_add', '2025-12-25 02:48:50.837399'),
-(18, 'admin', '0003_logentry_add_action_flag_choices', '2025-12-25 02:48:50.844604'),
-(19, 'authtoken', '0001_initial', '2025-12-25 02:48:50.918308'),
-(20, 'authtoken', '0002_auto_20160226_1747', '2025-12-25 02:48:50.938670'),
-(21, 'authtoken', '0003_tokenproxy', '2025-12-25 02:48:50.941702'),
-(22, 'authtoken', '0004_alter_tokenproxy_options', '2025-12-25 02:48:50.948156'),
 (23, 'sessions', '0001_initial', '2025-12-25 02:48:50.982125'),
-(24, 'myapp', '0002_alter_review_options_alter_orderitem_product_and_more', '2025-12-29 16:29:34.437094'),
-(25, 'myapp', '0003_review_reply_comment_review_reply_timestamp', '2025-12-30 03:38:16.452884'),
-(26, 'myapp', '0004_product_admin', '2025-12-30 08:42:55.888267'),
-(27, 'myapp', '0005_order_payment_date_order_slip_image', '2026-01-05 02:40:57.461521'),
-(28, 'myapp', '0006_order_bank_name_order_transfer_amount_and_more', '2026-01-05 02:58:57.761280'),
-(29, 'myapp', '0007_order_transfer_account_number', '2026-01-05 04:00:59.718953'),
-(30, 'myapp', '0008_stockhistory', '2026-01-05 09:31:52.731333'),
-(31, 'myapp', '0009_product_original_price', '2026-01-06 05:02:42.862529'),
-(32, 'myapp', '0010_category_alter_stockhistory_action_and_more', '2026-01-09 04:36:41.000000'),
-(33, 'myapp', '0011_tag_product_depth_product_height_product_sku_and_more', '2026-01-09 04:36:41.000000'),
-(34, 'myapp', '0012_order_shipping_province', '2026-01-09 04:37:56.393785'),
-(35, 'myapp', '0012_order_shipping_province', '2026-01-09 04:38:47.000000'),
-(37, 'myapp', '0013_coupon_order_discount_amount_order_coupon', '2026-01-14 01:54:29.299092'),
-(38, 'myapp', '0014_flashsale_coupon_max_use_per_user_flashsaleproduct', '2026-01-14 03:09:29.101216'),
-(39, 'myapp', '0015_coupon_allowed_roles_alter_product_title', '2026-01-16 02:26:56.279483'),
-(40, 'myapp', '0016_flashsale_description', '2026-01-16 07:30:50.704241'),
-(41, 'myapp', '0017_review_image_alter_coupon_discount_type', '2026-01-19 09:10:12.352124'),
-(42, 'myapp', '0018_stockreservation_usercoupon_and_more', '2026-01-19 09:51:25.961217'),
-(43, 'myapp', '0019_promotionschedule_promousagelog_alter_coupon_options_and_more', '2026-01-20 09:15:09.819883'),
-(44, 'myapp', '0020_flashsale_auto_disable_on_end_and_more', '2026-01-21 03:22:47.331483'),
-(45, 'myapp', '0021_add_flash_sale_campaign', '2026-01-22 02:46:07.024907'),
-(46, 'myapp', '0022_fix_flashsalecampaign_id_autoincrement', '2026-01-22 03:08:08.267155'),
-(47, 'myapp', '0023_fix_flashsalecampaign_auto_increment_raw_sql', '2026-01-28 05:15:57.132467'),
-(48, 'myapp', '0024_fix_auto_increment_only', '2026-01-28 05:15:57.163645'),
-(49, 'myapp', '0025_fix_order_auto_increment', '2026-01-28 06:17:11.828173'),
-(50, 'myapp', '0026_alter_flashsalecampaign_id', '2026-01-28 06:17:11.843556');
+(51, 'myapp', '0001_initial', '2026-02-02 07:30:29.021569'),
+(52, 'myapp', '0002_alter_review_options_alter_orderitem_product_and_more', '2026-02-02 07:30:29.027966'),
+(53, 'myapp', '0003_review_reply_comment_review_reply_timestamp', '2026-02-02 07:30:29.034549'),
+(54, 'myapp', '0004_product_seller', '2026-02-02 07:30:29.044557'),
+(55, 'myapp', '0005_order_payment_date_order_slip_image', '2026-02-02 07:30:29.054925'),
+(56, 'myapp', '0006_order_bank_name_order_transfer_amount_and_more', '2026-02-02 07:30:29.064972'),
+(57, 'myapp', '0007_order_transfer_account_number', '2026-02-02 07:30:29.073710'),
+(58, 'myapp', '0008_stockhistory', '2026-02-02 07:30:29.081607'),
+(59, 'myapp', '0009_product_original_price', '2026-02-02 07:30:29.089505'),
+(60, 'myapp', '0010_category_alter_stockhistory_action_and_more', '2026-02-02 07:30:29.096357'),
+(61, 'myapp', '0011_tag_product_depth_product_height_product_sku_and_more', '2026-02-02 07:30:29.102669'),
+(62, 'myapp', '0012_order_shipping_province', '2026-02-02 07:30:29.109067'),
+(63, 'myapp', '0013_coupon_order_discount_amount_order_coupon', '2026-02-02 07:30:29.116745'),
+(64, 'myapp', '0014_flashsale_coupon_max_use_per_user_flashsaleproduct', '2026-02-02 07:30:29.125027'),
+(65, 'myapp', '0015_coupon_allowed_roles_alter_product_title', '2026-02-02 07:30:29.132331'),
+(66, 'myapp', '0016_flashsale_description', '2026-02-02 07:30:29.138483'),
+(67, 'myapp', '0017_review_image_alter_coupon_discount_type', '2026-02-02 07:30:29.144568'),
+(68, 'myapp', '0018_stockreservation_usercoupon_and_more', '2026-02-02 07:30:29.151380'),
+(69, 'myapp', '0019_promotionschedule_promousagelog_alter_coupon_options_and_more', '2026-02-02 07:30:29.157561'),
+(70, 'myapp', '0020_flashsale_auto_disable_on_end_and_more', '2026-02-02 07:30:29.163898'),
+(71, 'myapp', '0021_add_flash_sale_campaign', '2026-02-02 07:30:29.169762'),
+(72, 'myapp', '0022_fix_flashsalecampaign_id_autoincrement', '2026-02-02 07:30:29.175965'),
+(73, 'myapp', '0023_fix_flashsalecampaign_auto_increment_raw_sql', '2026-02-02 07:30:29.182272'),
+(74, 'myapp', '0024_fix_auto_increment_only', '2026-02-02 07:30:29.188092'),
+(75, 'myapp', '0025_fix_order_auto_increment', '2026-02-02 07:30:29.195918'),
+(76, 'myapp', '0026_alter_flashsalecampaign_id', '2026-02-02 07:30:29.203596'),
+(77, 'myapp', '0027_remove_product_seller_product_admin_alter_user_role', '2026-02-02 07:30:29.212061'),
+(78, 'myapp', '0028_tag_expiration', '2026-02-02 07:30:29.218879'),
+(79, 'admin', '0001_initial', '2026-02-02 07:30:37.469843'),
+(80, 'admin', '0002_logentry_remove_auto_add', '2026-02-02 07:30:37.489235'),
+(81, 'admin', '0003_logentry_add_action_flag_choices', '2026-02-02 07:30:37.499169'),
+(82, 'authtoken', '0001_initial', '2026-02-02 07:30:42.081156'),
+(83, 'authtoken', '0002_auto_20160226_1747', '2026-02-02 07:30:42.091969'),
+(84, 'authtoken', '0003_tokenproxy', '2026-02-02 07:30:42.098550'),
+(85, 'authtoken', '0004_alter_tokenproxy_options', '2026-02-02 07:30:42.104544'),
+(87, 'myapp', '0029_tag_color_tag_created_at_tag_group_name_tag_icon_and_more', '2026-02-02 07:58:41.833942'),
+(88, 'myapp', '0030_megamenuconfig', '2026-02-03 01:15:21.900767');
 
 -- --------------------------------------------------------
 
@@ -627,6 +636,22 @@ INSERT INTO `flash_sale_products` (`id`, `sale_price`, `quantity_limit`, `sold_c
 (79, 80.99, 85, 0, 28, 8, 1, NULL, 0),
 (80, 120.99, 50, 1, 28, 7, 1, NULL, 0),
 (81, 40.99, 22, 0, 28, 6, 1, NULL, 0);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `myapp_megamenuconfig`
+--
+
+CREATE TABLE `myapp_megamenuconfig` (
+  `id` bigint NOT NULL,
+  `banner_image` varchar(100) DEFAULT NULL,
+  `promo_text` varchar(255) DEFAULT NULL,
+  `button_text` varchar(50) NOT NULL,
+  `button_link` varchar(255) DEFAULT NULL,
+  `is_featured` tinyint(1) NOT NULL,
+  `category_id` bigint NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -770,7 +795,8 @@ INSERT INTO `orders` (`id`, `customer_name`, `customer_tel`, `customer_email`, `
 (81, 'ro ot', '0832465654', 'root@gmail.com', 'บ้านเมืองพล, อำเภอขุนยวม, จังหวัดแม่ฮ่องสอน, ประเทศไทย 41321', 59.99, 'Completed', 'Transfer', NULL, '2026-01-28 04:48:30.534796', '2026-01-28 04:48:53.654360', 11, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_wKolWVI.png', 'Unknown', 109.99, NULL, 'Unknown', 'แม่ฮ่องสอน', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
 (82, 'ro ot', '0987456465', 'root@gmail.com', 'บ้านแม่สะป๊อกเหนือ, อำเภอแม่วาง, จังหวัดเชียงใหม่, ประเทศไทย 53213', 100.00, 'Completed', 'Transfer', NULL, '2026-01-28 06:57:15.229929', '2026-01-28 06:58:04.595030', 11, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_xQ9166w.png', 'Unknown', 100.00, NULL, 'Unknown', 'เชียงใหม่', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 50.00, 50.00, NULL),
 (83, 'po tato', '0455222222', 'potat@gail.com', 'บ้านย่านดู่, อำเภอท่าปลา, จังหวัดอุตรดิตถ์, ประเทศไทย 45454', 166.99, 'Completed', 'Transfer', NULL, '2026-01-28 09:54:50.969378', '2026-01-28 09:57:14.617326', 13, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_QgAePsM.png', 'Unknown', 166.99, NULL, 'Unknown', 'อุตรดิตถ์', 13.00, 9, NULL, 0.00, 0.00, 0.00, 129.99, 50.00, NULL),
-(84, 'po tato', '0645674564', 'potat@gail.com', 'บ้านไร่ม่วง, นาอาน, อำเภอเมืองเลย, จังหวัดเลย, 42000, ประเทศไทย 42000', 2349.99, 'Completed', 'Transfer', NULL, '2026-01-28 09:56:27.721221', '2026-01-28 09:57:12.514619', 13, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_1MExfN4.png', 'Unknown', 2349.99, NULL, 'Unknown', 'เลย', 200.00, 12, NULL, 0.00, 0.00, 0.00, 2499.99, 50.00, NULL);
+(84, 'po tato', '0645674564', 'potat@gail.com', 'บ้านไร่ม่วง, นาอาน, อำเภอเมืองเลย, จังหวัดเลย, 42000, ประเทศไทย 42000', 2349.99, 'Completed', 'Transfer', NULL, '2026-01-28 09:56:27.721221', '2026-01-28 09:57:12.514619', 13, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_1MExfN4.png', 'Unknown', 2349.99, NULL, 'Unknown', 'เลย', 200.00, 12, NULL, 0.00, 0.00, 0.00, 2499.99, 50.00, NULL),
+(85, 'po tato', '0987464654', 'potat@gail.com', 'เขาโจด, อำเภอศรีสวัสดิ์, จังหวัดกาญจนบุรี, ประเทศไทย 42000', 79.99, 'Completed', 'Transfer', NULL, '2026-01-29 05:12:18.127659', '2026-01-29 05:12:55.057092', 13, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_dXWBktM.png', 'Unknown', 79.99, NULL, 'Unknown', 'กาญจนบุรี', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 29.99, 50.00, NULL);
 
 -- --------------------------------------------------------
 
@@ -864,7 +890,8 @@ INSERT INTO `order_items` (`id`, `quantity`, `price_at_purchase`, `order_id`, `p
 (82, 1, 59.99, 81, 43, 0.00, NULL, 'normal'),
 (83, 1, 50.00, 82, 149, 0.00, NULL, 'normal'),
 (84, 1, 129.99, 83, 173, 0.00, NULL, 'normal'),
-(85, 1, 2499.99, 84, 12, 0.00, NULL, 'normal');
+(85, 1, 2499.99, 84, 12, 0.00, NULL, 'normal'),
+(86, 1, 29.99, 85, 182, 0.00, NULL, 'normal');
 
 -- --------------------------------------------------------
 
@@ -1081,7 +1108,7 @@ INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `s
 (179, 'Corset With Black Skirt', 'The Corset With Black Skirt is a chic and versatile outfit that pairs a fashionable corset with a classic black skirt. It offers a trendy and coordinated look for various occasions.', 34, 79.99, 32, 'Unknown', 'products/thumb_179_2m8ntR2.jpg', 4.52, 1, '2025-12-11 03:29:31.710687', '2026-01-12 09:22:34.920458', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (180, 'Dress Pea', 'The Dress Pea is a stylish and comfortable dress with a pea pattern. Perfect for casual outings, it adds a playful and fun element to your wardrobe, making it a great choice for day-to-day wear.', 34, 49.99, 6, 'Unknown', 'products/thumb_180_MfVbkeg.jpg', 4.88, 1, '2025-12-11 03:29:34.047041', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (181, 'Marni Red & Black Suit', 'The Marni Red & Black Suit is a sophisticated and fashion-forward suit ensemble. With a combination of red and black tones, it showcases a modern design for a bold and confident look.', 34, 179.99, 61, 'Unknown', 'products/thumb_181_V4OcXV9.jpg', 4.48, 1, '2025-12-11 03:29:38.700981', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(182, 'Green Crystal Earring', 'The Green Crystal Earring is a dazzling accessory that features a vibrant green crystal. With a classic design, it adds a touch of elegance to your ensemble, perfect for formal or special occasions.', 35, 29.99, 52, 'Unknown', 'products/thumb_182_ra1DwIs.jpg', 3.96, 1, '2025-12-11 03:29:43.268859', '2026-01-12 08:03:36.426053', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(182, 'Green Crystal Earring', 'The Green Crystal Earring is a dazzling accessory that features a vibrant green crystal. With a classic design, it adds a touch of elegance to your ensemble, perfect for formal or special occasions.', 35, 29.99, 51, 'Unknown', 'products/thumb_182_ra1DwIs.jpg', 3.96, 1, '2025-12-11 03:29:43.268859', '2026-01-29 05:12:18.118955', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (183, 'Green Oval Earring', 'The Green Oval Earring is a stylish and versatile accessory with a unique oval shape. Whether for casual or dressy occasions, its green hue and contemporary design make it a standout piece.', 35, 24.99, 73, 'Unknown', 'products/thumb_183_WYjeZF7.jpg', 3.57, 1, '2025-12-11 03:29:45.154106', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (184, 'Tropical Earring', 'The Tropical Earring is a fun and playful accessory inspired by tropical elements. Featuring vibrant colors and a lively design, it\'s perfect for adding a touch of summer to your look.', 35, 19.99, 1, 'Unknown', 'products/thumb_184_U3yv4Fr.jpg', 4.40, 1, '2025-12-11 03:29:48.790352', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (185, 'Black & Brown Slipper', 'The Black & Brown Slipper is a comfortable and stylish choice for casual wear. Featuring a blend of black and brown colors, it adds a touch of sophistication to your relaxation.', 37, 19.99, 0, 'Comfort Trends', 'products/thumb_185_TUE3lNb.jpg', 2.53, 1, '2025-12-11 03:29:53.080669', '2026-01-21 09:56:09.548006', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
@@ -1094,7 +1121,7 @@ INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `s
 (192, 'Rolex Datejust Women', 'The Rolex Datejust Women\'s watch is an iconic timepiece designed for women. With a timeless design and a date complication, it offers both elegance and functionality.', 36, 10999.99, 26, 'Rolex', 'products/thumb_192_ahZ8bv0.jpg', 2.86, 1, '2025-12-11 03:30:22.404300', '2026-01-06 09:31:20.743391', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (193, 'Watch Gold for Women', '', 36, 799.00, 23, 'Fashion Gold', 'products/thumb_193_8rccSlX.jpg', 4.24, 1, '2025-12-11 03:30:25.491168', '2026-01-26 09:33:46.855844', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (194, 'Women\'s Wrist Watch', '', 36, 250.00, 51, 'Fashion Co.', 'products/thumb_194_2qjasaO.jpg', 4.00, 1, '2025-12-11 03:30:27.751801', '2026-01-27 06:32:26.800283', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(205, 'iphone17', '', 15, 35000.00, 10, '', 'products/iphone-card-40-17pro-202509_FMT_WHH_z7llJkH.jpg', 0.00, 1, '2026-01-27 03:34:22.689968', '2026-01-27 09:44:36.016747', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(205, 'iphone17', '', 15, 35000.00, 10, '', 'products/iphone-card-40-17pro-202509_FMT_WHH_z7llJkH.jpg', 0.00, 1, '2026-01-27 03:34:22.689968', '2026-01-29 07:50:23.700531', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1107,6 +1134,30 @@ CREATE TABLE `products_tags` (
   `product_id` bigint NOT NULL,
   `tag_id` bigint NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `products_tags`
+--
+
+INSERT INTO `products_tags` (`id`, `product_id`, `tag_id`) VALUES
+(47, 6, 17),
+(48, 7, 17),
+(49, 8, 17),
+(40, 9, 15),
+(50, 9, 17),
+(51, 10, 17),
+(41, 26, 15),
+(42, 86, 15),
+(52, 102, 20),
+(43, 105, 15),
+(53, 117, 20),
+(54, 132, 20),
+(44, 136, 15),
+(55, 153, 20),
+(56, 155, 20),
+(45, 184, 15),
+(57, 185, 20),
+(46, 205, 16);
 
 -- --------------------------------------------------------
 
@@ -1710,8 +1761,30 @@ CREATE TABLE `stock_reservations` (
 
 CREATE TABLE `tags` (
   `id` bigint NOT NULL,
-  `name` varchar(50) NOT NULL
+  `name` varchar(50) NOT NULL,
+  `expiration_date` date DEFAULT NULL,
+  `automation_rules` json DEFAULT NULL,
+  `group_name` varchar(50) DEFAULT 'ทั่วไป',
+  `color` varchar(20) DEFAULT '#6366f1',
+  `icon` varchar(50) DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` datetime(6) NOT NULL,
+  `slug` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `tags`
+--
+
+INSERT INTO `tags` (`id`, `name`, `expiration_date`, `automation_rules`, `group_name`, `color`, `icon`, `is_active`, `created_at`, `slug`) VALUES
+(15, 'Last Chance', NULL, '{}', 'ทั่วไป', '#6366f1', NULL, 1, '2026-02-02 07:54:29.722513', 'last-chance'),
+(16, 'New Arrival', NULL, '{}', 'ทั่วไป', '#6366f1', NULL, 1, '2026-02-02 07:54:29.722513', 'new-arrival'),
+(17, 'good', NULL, '{}', 'ทั่วไป', '#84cc16', 'Percent', 1, '2026-02-02 07:54:29.722513', 'good'),
+(18, 'Best Seller', NULL, '{}', 'ทั่วไป', '#6366f1', NULL, 1, '2026-02-02 07:54:29.722513', 'best-seller'),
+(19, 'Hot Selling', NULL, '{}', 'ระบบอัตโนมัติ', '#f87171', 'Zap', 1, '2026-02-02 07:54:29.722513', 'hot-selling'),
+(20, 'Out of Stock', NULL, '{}', 'ระบบอัตโนมัติ', '#94a3b8', 'Slash', 1, '2026-02-02 07:54:29.722513', 'out-of-stock'),
+(21, 'On Sale', NULL, '{}', 'ระบบอัตโนมัติ', '#6366f1', 'Percent', 1, '2026-02-02 07:54:29.722513', 'on-sale'),
+(22, 'Flash Sale', NULL, '{}', 'ระบบอัตโนมัติ', '#f59e0b', 'Activity', 1, '2026-02-02 07:54:29.722513', 'flash-sale');
 
 -- --------------------------------------------------------
 
@@ -1917,6 +1990,13 @@ ALTER TABLE `flash_sale_products`
   ADD KEY `flash_sale_products_product_id_1eb1cced_fk_products_id` (`product_id`);
 
 --
+-- Indexes for table `myapp_megamenuconfig`
+--
+ALTER TABLE `myapp_megamenuconfig`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `category_id` (`category_id`);
+
+--
 -- Indexes for table `myapp_review`
 --
 ALTER TABLE `myapp_review`
@@ -2005,7 +2085,9 @@ ALTER TABLE `stock_reservations`
 --
 ALTER TABLE `tags`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `name` (`name`);
+  ADD UNIQUE KEY `name` (`name`),
+  ADD UNIQUE KEY `slug` (`slug`),
+  ADD KEY `tags_slug_c72f9b_idx` (`slug`);
 
 --
 -- Indexes for table `users`
@@ -2060,7 +2142,7 @@ ALTER TABLE `auth_group`
 -- AUTO_INCREMENT for table `auth_permission`
 --
 ALTER TABLE `auth_permission`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=101;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=105;
 
 --
 -- AUTO_INCREMENT for table `categories`
@@ -2072,19 +2154,19 @@ ALTER TABLE `categories`
 -- AUTO_INCREMENT for table `coupons`
 --
 ALTER TABLE `coupons`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `django_content_type`
 --
 ALTER TABLE `django_content_type`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
 -- AUTO_INCREMENT for table `django_migrations`
 --
 ALTER TABLE `django_migrations`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=89;
 
 --
 -- AUTO_INCREMENT for table `flash_sales`
@@ -2105,6 +2187,12 @@ ALTER TABLE `flash_sale_products`
   MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
 
 --
+-- AUTO_INCREMENT for table `myapp_megamenuconfig`
+--
+ALTER TABLE `myapp_megamenuconfig`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `myapp_review`
 --
 ALTER TABLE `myapp_review`
@@ -2114,13 +2202,13 @@ ALTER TABLE `myapp_review`
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=85;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=86;
 
 --
 -- AUTO_INCREMENT for table `order_items`
 --
 ALTER TABLE `order_items`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=86;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=87;
 
 --
 -- AUTO_INCREMENT for table `products`
@@ -2132,7 +2220,7 @@ ALTER TABLE `products`
 -- AUTO_INCREMENT for table `products_tags`
 --
 ALTER TABLE `products_tags`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
 
 --
 -- AUTO_INCREMENT for table `product_images`
@@ -2168,7 +2256,7 @@ ALTER TABLE `stock_reservations`
 -- AUTO_INCREMENT for table `tags`
 --
 ALTER TABLE `tags`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -2198,6 +2286,12 @@ ALTER TABLE `flash_sales`
 ALTER TABLE `flash_sale_products`
   ADD CONSTRAINT `flash_sale_products_flash_sale_id_d09e2be2_fk_flash_sales_id` FOREIGN KEY (`flash_sale_id`) REFERENCES `flash_sales` (`id`),
   ADD CONSTRAINT `flash_sale_products_product_id_1eb1cced_fk_products_id` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`);
+
+--
+-- Constraints for table `myapp_megamenuconfig`
+--
+ALTER TABLE `myapp_megamenuconfig`
+  ADD CONSTRAINT `myapp_megamenuconfig_category_id_b78fe310_fk_categories_id` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`);
 
 --
 -- Constraints for table `orders`

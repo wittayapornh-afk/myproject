@@ -17,7 +17,7 @@ import {
     Star,
     Bell,
     Truck,
-    Ticket,
+    Ticket, List,
     User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -485,6 +485,13 @@ const FlashSaleManagement = () => {
     const [showCampaignForm, setShowCampaignForm] = useState(false);
     const [selectedCampaign, setSelectedCampaign] = useState(null);
 
+    // ✅ NEW: Tag Selection State
+    const [tags, setTags] = useState([]);
+    const [selectedTags, setSelectedTags] = useState([]);
+    const [tagDiscountType, setTagDiscountType] = useState('percent'); // 'percent' | 'fixed'
+    const [tagDiscountValue, setTagDiscountValue] = useState('10'); // Default 10%
+    const [useTagMode, setUseTagMode] = useState(false); // Toggle between Manual / Tag Mode
+
     // Refs for DatePickers
     const startDateRef = useRef(null);
     const endDateRef = useRef(null);
@@ -503,7 +510,8 @@ const FlashSaleManagement = () => {
         fetchFlashSales();
         fetchProducts();
         fetchCategories();
-        fetchCampaigns(); // ✅ NEW: Fetch campaigns
+        fetchCampaigns();
+        fetchTags(); // ✅ NEW: Fetch tags
     }, []);
 
     // ✅ NEW: Handle Image Selection
@@ -645,6 +653,105 @@ const FlashSaleManagement = () => {
             }
         } catch (error) {
             console.error("Error fetching categories", error);
+        }
+    };
+
+    // ✅ NEW: Fetch Tags
+    const fetchTags = async () => {
+        try {
+            const res = await axios.get(API_BASE_URL + "/api/tags/");
+            setTags(res.data);
+        } catch (error) {
+            console.error("Error fetching tags", error);
+        }
+    };
+
+    // ✅ NEW: Handle Add Products by Tag
+    // ✅ NEW: Handle Add Products by Tag (Backend Integrated)
+    const handleAddProductsByTags = async () => {
+        if (selectedTags.length === 0) {
+            Swal.fire('Warning', 'กรุณาเลือกป้ายกำกับอย่างน้อย 1 รายการ', 'warning');
+            return;
+        }
+        if (!tagDiscountValue || parseFloat(tagDiscountValue) < 0) {
+            Swal.fire('Warning', 'กรุณาระบุส่วนลดที่ถูกต้อง', 'warning');
+            return;
+        }
+
+        try {
+            // Show Loading State
+            Swal.fire({
+                title: 'กำลังค้นหาสินค้า...',
+                text: 'กรุณารอสักครู่',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            const token = authContextToken || localStorage.getItem('token');
+            const res = await axios.post(`${API_BASE_URL}/api/products/by-tags/`, {
+                tag_ids: selectedTags
+            }, {
+                headers: { Authorization: `Token ${token}` }
+            });
+
+            const matchingProducts = res.data;
+
+            if (matchingProducts.length === 0) {
+                Swal.fire('Info', 'ไม่พบสินค้าที่มีป้ายกำกับที่เลือก', 'info');
+                return;
+            }
+
+            const discountVal = parseFloat(tagDiscountValue);
+            let addedCount = 0;
+            const newProducts = [...formData.products];
+            const existingIds = new Set(newProducts.map(p => p.product_id || p.id));
+
+            matchingProducts.forEach(product => {
+                // Avoid duplicates
+                if (existingIds.has(product.id)) return;
+
+                let salePrice = 0;
+                const originalPrice = parseFloat(product.price);
+
+                // 2. Calculate Price
+                if (tagDiscountType === 'percent') {
+                    // Formula: Original - (Original * % / 100)
+                    salePrice = originalPrice - (originalPrice * discountVal / 100);
+                } else {
+                    // Fixed Price
+                    salePrice = discountVal;
+                }
+
+                // Safety Clamp
+                salePrice = Math.max(0, Math.floor(salePrice)); // Floor to integer for cleanliness
+                
+                // 3. Add to list
+                newProducts.push({
+                    product_id: product.id,
+                    product_name: product.title,
+                    product_image: product.thumbnail,
+                    original_price: product.price,
+                    sale_price: salePrice,
+                    stock: product.stock, // Show stock for reference
+                    stock: product.stock, // Show stock for reference
+                    limit: product.stock // Default quota to Max Stock (User friendly)
+                });
+                
+                addedCount++;
+            });
+
+            setFormData({ ...formData, products: newProducts });
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'เพิ่มสินค้าเรียบร้อย',
+                text: `เพิ่มสินค้า ${addedCount} รายการจากป้ายกำกับ`,
+                timer: 1500
+            });
+
+        } catch (error) {
+            console.error("Error fetching matching products:", error);
+            Swal.fire('Error', 'เกิดข้อผิดพลาดในการดึงข้อมูลสินค้าจากระบบ', 'error');
         }
     };
 
@@ -1754,22 +1861,153 @@ const FlashSaleManagement = () => {
 
                                             {/* 3. Inventory Integration (Extended Table) */}
                                             <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-gray-100/50 border border-gray-100 flex flex-col gap-6">
-                                                <div className="flex items-center justify-between">
-                                                    <h3 className="flex items-center gap-3 text-2xl font-black text-gray-800 tracking-tighter">
-                                                        <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
-                                                            <Package size={20} />
+
+                                                {/* 🏷️✨ Smart Selection Mode */}
+                                                <div className="flex flex-col gap-6">
+                                                    <div className="flex items-center justify-between">
+                                                        <h3 className="flex items-center gap-3 text-2xl font-black text-gray-800 tracking-tighter">
+                                                            <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                                                                <Package size={20} />
+                                                            </div>
+                                                            Deal Inventory
+                                                            <span className="bg-gray-900 text-white px-3 py-1 rounded-full text-xs font-black ml-2 shadow-lg">{formData.products.length}</span>
+                                                        </h3>
+                                                        
+                                                        {/* 🔄 Mode Toggle */}
+                                                        <div className="bg-gray-100 p-1.5 rounded-xl flex items-center gap-1 shadow-inner">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => setUseTagMode(false)}
+                                                                className={`px-4 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all ${
+                                                                    !useTagMode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                                                                }`}
+                                                            >
+                                                                <List size={14} /> รายชิ้น
+                                                            </button>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => setUseTagMode(true)}
+                                                                className={`px-4 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all ${
+                                                                    useTagMode ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'
+                                                                }`}
+                                                            >
+                                                                <Tag size={14} /> เลือกจาก Tags
+                                                            </button>
                                                         </div>
-                                                        Deal Inventory
-                                                        <span className="bg-gray-900 text-white px-3 py-1 rounded-full text-xs font-black ml-2 shadow-lg">{formData.products.length}</span>
-                                                    </h3>
-                                                    <button 
-                                                        type="button"
-                                                        onClick={() => setShowProductSelector(true)}
-                                                        className="px-6 py-3 bg-gray-900 text-white rounded-[1.25rem] font-black text-sm hover:bg-orange-600 hover:shadow-2xl hover:shadow-orange-200 transition-all flex items-center gap-2 active:scale-95 group"
-                                                    >
-                                                        <Plus size={18} className="group-hover:rotate-90 transition-transform" />
-                                                        จัดการสินค้า
-                                                    </button>
+                                                    </div>
+
+                                                    {/* 🚀 TAG MODE UI */}
+                                                    {useTagMode && (
+                                                        <div className="bg-orange-50/50 rounded-[2rem] p-6 border border-orange-100 animation-fade-in-up">
+                                                            <div className="flex flex-col gap-6">
+                                                                {/* 1. Tag List */}
+                                                                <div>
+                                                                    <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3">
+                                                                        1. เลือกกลุ่มสินค้า (Tags)
+                                                                    </label>
+                                                                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                                                                        {tags.map(tag => {
+                                                                            const isSelected = selectedTags.includes(tag.id);
+                                                                            return (
+                                                                                <button
+                                                                                    key={tag.id}
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        if (isSelected) setSelectedTags(prev => prev.filter(id => id !== tag.id));
+                                                                                        else setSelectedTags(prev => [...prev, tag.id]);
+                                                                                    }}
+                                                                                    className={`px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
+                                                                                        isSelected 
+                                                                                        ? 'bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-200 scale-105' 
+                                                                                        : 'bg-white border-gray-100 text-gray-500 hover:border-orange-200 hover:text-orange-500'
+                                                                                    }`}
+                                                                                >
+                                                                                    {tag.name}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                        {tags.length === 0 && <div className="text-gray-400 text-sm">ไม่พบ Tags ในระบบ</div>}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* 2. Pricing Rule */}
+                                                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-end">
+                                                                    <div className="lg:col-span-2">
+                                                                        <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3">
+                                                                            2. ตั้งราคาทั้งกลุ่ม (Pricing Rule)
+                                                                        </label>
+                                                                        <div className="flex flex-col sm:flex-row gap-6 p-6 bg-white rounded-2xl border border-orange-100 shadow-sm">
+                                                                            <div className="flex-1">
+                                                                                <label className="text-xs text-gray-400 font-bold mb-2 block">รูปแบบราคา</label>
+                                                                                <div className="flex bg-gray-50 rounded-xl p-1.5 gap-1">
+                                                                                    <button 
+                                                                                        type="button" 
+                                                                                        onClick={() => setTagDiscountType('percent')}
+                                                                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${tagDiscountType === 'percent' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                                                    >
+                                                                                        % ส่วนลด
+                                                                                    </button>
+                                                                                    <button 
+                                                                                        type="button" 
+                                                                                        onClick={() => setTagDiscountType('fixed')}
+                                                                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${tagDiscountType === 'fixed' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                                                    >
+                                                                                        ราคาเดียว
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="hidden sm:block w-px bg-gray-100 my-2" />
+                                                                            <div className="flex-1">
+                                                                                <label className="text-xs text-xs text-gray-400 font-bold mb-2 block">
+                                                                                    {tagDiscountType === 'percent' ? 'ลดกี่ % (จากราคาเต็ม)' : 'ขายราคาเท่าไหร่ (บาท)'}
+                                                                                </label>
+                                                                                <div className="relative">
+                                                                                    <input 
+                                                                                        type="number" 
+                                                                                        value={tagDiscountValue}
+                                                                                        onChange={e => setTagDiscountValue(e.target.value)}
+                                                                                        className="w-full bg-gray-50 border-2 border-transparent focus:border-orange-100 rounded-xl px-4 py-2.5 font-black text-gray-900 focus:ring-4 focus:ring-orange-50 outline-none text-lg transition-all"
+                                                                                        placeholder="0"
+                                                                                    />
+                                                                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm pointer-events-none">
+                                                                                        {tagDiscountType === 'percent' ? '%' : '฿'}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    {/* 3. Action Button */}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={handleAddProductsByTags}
+                                                                        disabled={selectedTags.length === 0}
+                                                                        className="h-[108px] w-full bg-gray-900 text-white rounded-[1.5rem] font-black hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-200 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50 disabled:grayscale active:scale-95 group"
+                                                                    >
+                                                                        <div className="bg-white/10 p-2 rounded-full mb-1 group-hover:bg-white/20 transition-all">
+                                                                            <Plus size={20} className={selectedTags.length > 0 ? 'animate-bounce' : ''} />
+                                                                        </div>
+                                                                        <span className="text-sm tracking-widest uppercase">ดึงสินค้าลงตาราง</span>
+                                                                        <span className="text-[10px] text-gray-400 font-normal group-hover:text-white/80">พร้อมคำนวณราคาอัตโนมัติ</span>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* MANUAL BUTTON (Only in Manual Mode) */}
+                                                    {!useTagMode && (
+                                                        <div className="flex justify-end">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => setShowProductSelector(true)}
+                                                                className="px-6 py-3 bg-gray-900 text-white rounded-[1.25rem] font-black text-sm hover:bg-orange-600 hover:shadow-2xl hover:shadow-orange-200 transition-all flex items-center gap-2 active:scale-95 group"
+                                                            >
+                                                                <Plus size={18} className="group-hover:rotate-90 transition-transform" />
+                                                                เปิดคลังเลือกรายชิ้น
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Expanded Product List */}
@@ -1855,8 +2093,8 @@ const FlashSaleManagement = () => {
                                                                                     )}
                                                                                 </div>
                                                                                 <div className="flex items-center justify-center gap-2 mt-2">
-                                                                                    <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 uppercase tracking-tighter animate-pulse">
-                                                                                        -{item.original_price && item.sale_price ? Math.round(((item.original_price - item.sale_price)/item.original_price)*100) : 0}%
+                                <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 uppercase tracking-tighter animate-pulse">
+                                                                                        -{item.original_price && item.sale_price ? Math.floor(((item.original_price - item.sale_price)/item.original_price)*100) : 0}%
                                                                                     </span>
                                                                                 </div>
                                                                             </td>
