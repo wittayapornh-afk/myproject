@@ -25,8 +25,6 @@ function ProductEdit() {
   const [galleryImages, setGalleryImages] = useState([]); // Existing gallery (from DB)
   const [newGalleryFiles, setNewGalleryFiles] = useState([]); // New files to upload
   const [newGalleryPreviews, setNewGalleryPreviews] = useState([]); // Previews for new files
-  
-  // Stock History
 
 
   const API_BASE_URL = 'http://localhost:8000'; // Or use env variable
@@ -53,7 +51,7 @@ function ProductEdit() {
         navigate('/shop');
       }
     };
-    fetchProduct(); // ✅ Run always (internal logic handles token fallback)
+    fetchProduct();
   }, [id, navigate, token]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -138,7 +136,7 @@ function ProductEdit() {
       });
 
       try {
-          await axios.put(`${API_BASE_URL}/api/edit_product/${id}/`, data, {
+          await axios.put(`${API_BASE_URL}/api/products/${id}/edit/`, data, {
   headers: {
     'Authorization': `Token ${token}`
   }

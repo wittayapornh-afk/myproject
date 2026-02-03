@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 # ==========================================
 # 👤 Custom User Model
@@ -76,6 +78,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 # ==========================================
 
 # ==========================================
+# 🍌 Mega Menu Config
+# ==========================================
+from .models_menu import MegaMenuConfig
+
+# ==========================================
 # 📂 Category System (New)
 # ==========================================
 class Category(models.Model):
@@ -92,13 +99,46 @@ class Category(models.Model):
 # 🏷️ Tag System (New)
 # ==========================================
 class Tag(models.Model):
+    GROUP_CHOICES = [
+        ('category', 'หมวดหมู่ (Category)'),
+        ('promotion', 'โปรโมชั่น (Promotion)'),
+        ('feature', 'คุณสมบัติ (Feature)'),
+        ('brand', 'แบรนด์ (Brand)'),
+        ('other', 'อื่นๆ (Other)'),
+    ]
+
     name = models.CharField(max_length=50, unique=True)
+    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, help_text="URL-friendly name (Auto-generated)")
+    group_name = models.CharField(max_length=50, choices=GROUP_CHOICES, default='other', help_text="กลุ่มของ Tag")
+    color = models.CharField(max_length=20, default='#6366f1', help_text="สีของ Tag (Hex Code)")
+    icon = models.CharField(max_length=50, null=True, blank=True, help_text="ชื่อไอคอนจาก Lucide")
     
+    expiration_date = models.DateField(null=True, blank=True, help_text="วันหมดอายุ")
+    automation_rules = models.JSONField(default=dict, blank=True, help_text="Automation Logic")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
         db_table = 'tags'
+        indexes = [
+            models.Index(fields=['slug']),
+            models.Index(fields=['group_name']),
+        ]
+
+    def save(self, *args, **kwargs):
+        from django.utils.text import slugify
+        if not self.slug:
+            self.slug = slugify(self.name)
+            # Ensure unique slug
+            original_slug = self.slug
+            count = 1
+            while Tag.objects.filter(slug=self.slug).exists():
+                self.slug = f"{original_slug}-{count}"
+                count += 1
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.get_group_name_display()})"
 
 from .validators import validate_product_name
 
@@ -729,3 +769,34 @@ class AdminLog(models.Model):
 
     class Meta:
         db_table = 'admin_logs'
+
+# ==========================================
+# 🤖 Signals & Automation Logic
+# ==========================================
+
+@receiver(post_save, sender=Product)
+def auto_tag_new_arrival(sender, instance, created, **kwargs):
+    """
+    ติด Tag 'New Arrival' อัตโนมัติเมื่อสร้างสินค้าใหม่
+    """
+    if created:
+        try:
+            # ค้นหาหรือสร้าง Tag 'New Arrival'
+            # กำหนดค่าพื้นฐานเป็นสีเขียว Emerald และไอคอน Sparkles
+            new_tag, _ = Tag.objects.get_or_create(
+                name='New Arrival',
+                defaults={
+                    'color': '#10b981', 
+                    'icon': 'Sparkles', 
+                    'group_name': 'สถานะสินค้า'
+                }
+            )
+            instance.tags.add(new_tag)
+        except Exception as e:
+            # Fail silently to not block product creation
+            print(f"Error in auto_tag_new_arrival: {str(e)}")
+
+# ==========================================
+# 🍌 Mega Menu Config
+# ==========================================
+from .models_menu import MegaMenuConfig

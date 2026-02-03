@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Ticket, Tag, Clock, Plus, Trash2, X, Info, Percent, 
     ChevronRight, Calendar, Users, Check, AlertCircle, Search, Filter, 
-    Truck, Settings, Copy, ChevronDown, ChevronUp, ChevronLeft 
+    Truck, Settings, Copy, ChevronDown, ChevronUp, ChevronLeft, Edit2, Star,
+    UserPlus, Crown, HelpCircle 
 } from 'lucide-react';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -259,10 +260,12 @@ const CouponManagement = () => {
         is_public: true, 
         auto_apply: false, 
         is_stackable_with_flash_sale: false,
-        conditions: {} // ✅ New field for advanced rules
+        allowed_roles: [], // ✅ Customer Eligibility
+        conditions: { applicable_tags: [] } // ✅ Tag Rules
     });
     const [isEditing, setIsEditing] = useState(false);
     const [selectedCoupon, setSelectedCoupon] = useState(null);
+    const [errors, setErrors] = useState({}); // ✅ Validation Errors State
 
     // 🔍 Filter States
     const [filterStatus, setFilterStatus] = useState('all');
@@ -277,9 +280,21 @@ const CouponManagement = () => {
 
     const API_BASE_URL = "http://localhost:8000";
 
+    const [tags, setTags] = useState([]); // ✅ Tags State
+    
     useEffect(() => {
         fetchCoupons();
+        fetchTags();
     }, []);
+
+    const fetchTags = async () => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/tags/`);
+            setTags(res.data);
+        } catch (err) {
+            console.error("Error fetching tags:", err);
+        }
+    };
 
     const fetchCoupons = async () => {
         try {
@@ -336,38 +351,66 @@ const CouponManagement = () => {
                 return;
             }
 
+
             // Handle Free Shipping logic (จัดการค่าลดเมื่อเป็นส่งฟรี)
             if (formData.discount_type === 'free_shipping') {
                 formData.discount_value = 0;
             }
 
-            // ✅ Strict Validation: Loss Prevention & Input Limits
             const discountVal = parseFloat(formData.discount_value) || 0;
             const maxDiscount = parseFloat(formData.max_discount_amount) || 0;
             const minSpend = parseFloat(formData.min_spend) || 0;
 
+            // ✅ 1. ห้ามแจก 0 บาท (Discount > 0)
+            if (formData.discount_type !== 'free_shipping' && discountVal <= 0) {
+                setErrors({...errors, discount_value: 'มูลค่าส่วนลดต้องมากกว่า 0 บาท'});
+                return;
+            }
+
+            // ✅ 2. เปอร์เซ็นต์ห้ามเกินร้อย (Percent <= 100)
+            if (formData.discount_type === 'percent' && discountVal > 100) {
+                 setErrors({...errors, discount_value: 'ส่วนลดเปอร์เซ็นต์ต้องไม่เกิน 100%'});
+                 return;
+            }
+
+            // ✅ 3. ห้ามขาดทุน (Fixed Discount < Min Spend)
             if (formData.discount_type === 'fixed') {
-                if (minSpend <= discountVal) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'ความปลอดภัยของร้านค้า',
-                        text: `ยอดซื้อขั้นต่ำ (฿${minSpend.toLocaleString()}) ต้องมากกว่ามูลค่าส่วนลด (฿${discountVal.toLocaleString()}) เสมอ เพื่อป้องกันการสั่งซื้อที่ยอดเงินเป็น 0 หรือติดลบครับ`,
-                        confirmButtonText: 'แก้ไขข้อมูล',
-                        confirmButtonColor: '#4f46e5'
-                    });
-                    return;
+                if (minSpend > 0 && discountVal >= minSpend) {
+                     setErrors({
+                         ...errors, 
+                         discount_value: `ส่วนลด (฿${discountVal}) ต้องน้อยกว่ายอดซื้อขั้นต่ำ`,
+                         min_spend: `ยอดซื้อขั้นต่ำ (฿${minSpend}) ต้องมากกว่าส่วนลด`
+                     });
+                     return; 
                 }
             } else if (formData.discount_type === 'percent') {
-                if (maxDiscount > 0 && minSpend <= maxDiscount) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'ความปลอดภัยของร้านค้า',
-                        text: `ยอดซื้อขั้นต่ำ (฿${minSpend.toLocaleString()}) ต้องมากกว่ามูลค่าส่วนลดสูงสุด (Max Discount: ฿${maxDiscount.toLocaleString()}) เพื่อความปลอดภัยครับ`,
-                        confirmButtonText: 'แก้ไขข้อมูล',
-                        confirmButtonColor: '#4f46e5'
-                    });
+                 if (maxDiscount > 0 && minSpend <= maxDiscount) {
+                     setErrors({...errors, min_spend: `ยอดซื้อขั้นต่ำต้องมากกว่าส่วนลดสูงสุด (฿${maxDiscount})`});
+                     return;
+                 }
+            }
+
+            // ✅ 4. เช็ควันเวลา (Start < End)
+            if (formData.start_date && formData.end_date) {
+                const start = new Date(formData.start_date);
+                const end = new Date(formData.end_date);
+                if (start >= end) {
+                    Swal.fire('ข้อผิดพลาด', 'วันเริ่มต้องมาก่อนวันสิ้นสุด', 'warning');
                     return;
                 }
+            }
+
+            // ✅ 5. ต้องมีจำนวนจำกัด (Usage Limit > 0) & Limit Per User > 0
+            const limit = parseInt(formData.usage_limit) || 0;
+            const perUser = parseInt(formData.limit_per_user) || 0;
+            
+            if (limit <= 0) {
+                Swal.fire('ข้อผิดพลาด', 'กรุณาระบุจำนวนสิทธิ์รวม (Usage Limit) ให้ถูกต้อง (ต้องมากกว่า 0)', 'warning');
+                return;
+            }
+            if (perUser <= 0) {
+                Swal.fire('ข้อผิดพลาด', 'กรุณาระบุจำนวนสิทธิ์ขต่อคน (Limit Per User) ให้ถูกต้อง (ต้องมากกว่า 0)', 'warning');
+                return;
             }
 
             const url = isEditing && selectedCoupon 
@@ -520,7 +563,7 @@ const CouponManagement = () => {
     });
 
     return (
-        <div id="coupon-root" className="p-8 bg-gray-50/50 min-h-screen font-sans selection:bg-indigo-100 selection:text-indigo-900">
+        <div id="coupon-root" className="p-12 md:p-20 lg:p-28 bg-gray-50/50 min-h-screen font-sans selection:bg-indigo-100 selection:text-indigo-900">
              <div className="max-w-7xl mx-auto flex flex-col items-center mb-16 text-center">
                 <div className="flex flex-col items-center">
                     <h1 className="text-5xl font-black text-gray-900 tracking-tighter flex items-center gap-4 mb-4">
@@ -746,7 +789,7 @@ const CouponManagement = () => {
                                                 className="w-10 h-10 rounded-xl bg-white text-indigo-600 hover:bg-indigo-600 hover:text-white hover:shadow-lg hover:shadow-indigo-200 transition-all flex items-center justify-center border border-indigo-100 shadow-sm active:scale-95"
                                                 title="Edit"
                                             >
-                                                <Settings size={18} />
+                                                <Edit2 size={18} />
                                             </button>
                                             <button 
                                                 onClick={() => handleDelete(coupon.id)}
@@ -1003,17 +1046,30 @@ const CouponManagement = () => {
                                                                 } else {
                                                                     if (Number(val) > 9999999) val = "9999999"; // Limit to 9,999,999
                                                                 }
-                                                                if (Number(val) < 0) val = "0";
+                                                                
+                                                                // ✅ Clear Error on Change
+                                                                if (errors.discount_value) setErrors({...errors, discount_value: null});
+                                                                
                                                                 setFormData({...formData, discount_value: val});
                                                             }}
-                                                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                                                            className={`w-full bg-white border rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none focus:ring-2 transition-all ${
+                                                                errors.discount_value 
+                                                                ? 'border-red-400 focus:border-red-500 focus:ring-red-100 bg-red-50/10' 
+                                                                : 'border-gray-200 focus:border-indigo-500 focus:ring-indigo-200'
+                                                            }`}
                                                             placeholder={formData.discount_type === 'percent' ? "1-100" : "0.00"}
                                                         />
-                                                        <p className="text-[10px] text-gray-400 mt-1 pl-1">
-                                                            {formData.discount_type === 'percent' 
-                                                                ? 'ระบุเปอร์เซ็นต์ (สูงสุด 100%)' 
-                                                                : 'ระบุจำนวนเงินที่ต้องการลด (บาท)'}
-                                                        </p>
+                                                        {errors.discount_value ? (
+                                                            <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-red-500 animate-pulse">
+                                                                <AlertCircle size={10} /> {errors.discount_value}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-[10px] text-gray-400 mt-1 pl-1">
+                                                                {formData.discount_type === 'percent' 
+                                                                    ? 'ระบุเปอร์เซ็นต์ (สูงสุด 100%)' 
+                                                                    : 'ระบุจำนวนเงินที่ต้องการลด (บาท)'}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 )}
                                                 
@@ -1046,14 +1102,28 @@ const CouponManagement = () => {
                                                         onChange={e => {
                                                             let val = parseInt(e.target.value) || 0;
                                                             val = Math.max(0, Math.min(9999999, val)); // Limit to 9,999,999
+                                                            
+                                                            // ✅ Clear Error
+                                                            if (errors.min_spend) setErrors({...errors, min_spend: null});
+
                                                             setFormData({...formData, min_spend: val});
                                                         }}
-                                                        className={`w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm transition-all ${
+                                                        className={`w-full bg-white border rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none focus:ring-2 transition-all text-sm ${
                                                             formData.min_spend === 0 ? 'opacity-50 bg-gray-50' : ''
+                                                        } ${
+                                                            errors.min_spend 
+                                                            ? 'border-red-400 focus:border-red-500 focus:ring-red-100 bg-red-50/10' 
+                                                            : 'border-gray-200 focus:border-indigo-500 focus:ring-indigo-200'
                                                         }`}
                                                         placeholder="0"
                                                     />
-                                                    <p className="text-[10px] text-gray-400 mt-1 pl-1">ยอดซื้อขั้นต่ำ (0 = ไม่มีขั้นต่ำ)</p>
+                                                    {errors.min_spend ? (
+                                                        <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-red-500 animate-pulse">
+                                                            <AlertCircle size={10} /> {errors.min_spend}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[10px] text-gray-400 mt-1 pl-1">ยอดซื้อขั้นต่ำ (0 = ไม่มีขั้นต่ำ)</p>
+                                                    )}
                                                 </div>
 
                                                 {formData.discount_type === 'percent' && (
@@ -1075,6 +1145,245 @@ const CouponManagement = () => {
                                                         <p className="text-[10px] text-gray-400 mt-1 pl-1">จำกัดมูลค่าส่วนลดไม่เกินยอดนี้</p>
                                                     </div>
                                                 )}
+                                                
+                                                {/* 👑 Customer Eligibility (Final UI Design from Mockup) */}
+                                                <div className="col-span-2 pt-6 border-t border-gray-100 mt-2">
+                                                     
+                                                     {/* 1. Master Toggle: Send to Everyone */}
+                                                     <div className={`p-4 rounded-3xl border-2 transition-all flex justify-between items-center cursor-pointer ${
+                                                         formData.allowed_roles.length === 0 
+                                                         ? 'bg-white border-indigo-500 shadow-xl shadow-indigo-100' 
+                                                         : 'bg-white border-gray-100'
+                                                     }`}
+                                                     onClick={() => {
+                                                         // Toggle Logic
+                                                         if (formData.allowed_roles.length === 0) {
+                                                             // Currently ON (All) -> Turn OFF (Select Default 'New User')
+                                                             setFormData({...formData, allowed_roles: ['new_user']});
+                                                         } else {
+                                                             // Currently OFF (Specific) -> Turn ON (All)
+                                                             setFormData({...formData, allowed_roles: []});
+                                                         }
+                                                     }}
+                                                     >
+                                                         <div className="flex items-center gap-4">
+                                                             <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-500">
+                                                                 <Users size={24} />
+                                                             </div>
+                                                             <div>
+                                                                 <h4 className="font-extrabold text-gray-800 text-sm">ส่งให้ทุกคน (Send to Everyone)</h4>
+                                                                 <p className="text-xs font-bold text-gray-400 mt-0.5">
+                                                                     {formData.allowed_roles.length === 0 
+                                                                        ? 'สถานะ: ✅ เปิดใช้งาน (ลูกค้าทุกคนได้รับสิทธิ์)' 
+                                                                        : 'สถานะ: ❌ ปิดอยู่ (เลือกกลุ่มด้านล่าง)'}
+                                                                 </p>
+                                                             </div>
+                                                         </div>
+                                                         
+                                                         {/* Toggle Switch UI */}
+                                                         <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 relative ${
+                                                             formData.allowed_roles.length === 0 ? 'bg-indigo-500' : 'bg-gray-200'
+                                                         }`}>
+                                                             <div className={`w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-300 ${
+                                                                 formData.allowed_roles.length === 0 ? 'translate-x-6' : 'translate-x-0'
+                                                             }`}></div>
+                                                         </div>
+                                                     </div>
+
+                                                     {/* Separator / Title */}
+                                                     <div className="flex items-center gap-4 my-6 opacity-60">
+                                                         <div className="h-[1px] bg-gray-200 flex-1"></div>
+                                                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">เลือกกลุ่มที่ต้องการ (Select Target)</span>
+                                                         <div className="h-[1px] bg-gray-200 flex-1"></div>
+                                                     </div>
+
+                                                     {/* 2. Target Group Cards (Animated Slide Down) */}
+                                                     <AnimatePresence>
+                                                         {formData.allowed_roles.length > 0 && (
+                                                             <motion.div 
+                                                                 initial={{ height: 0, opacity: 0 }}
+                                                                 animate={{ height: "auto", opacity: 1 }}
+                                                                 exit={{ height: 0, opacity: 0 }}
+                                                                 transition={{ duration: 0.3, ease: "easeInOut" }}
+                                                                 className="overflow-hidden"
+                                                             >
+                                                                 <div className="space-y-3 pt-2 pb-2">
+                                                                     {[
+                                                                         { id: 'new_user', title: 'ลูกค้าใหม่ (New Users)', desc: 'New Users • ~450 คน', icon: <UserPlus size={20}/>, color: 'blue', bg: 'bg-blue-50', text: 'text-blue-600', border: 'hover:border-blue-300' },
+                                                                         { id: 'customer', title: 'สมาชิกทั่วไป (General)', desc: 'Active Members • ~2,500 คน', icon: <Users size={20}/>, color: 'emerald', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'hover:border-emerald-300' },
+                                                                         { id: 'vip', title: 'VIP Member', desc: 'High Value • ~120 คน', icon: <Crown size={20}/>, color: 'amber', bg: 'bg-amber-50', text: 'text-amber-600', border: 'hover:border-amber-300' }
+                                                                     ].map(item => {
+                                                                         const isSelected = formData.allowed_roles.includes(item.id);
+                                                                         return (
+                                                                             <div 
+                                                                                key={item.id}
+                                                                                onClick={() => {
+                                                                                    // Must prevent deselecting the last item completely via click if needed, or allow empty to reset to 'Everyone'.
+                                                                                    // Current logic: If empty -> effectively becomes "Everyone" (so Toggle flips ON, and this section slides up/hides).
+                                                                                    const newRoles = isSelected 
+                                                                                       ? formData.allowed_roles.filter(r => r !== item.id)
+                                                                                       : [...formData.allowed_roles, item.id];
+                                                                                    
+                                                                                    setFormData({...formData, allowed_roles: newRoles});
+                                                                                }}
+                                                                                className={`group relative p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center justify-between ${
+                                                                                 isSelected 
+                                                                                 ? `bg-white border-${item.color}-500 shadow-lg shadow-${item.color}-500/10 z-10` 
+                                                                                 : `bg-slate-50 border-transparent ${item.border}`
+                                                                             }`}>
+                                                                                 <div className="flex items-center gap-4">
+                                                                                     <div className={`w-12 h-12 rounded-2xl ${item.bg} ${item.text} flex items-center justify-center transition-colors`}>
+                                                                                         {item.icon}
+                                                                                     </div>
+                                                                                     <div>
+                                                                                         <h4 className={`font-bold text-sm ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>{item.title}</h4>
+                                                                                         <p className="text-xs font-bold text-gray-400 mt-0.5">{item.desc}</p>
+                                                                                     </div>
+                                                                                 </div>
+
+                                                                                 {/* Selection Circle */}
+                                                                                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                                                     isSelected 
+                                                                                     ? `border-${item.color}-500 bg-${item.color}-500 text-white` 
+                                                                                     : 'border-gray-300 bg-white group-hover:border-gray-400'
+                                                                                 }`}>
+                                                                                     {isSelected && <Check size={14} strokeWidth={4} />}
+                                                                                 </div>
+                                                                             </div>
+                                                                         );
+                                                                     })}
+                                                                 </div>
+                                                             </motion.div>
+                                                         )}
+                                                     </AnimatePresence>
+
+                                                     {/* 3. Info Footer */}
+                                                     <div className="mt-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                                                         <div className="flex items-center gap-2 mb-2 text-gray-400 cursor-pointer" onClick={() => document.getElementById('info-details').classList.toggle('hidden')}>
+                                                            <HelpCircle size={14} /> 
+                                                            <span className="text-[10px] font-bold uppercase tracking-widest hover:text-indigo-500 transition-colors">ข้อแตกต่างระหว่าง 2 แบบนี้?</span>
+                                                         </div>
+                                                         <ul id="info-details" className="space-y-2 text-xs text-gray-500 font-medium pl-1 hidden">
+                                                             <li className="flex gap-2">
+                                                                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0"></div>
+                                                                 <span><strong className="text-indigo-600">ส่งให้ทุกคน:</strong> รวมหมดทั้งคนเก่า คนใหม่ และคนในอนาคต</span>
+                                                             </li>
+                                                             <li className="flex gap-2">
+                                                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
+                                                                 <span><strong>เลือกกลุ่ม:</strong> เฉพาะคนที่มีสถานะตรงตามที่เลือกเท่านั้น</span>
+                                                             </li>
+                                                         </ul>
+                                                     </div>
+                                                </div>
+
+                                                {/* 🏷️ Tag Rules - REDESIGNED */}
+                                                <div className="col-span-2 pt-4 border-t border-gray-100 mt-2">
+                                                    <div className="flex items-center justify-between mb-3 px-1">
+                                                        <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                            <Tag size={12} className="text-indigo-500"/> ใช้ได้เฉพาะสินค้าที่มี Tag (Optional)
+                                                        </label>
+                                                        {formData.conditions.applicable_tags?.length > 0 && (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => setFormData({...formData, conditions: {...formData.conditions, applicable_tags: []}})}
+                                                                className="text-[10px] font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-tight"
+                                                            >
+                                                                ล้างทั้งหมด (Clear)
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-4 space-y-4">
+                                                        {/* Tag Search & Quick Info */}
+                                                        <div className="flex flex-col sm:flex-row gap-3 items-center">
+                                                            <div className="relative flex-1 w-full group">
+                                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={14}/>
+                                                                <input 
+                                                                    type="text" 
+                                                                    placeholder="ค้นหา Tag..." 
+                                                                    className="w-full bg-white pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all shadow-sm"
+                                                                    onChange={(e) => {
+                                                                        const term = e.target.value.toLowerCase();
+                                                                        const filtered = tags.filter(t => t.name.toLowerCase().includes(term));
+                                                                        // Since we can't easily set another state here without more boilerplate, 
+                                                                        // we'll just handle display via inline filter in the map below.
+                                                                        e.target.dataset.term = term;
+                                                                    }}
+                                                                    onKeyUp={(e) => {
+                                                                        // Trigger re-render if needed or just use standard react pattern
+                                                                        setSearchTerm(e.target.value); 
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div className={`text-[10px] font-black px-3 py-2 rounded-xl border transition-all whitespace-nowrap ${
+                                                                formData.conditions.applicable_tags?.length > 0 
+                                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                                                                : 'bg-white border-gray-200 text-gray-400'
+                                                            }`}>
+                                                                เลือกอยู่: {formData.conditions.applicable_tags?.length || 0} รายการ
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Tags Grid */}
+                                                        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar p-1">
+                                                            {tags
+                                                                .filter(tag => !searchTerm || tag.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                                                .map(tag => {
+                                                                    const isSelected = formData.conditions.applicable_tags?.includes(tag.id);
+                                                                    return (
+                                                                        <button
+                                                                            key={tag.id}
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const currentTags = formData.conditions.applicable_tags || [];
+                                                                                const newTags = isSelected 
+                                                                                    ? currentTags.filter(id => id !== tag.id) 
+                                                                                    : [...currentTags, tag.id];
+                                                                                
+                                                                                setFormData({
+                                                                                    ...formData, 
+                                                                                    conditions: { ...formData.conditions, applicable_tags: newTags }
+                                                                                });
+                                                                            }}
+                                                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all flex items-center gap-1.5 ${
+                                                                                isSelected 
+                                                                                ? 'bg-indigo-500 border-indigo-500 text-white shadow-md shadow-indigo-100 scale-[1.02]' 
+                                                                                : 'bg-white border-gray-100 text-gray-500 hover:border-indigo-200 hover:text-indigo-600'
+                                                                            }`}
+                                                                        >
+                                                                            {isSelected ? <Check size={12} strokeWidth={3}/> : <span className="opacity-40">#</span>}
+                                                                            {tag.name}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            
+                                                            {tags.length === 0 && (
+                                                                <div className="w-full py-8 flex flex-col items-center justify-center text-gray-400 opacity-60">
+                                                                    <Tag size={24} className="mb-2 stroke-1"/>
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest">ไม่พบข้อมูล Tag ในระบบ</span>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {tags.length > 0 && tags.filter(tag => !searchTerm || tag.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                                                                <div className="w-full py-6 text-center text-gray-400 text-[10px] font-bold uppercase">
+                                                                    ไม่พบ Tag ที่ค้นหา
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Helper Text */}
+                                                        <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 mt-2">
+                                                            <div className="flex gap-2">
+                                                                <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                                                                <p className="text-[10px] text-blue-600 font-bold leading-relaxed">
+                                                                    {formData.conditions.applicable_tags?.length > 0 
+                                                                        ? `คูปองนี้จะใช้ได้ "เฉพาะ" กับสินค้าที่ติดป้ายกำกับที่คุณเลือกไว้เท่านั้น (${formData.conditions.applicable_tags.length} ป้าย)` 
+                                                                        : 'หากไม่เลือกเลย คูปองนี้จะสามารถใช้ได้กับสินค้า "ทุกชิ้น" ในร้าน'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
 
                                                 <div>
                                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block pl-1 font-noto">จำนวนสิทธิ์ทั้งหมด</label>

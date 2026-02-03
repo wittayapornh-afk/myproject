@@ -74,7 +74,7 @@ const AppContent = () => {
 
 
       {/* Content Wrapper */}
-      <div className={`flex flex-col min-h-screen transition-all duration-300 ease-in-out ${showSidebar && isSidebarOpen ? 'md:ml-[300px]' : 'md:ml-[100px]'}`}>
+      <div className={`flex flex-col min-h-screen transition-all duration-300 ease-in-out ${showSidebar && isSidebarOpen ? 'md:ml-[300px]' : 'md:ml-[84px]'} ${showSidebar ? 'px-4 md:px-8' : ''}`}>
 
         {/* ✅ Toggle Button handled in Sidebar/Navbar now */}
 

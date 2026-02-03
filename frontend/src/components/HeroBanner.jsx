@@ -471,37 +471,37 @@ const HeroBanner = () => {
             </AnimatePresence>
 
             {/* Navigation Controls */}
-            <div className="absolute inset-x-0 bottom-8 z-30 flex items-center justify-center gap-4">
-                <button 
-                    onClick={prevSlide}
-                    className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-white/10 transition-all shadow-lg hover:scale-110"
-                >
-                    <ChevronLeft size={24} />
-                </button>
+            <button 
+                onClick={prevSlide}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all shadow-lg hover:scale-110 group"
+            >
+                <ChevronLeft size={24} className="group-hover:-translate-x-0.5 transition-transform" />
+            </button>
 
-                <div className="flex gap-2">
-                    {slides.map((_, index) => (
-                        <button
-                            key={index}
-                            onClick={() => setCurrent(index)}
-                            className={`transition-all ${
-                                current === index 
-                                    ? 'w-8 h-2 bg-white/80 rounded-full' 
-                                    : 'w-2 h-2 bg-white/20 rounded-full hover:bg-white/40'
-                            }`}
-                        />
-                    ))}
-                </div>
+            <button 
+                onClick={nextSlide}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all shadow-lg hover:scale-110 group"
+            >
+                <ChevronRight size={24} className="group-hover:translate-x-0.5 transition-transform" />
+            </button>
 
-                <button 
-                    onClick={nextSlide}
-                    className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-white/10 transition-all shadow-lg hover:scale-110"
-                >
-                    <ChevronRight size={24} />
-                </button>
+            {/* Pagination Dots */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex gap-2 p-2 bg-black/20 backdrop-blur-sm rounded-full border border-white/10">
+                {slides.map((_, index) => (
+                    <button
+                        key={index}
+                        onClick={() => setCurrent(index)}
+                        className={`transition-all duration-300 rounded-full ${
+                            current === index 
+                                ? 'w-8 h-2 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' 
+                                : 'w-2 h-2 bg-white/30 hover:bg-white/60'
+                        }`}
+                    />
+                ))}
             </div>
         </div>
     );
 };
+
 
 export default HeroBanner;

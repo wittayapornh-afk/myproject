@@ -13,6 +13,7 @@ import { Navigation } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import ProductBadge from './ProductBadge';
 
 // ========================================
 // 🎯 Component: CategoryRow
@@ -43,8 +44,9 @@ function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
     useEffect(() => {
         setLoading(true);
         
-        // 📡 เรียก API ดึงสินค้าตามหมวดหมู่
-        fetch(`/api/products/?category=${categorySlug}`)
+    // 📡 เรียก API ดึงสินค้าตามหมวดหมู่
+        const API_BASE_URL = "http://localhost:8000";
+        fetch(`${API_BASE_URL}/api/products/?category=${categorySlug}`)
             .then(res => {
                 if (!res.ok) {
                     res.text().then(text => console.error("❌ API Error:", text));
@@ -142,6 +144,12 @@ function CategoryRow({ title, categorySlug, bgColor = "#FFFFFF" }) {
                                     
                                     {/* 📸 ส่วนรูปภาพสินค้า */}
                                     <div className="aspect-[4/5] bg-[#F3F4F6] rounded-[2rem] mb-5 overflow-hidden relative">
+                                        {/* 🏷️ NEW: Enriched Tag Badges */}
+                                        <div className="absolute top-4 left-4 flex flex-col gap-1.5 z-20">
+                                            {product.stock > 0 && product.tags && product.tags.map(tag => (
+                                                <ProductBadge key={tag.id} tag={tag} />
+                                            ))}
+                                        </div>
                                         {/* Link ครอบทั้งรูป - คลิกแล้วไปหน้า ProductDetail */}
                                         <Link to={`/product/${product.id}`} className="block w-full h-full flex items-center justify-center p-6">
                                             <img 

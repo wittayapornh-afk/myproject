@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, ChevronsLeft, User, Home, ShoppingBag, ClipboardList, Heart, History, Box, Truck, BarChart2, Bell, Tag, Zap, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, ChevronsLeft, User, Home, ShoppingBag, ClipboardList, Heart, History, Box, Truck, BarChart2, Bell, Tag, Zap, Sparkles, Ticket } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext'; 
 import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
@@ -50,7 +50,7 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
       title: "ทั่วไป",
       items: [
         { id: 'flash-sales', label: 'Flash Sale', icon: <Zap size={20} />, path: '/admin/flash-sales' }, 
-        { id: 'coupons', label: 'คูปองส่วนลด', icon: <Tag size={20} />, path: '/admin/coupons' },
+        { id: 'coupons', label: 'คูปองส่วนลด', icon: <Ticket size={20} />, path: '/admin/coupons' },
         { id: 'tags', label: 'จัดการ Tags', icon: <Tag size={20} />, path: '/admin/tags' }, // 🏷️ เพิ่มเมนู Tags
         { id: 'history', label: 'ประวัติสต็อก', icon: <History size={20} /> },
       ]
@@ -105,20 +105,20 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
       >
         
         {/* HEADER AREA: "Menu" */}
-        <div className="pt-8 px-8 pb-6 flex items-center justify-between">
+        <div className={`pt-8 pb-6 flex items-center transition-all ${isSidebarOpen ? 'justify-between px-8 flex-row' : 'flex-col gap-6 px-2'}`}>
              {/* Title on Left */}
              {/* Brand Logo - Click to Home */}
-             <Link to="/" className={`flex items-center gap-2 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden pointer-events-none'}`}>
-                 <div className="w-8 h-8 bg-[#1a4d2e] rounded-lg flex items-center justify-center text-white shadow-sm">
+             {/* Title on Left */}
+             {/* Brand Logo - Click to Home */}
+             <Link to="/" className={`flex items-center gap-2 transition-all duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden pointer-events-none'}`}>
+                 <div className="w-8 h-8 bg-[#1a4d2e] rounded-lg flex items-center justify-center text-white shadow-sm shrink-0">
                      <Sparkles size={16} />
                  </div>
-                 <span className="text-xl font-black text-[#1a4d2e] tracking-tighter uppercase">Shop.</span>
+                 <span className="text-xl font-black text-[#1a4d2e] tracking-tighter uppercase whitespace-nowrap">Shop.</span>
              </Link>
              
              {/* Action Icons (Right) */}
-             <div className="flex items-center gap-4">
-                 {/* 🔽 Removed User/Cart icons from here as requested */}
-                 
+             <div className={`flex items-center gap-4 ${!isSidebarOpen && 'flex-col'}`}>
                  {/* Toggle Button (X or Menu) */}
                  <button 
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
@@ -131,9 +131,8 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
 
         {/* Restore Toggle Button for Mini Mode (If closed on desktop) */}
         {!isSidebarOpen && (
-             <div className="flex justify-center mb-6">
-                 {/* Mini Logo or Placeholder */}
-                 <div className="w-10 h-10 bg-[#1a4d2e] rounded-xl flex items-center justify-center text-white font-bold">A</div>
+             <div className="flex justify-center mb-6 opacity-0 pointer-events-none h-0">
+                 {/* Placeholder removed to keep clean */}
              </div>
         )}
 

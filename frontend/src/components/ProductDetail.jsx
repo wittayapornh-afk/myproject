@@ -10,6 +10,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
+import ProductBadge from './ProductBadge';
 
 // 🎠 Swiper - สำหรับทำ Gallery รูปสินค้า
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -403,9 +404,12 @@ function ProductDetail() {
              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-bl-[10rem] -z-0 opacity-50 pointer-events-none"></div>
 
              <div className="relative z-10">
-                 <div className="flex items-center gap-2 mb-4">
+                 <div className="flex flex-wrap items-center gap-2 mb-4">
                      <span className="text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em] bg-indigo-50 px-3 py-1.5 rounded-lg">{product.category}</span>
                      {product.stock > 0 && product.stock < 5 && <span className="text-orange-500 font-bold text-[10px] uppercase tracking-wide bg-orange-50 px-2 py-1.5 rounded-lg flex items-center gap-1"><Zap size={10} fill="currentColor"/> Low Stock</span>}
+                     {product.tags && product.tags.map(tag => (
+                         <ProductBadge key={tag.id} tag={tag} size="lg" />
+                     ))}
                  </div>
 
                  <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight">{product.title}</h1>
@@ -544,6 +548,11 @@ function ProductDetail() {
                     {relatedProducts.map((item) => (
                         <Link key={item.id} to={`/product/${item.id}`} className="group bg-white p-4 rounded-[2rem] shadow-sm hover:shadow-xl transition-all border border-transparent hover:border-indigo-50">
                             <div className="aspect-square bg-gray-50 rounded-[1.5rem] mb-4 overflow-hidden p-4 flex items-center justify-center relative">
+                                <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-20">
+                                    {item.tags && item.tags.map(tag => (
+                                        <ProductBadge key={tag.id} tag={tag} />
+                                    ))}
+                                </div>
                                 <img src={getImageUrl(item.thumbnail || item.image)} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500 mix-blend-multiply" alt=""/>
                             </div>
                             <h3 className="font-bold text-gray-900 text-sm truncate px-1">{item.title}</h3>

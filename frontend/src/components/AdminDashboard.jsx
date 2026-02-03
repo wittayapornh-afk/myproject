@@ -137,9 +137,12 @@ function AdminDashboard() {
                 setErrorMsg("No Token Found");
                 return;
             }
+            // ✅ Fix: Use YYYY-MM-DD for API (Local Time) to avoid Timezone issues
+            const dateParam = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
             const response = await axios.get(`${API_BASE_URL}/api/admin-stats/`, {
                 params: { 
-                    date: formatDate(selectedDate),
+                    date: dateParam,
                     period: viewMode,
                     category_id: selectedCategory 
                 },
@@ -363,7 +366,7 @@ function AdminDashboard() {
         <div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-900 pb-20">
             <DatePickerStyles />
             {/* Sidebar Desktop */}
-            <div className="flex-1 w-full p-6 md:p-10 transition-all">
+            <div className="flex-1 w-full p-8 md:p-16 lg:p-24 transition-all">
                 {/* Top Header */}
                 <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white/80 backdrop-blur-md p-6 rounded-[2rem] shadow-sm border border-gray-100 sticky top-24 z-[30]">
                     <div>

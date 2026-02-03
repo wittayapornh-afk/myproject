@@ -35,6 +35,7 @@ urlpatterns = [
     # --- Products (สินค้า) ---
     path('api/products/', views.products_api, name='products_api'),
     path('api/products/add/', views.add_product_api, name='add_product'),
+    path('api/products/by-tags/', views.get_products_by_tags_api, name='get_products_by_tags'), # ✅ Moved Here for Priority
     path('api/products/<int:product_id>/', views.product_detail_api, name='product_detail_api'),
     path('api/products/<int:product_id>/related/', views.get_related_products, name='get_related_products'),
     path('api/products/<int:product_id>/stock-history/', views.get_stock_history, name='get_stock_history'),
@@ -42,6 +43,7 @@ urlpatterns = [
     path('api/products/<int:product_id>/delete/', views.delete_product_api, name='delete_product'),
     
     path('api/categories/', views.categories_api, name='categories_api'),
+    path('api/menu-configs/', views.get_menu_configs_api, name='get_menu_configs'), # ✅ New Endpoint
     path('api/admin/categories-list/', views.get_categories, name='get_categories_list'), # ✅ New Endpoint for Dropdown
     path('api/brands/', views.brands_api, name='brands_api'),
     
@@ -49,6 +51,10 @@ urlpatterns = [
     path('api/tags/', views.tag_api, name='tags_api'),  # GET: ดึง Tags ทั้งหมด, POST: สร้าง Tag ใหม่
     path('api/tags/<int:tag_id>/', views.tag_api, name='tag_detail'),  # DELETE: ลบ Tag
     path('api/products/<int:product_id>/tags/', views.product_tags_api, name='product_tags'),  # POST: กำหนด Tags ให้สินค้า
+    
+    # ⚡ Advanced Tag Management
+    path('api/tags/automation/run/', views.run_tag_automation_api, name='run_tag_automation'),
+    path('api/products/bulk-update-tags/', views.bulk_update_tags_api, name='bulk_update_tags'),
     
     path('api/submit-review/', views.submit_review, name='submit_review'),
 

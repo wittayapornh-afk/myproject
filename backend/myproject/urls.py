@@ -23,8 +23,18 @@ urlpatterns = [
     # 🛒 Product APIs (หน้าบ้าน)
     # ==============================
     path('api/products/', views.products_api),
+    path('api/products/by-tags/', views.get_products_by_tags_api), # ✅ Fetch Products by Tags
     path('api/categories/', views.categories_api),
+    path('api/menu-configs/', views.get_menu_configs_api, name='get_menu_configs'), # ✅ Fix 404
     path('api/brands/', views.brands_api), # ✅ Add brands API
+    
+    # --- Tags (🏷️ Tag System) ---
+    path('api/tags/', views.tag_api, name='tags_api'),  # GET: ดึง Tags ทั้งหมด, POST: สร้าง Tag ใหม่
+    path('api/tags/<int:tag_id>/', views.tag_api, name='tag_detail'),  # DELETE: ลบ Tag
+    path('api/products/<int:product_id>/tags/', views.product_tags_api, name='product_tags'),  # POST: กำหนด Tags ให้สินค้า
+    path('api/tags/automation/run/', views.run_tag_automation_api), # ✅ Add Automation API
+    path('api/products/bulk-update-tags/', views.bulk_update_tags_api), # ✅ Add Bulk Update API
+    
     # ✅ แก้เป็น products (เติม s) ให้ตรงกับ Frontend
     path('api/products/<int:product_id>/', views.product_detail_api),
     path('api/products/<int:product_id>/related/', views.get_related_products), # ✅ Add Related Products
@@ -73,6 +83,7 @@ urlpatterns = [
 
     # 2. จัดการสินค้า (Admin)
     path('api/admin/all_products/', views.get_all_products_admin_api), # ดึงสินค้าทั้งหมด (Admin)
+    path('api/admin/products/', views.get_all_products_admin_api), # ✅ Fix 404: Map requested URL to existing view
     path('api/add_product/', views.add_product_api),
     path('api/edit_product/<int:product_id>/', views.edit_product_api),
     path('api/delete_product/<int:product_id>/', views.delete_product_api),
