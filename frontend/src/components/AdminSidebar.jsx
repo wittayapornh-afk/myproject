@@ -60,7 +60,7 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
       items: [
         { id: 'users', label: 'ผู้ใช้งานระบบ', icon: <Users size={20} />, restricted: true },
         { id: 'logs', label: 'บันทึกกิจกรรม', icon: <ClipboardList size={20} /> }, 
-        { id: 'profile', label: 'การตั้งค่า', icon: <User size={20} /> },
+        { id: 'profile', label: 'โปรไฟล์ของฉัน', icon: <User size={20} /> },
       ]
     }
   ];
@@ -69,7 +69,7 @@ const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
     { id: 'home', label: 'หน้าแรก', icon: <Home size={20} />, path: '/' },
     { id: 'shop', label: 'สินค้าทั้งหมด', icon: <ShoppingBag size={20} />, path: '/shop' },
     { id: 'cart', label: 'ตะกร้าสินค้า', icon: <ShoppingCart size={20} />, path: '/cart', badge: cartItems.length }, 
-    { id: 'profile', label: 'บัญชีของฉัน', icon: <User size={20} />, path: '/profile' },
+    { id: 'profile', label: 'โปรไฟล์ของฉัน', icon: <User size={20} />, path: '/profile' },
   ];
 
   const handleMenuClick = (item) => {
