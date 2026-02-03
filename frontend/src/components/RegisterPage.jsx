@@ -46,59 +46,61 @@ function RegisterPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    let newValue = value;
 
+    // 1. Phone Validation
     if (name === 'phone') {
       const numericValue = value.replace(/\D/g, ''); // Allow only numbers
-      if (numericValue.length <= 10) {
-        setFormData(prev => ({ ...prev, [name]: numericValue }));
-      }
-      return;
+      if (numericValue.length > 10) return; // Block input if > 10
+      newValue = numericValue;
     }
 
-    if (name === 'password' || name === 'confirmPassword') {
+    // 2. Password Validation
+    else if (name === 'password' || name === 'confirmPassword') {
       // Block Thai characters
-      const sanitizedValue = value.replace(/[\u0E00-\u0E7F]/g, '');
-      setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
+      newValue = value.replace(/[\u0E00-\u0E7F]/g, '');
 
       if (name === 'password') {
         setPasswordCriteria({
-          length: sanitizedValue.length >= 6,
-          number: /\d/.test(sanitizedValue),
-          special: /[^A-Za-z0-9]/.test(sanitizedValue)
+          length: newValue.length >= 6,
+          number: /\d/.test(newValue),
+          special: /[^A-Za-z0-9]/.test(newValue)
         });
       }
-      return;
     }
 
-    // Default update for other fields
-    setFormData(prev => ({ ...prev, [name]: value }));
-
-    if (name === 'username') {
-      const sanitizedValue = value.replace(/[^A-Za-z0-9]/g, '');
-      setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
+    // 3. Username Validation & Check
+    else if (name === 'username') {
+      newValue = value.replace(/[^A-Za-z0-9]/g, ''); // Alphanumeric only
 
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-      if (sanitizedValue.length >= 3) {
-        timeoutRef.current = setTimeout(() => checkUsername(sanitizedValue), 500);
+      if (newValue.length >= 3) {
+        timeoutRef.current = setTimeout(() => checkUsername(newValue), 500);
       } else {
         setUsernameStatus(null);
       }
-      return;
     }
 
-    if (name === 'first_name' || name === 'last_name') {
-      // Allow Thai, English, and Spaces only
-      const sanitizedValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F\s]/g, '');
-      setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
-      return;
+    // 4. Name Validation (No Spaces)
+    else if (name === 'first_name' || name === 'last_name') {
+      // Allow Thai and English only (No Spaces)
+      newValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F]/g, '');
     }
 
-    if (name === 'email') {
-      // Allow only a-z, 0-9, ., @
-      const sanitizedValue = value.toLowerCase().replace(/[^a-z0-9.@]/g, '');
-      setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
-      return;
+    // 5. Email Validation (No Spaces)
+    else if (name === 'email') {
+      // Allow only a-z, 0-9, ., @ and forcefully remove ANY whitespace
+      newValue = value.toLowerCase().replace(/\s/g, '').replace(/[^a-z0-9.@]/g, '');
+    }
+
+    // Single State Update
+    setFormData(prev => ({ ...prev, [name]: newValue }));
+  };
+
+  // 🚫 Block Space Key Event
+  const handleKeyDown = (e) => {
+    if (e.key === ' ') {
+      e.preventDefault();
     }
   };
 
@@ -113,6 +115,24 @@ function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    // Final Validation Check
+    if (
+      !formData.first_name.trim() ||
+      !formData.last_name.trim() ||
+      !formData.username.trim() ||
+      !formData.email.trim()
+    ) {
+      Swal.fire('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกข้อมูลที่จำเป็นให้ครบ', 'warning');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      Swal.fire('รหัสผ่านไม่ตรงกัน', 'กรุณาตรวจสอบการยืนยันรหัสผ่าน', 'error');
+      setLoading(false);
+      return;
+    }
 
     // Password Validation
     if (formData.password.length < 6) {
@@ -305,7 +325,7 @@ function RegisterPage() {
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">อีเมล</label>
               <div className="relative">
                 <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
-                <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-bold shadow-sm placeholder-gray-300" placeholder="อีเมลของคุณ" required />
+                <input type="email" name="email" value={formData.email} onChange={handleChange} onKeyDown={handleKeyDown} className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent hover:border-gray-100 focus:border-[#1a4d2e] rounded-2xl focus:outline-none focus:bg-white transition-all text-[#263A33] font-bold shadow-sm placeholder-gray-300" placeholder="อีเมลของคุณ" required />
               </div>
             </div>
 

@@ -181,11 +181,22 @@ function CheckoutPage() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+
+        let newValue = value;
+
+        if (name === 'first_name' || name === 'last_name') {
+            // Allow Thai and English only (No Spaces)
+            newValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F]/g, '');
+        } else if (name === 'email') {
+            // Allow only a-z, 0-9, ., @
+            newValue = value.toLowerCase().replace(/[^a-z0-9.@]/g, '');
+        }
+
+        setFormData(prev => ({ ...prev, [name]: newValue }));
 
         // Real-time validation for some fields
         if (['phone', 'zip_code'].includes(name)) {
-            validateField(name, value);
+            validateField(name, newValue);
         } else {
             // Clear error if exists when typing
             if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
@@ -402,15 +413,15 @@ function CheckoutPage() {
     };
 
     // ✅ Refactored Calculation for Clarity
-    const BASE_SHIPPING_COST = 50; 
+    const BASE_SHIPPING_COST = 50;
     const isFreeShipping = couponData?.discount_type === 'free_shipping'; // Restored for UI logic
-    
+
     // Fixed: Do not zero out shipping, let discount offset it.
     const shippingCost = BASE_SHIPPING_COST;
 
     // 1. Calculate Base Subtotal (Full Price)
     const baseSubtotal = checkoutItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-    
+
     // 2. Calculate Flash Savings
     const flashSavings = checkoutItems.reduce((total, item) => {
         if (flashSaleItems[item.id]) {
@@ -426,7 +437,7 @@ function CheckoutPage() {
     // 🛡️ Safety Clamp: Discount cannot exceed (Base - Flash)
     const maxAllowedDiscount = Math.max(0, baseSubtotal - flashSavings);
     const effectiveDiscount = Math.min(discount, maxAllowedDiscount);
-    
+
     const finalTotal = Math.max(0, baseSubtotal - flashSavings - effectiveDiscount + shippingCost);
     const hasFlashSaleItem = checkoutItems.some(item => flashSaleItems[String(item.id)]);
 
@@ -475,7 +486,7 @@ function CheckoutPage() {
 
         try {
             const storedToken = token || localStorage.getItem('token') || (user && user.token);
-            
+
             const payload = {
                 code: code,
                 total_amount: baseSubtotal,
@@ -491,12 +502,12 @@ function CheckoutPage() {
             });
 
             if (res.data.valid) {
-                 // Close Loading
+                // Close Loading
                 Swal.close();
 
                 setDiscount(res.data.discount_amount);
                 setCouponData(res.data);
-                
+
                 // Show Success
                 Swal.fire({
                     icon: 'success',
@@ -517,10 +528,10 @@ function CheckoutPage() {
             setDiscount(0);
             setCouponData(null);
             setCouponCode('');
-            
+
             // ✅ Handle Strict Backend Errors (Friendly Display)
             const errorMsg = error.response?.data?.error || 'คูปองไม่ถูกต้อง หรือหมดอายุแล้ว';
-            
+
             Swal.fire({
                 icon: 'error',
                 title: 'ขออภัย',
@@ -1019,7 +1030,7 @@ function CheckoutPage() {
                                     const prodId = String(item.id);
                                     const isFlashSale = !!flashSaleItems[prodId];
                                     const price = getEffectivePrice(item);
-                                    
+
                                     return (
                                         <div key={`${item.id}-${idx}`} className={`flex gap-4 items-center p-3 rounded-2xl transition-all duration-300 ${isFlashSale ? 'bg-orange-500/10 border border-orange-500/40 shadow-sm shadow-orange-500/20 hover:scale-[1.02]' : 'bg-white/5 border border-white/5'}`}>
                                             <div className="w-14 h-14 rounded-2xl bg-white/10 flex-shrink-0 p-1.5 relative border border-white/10 shadow-inner">
@@ -1033,7 +1044,7 @@ function CheckoutPage() {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
                                                     <p className="text-xs font-black truncate text-gray-100">{item.title}</p>
-                                                    {isFlashSale && <span className="text-[9px] bg-orange-500 text-white px-1.5 py-0.5 rounded-md flex items-center gap-1 font-black animate-bounce shadow-sm"><Zap size={8} fill="currentColor"/> SALE</span>}
+                                                    {isFlashSale && <span className="text-[9px] bg-orange-500 text-white px-1.5 py-0.5 rounded-md flex items-center gap-1 font-black animate-bounce shadow-sm"><Zap size={8} fill="currentColor" /> SALE</span>}
                                                 </div>
                                                 <p className="text-[10px] text-white/40 font-bold uppercase tracking-tight">จำนวน {item.quantity} รายการ</p>
                                             </div>
@@ -1138,13 +1149,13 @@ function CheckoutPage() {
                                                 </span>
                                             )}
                                         </div>
-                                        
+
                                         <p className="font-black text-indigo-950 text-lg mb-1">
-                                            {coupon.discount_type === 'percent' ? `${Number(coupon.discount_value)}% OFF` : 
-                                             coupon.discount_type === 'free_shipping' ? 'ส่งฟรี (Free Shipping)' : 
-                                             `ส่วนลด ฿${Number(coupon.discount_value)}`}
+                                            {coupon.discount_type === 'percent' ? `${Number(coupon.discount_value)}% OFF` :
+                                                coupon.discount_type === 'free_shipping' ? 'ส่งฟรี (Free Shipping)' :
+                                                    `ส่วนลด ฿${Number(coupon.discount_value)}`}
                                         </p>
-                                        
+
                                         <div className="flex flex-wrap gap-2 text-xs text-gray-500 font-medium">
                                             <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
                                                 ขั้นต่ำ ฿{Number(coupon.min_spend).toLocaleString()}
