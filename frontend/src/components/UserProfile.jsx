@@ -99,10 +99,10 @@ function UserProfile() {
       return;
     }
 
-    // Restriction for Name (No special chars, allow letters & spaces)
+    // Restriction for Name (No special chars, allow letters & NO spaces)
     if (name === 'first_name' || name === 'last_name') {
-      // Regex: Allow Thai/English letters, spaces. Disallow special chars like !@#$%^&*()
-      const restrictedValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F\s]/g, '');
+      // Regex: Allow Thai/English letters. Disallow spaces and special chars
+      const restrictedValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F]/g, '');
       setFormData(prev => ({ ...prev, [name]: restrictedValue }));
       return;
     }
