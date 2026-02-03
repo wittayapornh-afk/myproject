@@ -126,7 +126,7 @@ const CouponSection = () => {
     // 🎨 Render UI
     // ========================================
     return (
-        <section className="mb-16 -mt-8 relative z-20">
+        <section className="mb-16 mt-8 relative z-20">
             <div className="container mx-auto px-4 max-w-7xl">
                 
                 {/* ========================================

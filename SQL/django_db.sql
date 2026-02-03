@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: db:3306
--- Generation Time: Jan 22, 2026 at 09:21 AM
+-- Generation Time: Jan 29, 2026 at 02:09 AM
 -- Server version: 8.0.44
 -- PHP Version: 8.3.26
 
@@ -108,7 +108,9 @@ CREATE TABLE `authtoken_token` (
 --
 
 INSERT INTO `authtoken_token` (`key`, `created`, `user_id`) VALUES
+('04f544a372f1d5a7999402e68553e8e747624e10', '2026-01-27 09:28:48.694902', 12),
 ('24dbe24c7e24d3ca91149dbf0af2d4651cd031d8', '2025-12-25 05:33:41.349427', 2),
+('4ea641e9146781c0c48b11919f344cf43434b1b8', '2026-01-28 09:48:26.148498', 13),
 ('51596ff8d0efe086a4930d32af76d50fed067cba', '2026-01-06 09:26:28.114510', 8),
 ('7a95f81a3f7320da283cac8bb99ca7161bfe53eb', '2026-01-12 04:13:33.242611', 9),
 ('8e51e977d0042ff9c3bf3175bad6820d76d46523', '2025-12-31 02:25:07.812827', 5),
@@ -276,6 +278,10 @@ CREATE TABLE `categories` (
 
 INSERT INTO `categories` (`id`, `name`) VALUES
 (2, 'Beauty'),
+(42, 'Bedding'),
+(44, 'Clothing'),
+(40, 'Decor'),
+(43, 'Electronics'),
 (3, 'Fragrances'),
 (4, 'Furniture'),
 (5, 'Groceries'),
@@ -284,6 +290,7 @@ INSERT INTO `categories` (`id`, `name`) VALUES
 (32, 'Kitchen Accessories'),
 (7, 'Kitchen-Accessories'),
 (8, 'Laptops'),
+(41, 'Lighting'),
 (38, 'Mens Shirts'),
 (30, 'Mens Shoes'),
 (39, 'Mens Watches'),
@@ -358,7 +365,10 @@ INSERT INTO `coupons` (`id`, `code`, `discount_type`, `discount_value`, `min_spe
 (6, 'EEEE', 'fixed', 350.00, 1000.00, 20, 0, '2026-01-15 19:54:00.000000', '2026-01-15 19:54:00.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
 (7, 'QQQQ', 'fixed', 250.00, 500.00, 30, 0, '2026-01-15 19:55:00.000000', '2026-01-15 19:55:00.000000', 1, '[\"customer\", \"new_user\"]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
 (8, '1234', 'fixed', 99.00, 0.00, 1, 0, '2026-01-15 23:30:00.000000', '2026-01-15 17:30:00.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
-(9, '545554', 'percent', 10.00, 100.00, 20, 1, '2026-01-16 09:38:55.000000', '2026-01-23 09:38:55.352000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000);
+(9, '545554', 'percent', 10.00, 100.00, 20, 2, '2026-01-27 09:38:55.000000', '2026-01-29 09:38:55.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
+(10, 'CODE', 'free_shipping', 0.00, 100.00, 1, 0, '2026-01-27 02:17:58.000000', '2026-01-28 02:17:58.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
+(11, '350Z', 'fixed', 120.00, 50.00, 100, 0, '2026-01-28 06:20:53.341000', '2026-01-28 08:19:54.000000', 1, '[]', 0, '{}', '', 1, 0, 1, 0, NULL, '', 0, '[]', '[]', 1000000),
+(12, 'CODE12345678999', 'percent', 50.00, 600.00, 1, 1, '2026-01-28 09:45:10.212000', '2026-02-04 09:45:10.000000', 1, '[]', 1, '{\"new_user\": true}', '', 1, 0, 1, 0, 200.00, '', 0, '[]', '[]', 1000000);
 
 -- --------------------------------------------------------
 
@@ -463,7 +473,7 @@ INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES
 (23, 'sessions', '0001_initial', '2025-12-25 02:48:50.982125'),
 (24, 'myapp', '0002_alter_review_options_alter_orderitem_product_and_more', '2025-12-29 16:29:34.437094'),
 (25, 'myapp', '0003_review_reply_comment_review_reply_timestamp', '2025-12-30 03:38:16.452884'),
-(26, 'myapp', '0004_product_seller', '2025-12-30 08:42:55.888267'),
+(26, 'myapp', '0004_product_admin', '2025-12-30 08:42:55.888267'),
 (27, 'myapp', '0005_order_payment_date_order_slip_image', '2026-01-05 02:40:57.461521'),
 (28, 'myapp', '0006_order_bank_name_order_transfer_amount_and_more', '2026-01-05 02:58:57.761280'),
 (29, 'myapp', '0007_order_transfer_account_number', '2026-01-05 04:00:59.718953'),
@@ -482,7 +492,11 @@ INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES
 (43, 'myapp', '0019_promotionschedule_promousagelog_alter_coupon_options_and_more', '2026-01-20 09:15:09.819883'),
 (44, 'myapp', '0020_flashsale_auto_disable_on_end_and_more', '2026-01-21 03:22:47.331483'),
 (45, 'myapp', '0021_add_flash_sale_campaign', '2026-01-22 02:46:07.024907'),
-(46, 'myapp', '0022_fix_flashsalecampaign_id_autoincrement', '2026-01-22 03:08:08.267155');
+(46, 'myapp', '0022_fix_flashsalecampaign_id_autoincrement', '2026-01-22 03:08:08.267155'),
+(47, 'myapp', '0023_fix_flashsalecampaign_auto_increment_raw_sql', '2026-01-28 05:15:57.132467'),
+(48, 'myapp', '0024_fix_auto_increment_only', '2026-01-28 05:15:57.163645'),
+(49, 'myapp', '0025_fix_order_auto_increment', '2026-01-28 06:17:11.828173'),
+(50, 'myapp', '0026_alter_flashsalecampaign_id', '2026-01-28 06:17:11.843556');
 
 -- --------------------------------------------------------
 
@@ -502,6 +516,7 @@ CREATE TABLE `django_session` (
 
 INSERT INTO `django_session` (`session_key`, `session_data`, `expire_date`) VALUES
 ('4jmver4lr2pizie0lttxbou2912xgh1h', '.eJxVjDEOwjAMRe-SGUWxawphZO8ZIttJSAGlUtNOiLtDpQ6w_vfef5nA61LC2tIcxmguBszhdxPWR6obiHeut8nqVJd5FLspdqfNDlNMz-vu_h0UbuVbd4ienFLOLpN68XLEKADKAIRZe3d2wI70BIm8KvcADhN2ooICYt4f13w3xQ:1vfBWq:S0mbGwM6i_Di9isMgnZyeSFz8XSoUVOB532zywjCOPk', '2026-01-26 06:35:52.313829'),
+('9qdn8s1co0y0d9jwersw374wwh5qeanx', '.eJxVjDEOwjAMRe-SGUWxawphZO8ZIttJSAGlUtNOiLtDpQ6w_vfef5nA61LC2tIcxmguBszhdxPWR6obiHeut8nqVJd5FLspdqfNDlNMz-vu_h0UbuVbd4ienFLOLpN68XLEKADKAIRZe3d2wI70BIm8KvcADhN2ooICYt4f13w3xQ:1vkY9M:r10y_vaz_qQbqbqMjJn-XP0IdX4tQAGsbGtP6jS18Bo', '2026-02-10 01:45:48.421254'),
 ('u51lcn97xndebwh18s0m1glhfeh1i87k', '.eJxVjDEOwjAMRe-SGUWxawphZO8ZIttJSAGlUtNOiLtDpQ6w_vfef5nA61LC2tIcxmguBszhdxPWR6obiHeut8nqVJd5FLspdqfNDlNMz-vu_h0UbuVbd4ienFLOLpN68XLEKADKAIRZe3d2wI70BIm8KvcADhN2ooICYt4f13w3xQ:1vYgg7:UX3MeOG__nFolHIMsuD78OY8eGXvi7-S9vRrnzGVYXw', '2026-01-08 08:26:35.611070');
 
 -- --------------------------------------------------------
@@ -535,9 +550,13 @@ CREATE TABLE `flash_sales` (
 --
 
 INSERT INTO `flash_sales` (`id`, `name`, `start_time`, `end_time`, `is_active`, `description`, `banner_image`, `priority`, `limit_per_user_total`, `rounds`, `auto_disable_on_end`, `enable_notification`, `limit_per_user_enabled`, `show_countdown_timer`, `show_in_hero`, `display_order`, `campaign_id`) VALUES
-(17, '22', '2026-01-22 04:46:49.900000', '2026-01-23 05:06:00.000000', 1, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, 38),
-(19, 'ๅ/ๅ/', '2026-01-21 17:00:00.000000', '2026-01-24 17:00:00.000000', 1, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, 38),
-(20, '2323', '2026-01-22 17:00:00.000000', '2026-01-23 17:00:00.000000', 1, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, 39);
+(21, '2.3', '2026-01-22 17:00:00.000000', '2026-01-23 17:00:00.000000', 1, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, 41),
+(22, 'Deal $$$$$###!!!!', '2026-01-23 17:01:00.000000', '2026-01-26 17:01:00.000000', 0, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, 41),
+(23, 'ฟหกดหฟ', '2026-01-23 08:00:30.351000', '2026-01-25 02:00:00.000000', 1, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, 41),
+(24, '23', '2026-01-26 08:27:11.445000', '2026-01-27 08:27:11.445000', 0, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, NULL),
+(25, '27', '2026-01-27 02:30:45.486000', '2026-01-27 08:39:45.486000', 1, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, NULL),
+(26, '/-/-', '2026-01-28 09:51:44.487000', '2026-01-29 09:51:44.487000', 1, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, NULL),
+(28, '2222', '2026-01-27 09:03:33.626000', '2026-01-28 09:03:33.626000', 1, NULL, '', 0, 5, '[]', 1, 1, 1, 1, 1, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -564,8 +583,7 @@ CREATE TABLE `flash_sale_campaigns` (
 --
 
 INSERT INTO `flash_sale_campaigns` (`id`, `name`, `description`, `campaign_start`, `campaign_end`, `banner_image`, `theme_color`, `created_at`, `updated_at`, `is_active`, `priority`) VALUES
-(38, '121212', '', '2026-01-22 08:09:21.909000', '2026-01-29 08:09:21.909000', '', '#19f915', '2026-01-22 08:12:03.235633', '2026-01-22 08:12:03.235641', 1, 1),
-(39, '2323', '', '2026-01-22 08:30:38.065000', '2026-01-29 08:30:38.065000', '', '#6515f9', '2026-01-22 08:31:11.170192', '2026-01-22 08:31:11.170199', 1, 0);
+(41, '23.23', '', '2026-01-23 08:35:28.312000', '2026-01-25 08:35:28.000000', '', '#8715f9', '2026-01-23 08:36:15.093067', '2026-01-23 09:06:59.923123', 1, 0);
 
 -- --------------------------------------------------------
 
@@ -590,14 +608,25 @@ CREATE TABLE `flash_sale_products` (
 --
 
 INSERT INTO `flash_sale_products` (`id`, `sale_price`, `quantity_limit`, `sold_count`, `flash_sale_id`, `product_id`, `limit_per_user`, `original_price_snapshot`, `reserved_stock`) VALUES
-(25, 24.00, 10, 0, 17, 189, 1, NULL, 0),
-(28, 31500.00, 10, 0, 19, 195, 1, NULL, 0),
-(29, 123.00, 10, 0, 19, 194, 1, NULL, 0),
-(30, 687.00, 10, 0, 19, 193, 1, NULL, 0),
-(31, 9789.00, 10, 0, 19, 192, 1, NULL, 0),
-(32, 170.00, 10, 0, 20, 181, 1, NULL, 0),
-(33, 28.00, 10, 0, 20, 182, 1, NULL, 0),
-(34, 47.00, 10, 0, 20, 180, 1, NULL, 0);
+(40, 29.00, 10, 0, 21, 37, 1, NULL, 0),
+(41, 47.00, 10, 0, 21, 35, 1, NULL, 0),
+(42, 29.00, 10, 0, 21, 36, 1, NULL, 0),
+(50, 8.00, 98, 0, 23, 47, 1, NULL, 0),
+(51, 17.00, 34, 0, 23, 46, 1, NULL, 0),
+(52, 13.00, 88, 0, 23, 45, 1, NULL, 0),
+(53, 11.00, 89, 0, 23, 44, 1, NULL, 0),
+(54, 8.00, 77, 0, 23, 43, 1, NULL, 0),
+(60, 126.00, 38, 1, 25, 194, 1, NULL, 0),
+(72, 170.99, 55, 0, 26, 181, 1, NULL, 0),
+(73, 35.99, 2, 0, 26, 180, 1, NULL, 0),
+(74, 70.99, 26, 0, 26, 179, 1, NULL, 0),
+(75, 77.99, 20, 0, 26, 178, 1, NULL, 0),
+(76, 112.99, 20, 0, 26, 177, 1, NULL, 0),
+(77, 70.99, 81, 0, 28, 10, 1, NULL, 0),
+(78, 60.99, 1, 0, 28, 9, 1, NULL, 0),
+(79, 80.99, 85, 0, 28, 8, 1, NULL, 0),
+(80, 120.99, 50, 1, 28, 7, 1, NULL, 0),
+(81, 40.99, 22, 0, 28, 6, 1, NULL, 0);
 
 -- --------------------------------------------------------
 
@@ -614,7 +643,7 @@ CREATE TABLE `myapp_review` (
   `user_id` bigint NOT NULL,
   `reply_comment` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `reply_timestamp` datetime(6) DEFAULT NULL,
-  `image` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `image` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -656,7 +685,7 @@ CREATE TABLE `orders` (
   `transfer_amount` decimal(12,2) DEFAULT NULL,
   `transfer_date` datetime(6) DEFAULT NULL,
   `transfer_account_number` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `shipping_province` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `shipping_province` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `discount_amount` decimal(10,2) NOT NULL,
   `coupon_id` bigint DEFAULT NULL,
   `dummyy` int DEFAULT NULL,
@@ -728,8 +757,20 @@ INSERT INTO `orders` (`id`, `customer_name`, `customer_tel`, `customer_email`, `
 (68, 'd a', '0456743234', 'sa2779@gmail.com', 'อำเภอสระโบสถ์, จังหวัดลพบุรี, 15240, ประเทศไทย 15240', 22.99, 'Completed', 'Transfer', NULL, '2026-01-19 04:47:20.497473', '2026-01-19 06:26:37.167638', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_81OHJrJ.png', 'Unknown', 22.99, NULL, 'Unknown', 'ลพบุรี', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
 (69, 'd a', '0887423132', 'sa2779@gmail.com', 'บ้านหนองย่างงัว หมู่6, บ้านหนองย่างงัว, โพนเมือง, อำเภออาจสามารถ, จังหวัดร้อยเอ็ด, ประเทศไทย 08755', 4499.00, 'Completed', 'Transfer', NULL, '2026-01-20 10:00:51.491906', '2026-01-21 01:26:42.591862', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_T3K26gY.png', 'ไทยพาณิชย์ (SCB)', 5049.99, NULL, '0056646565', 'ร้อยเอ็ด', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
 (70, 'd a', '0795324565', 'sa2779@gmail.com', 'อ้อมน้อย, สวนหลวง, อำเภอกระทุ่มแบน, จังหวัดสมุทรสาคร, 73160, ประเทศไทย 73160', 35000.00, 'Completed', 'Transfer', NULL, '2026-01-21 09:52:40.897878', '2026-01-21 09:53:07.457352', 1, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_ehteY0B.png', 'Unknown', 35050.00, NULL, 'Unknown', 'สมุทรสาคร', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
-(71, 'd a', '0946375645', 'sa2779@gmail.com', '3249, พลวง, อำเภอเมืองจันทบุรี, จังหวัดจันทบุรี, ประเทศไทย 34564', 19.99, 'Pending', 'Transfer', NULL, '2026-01-21 09:56:09.549292', '2026-01-21 09:56:09.756363', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_ZAYjQJj.png', 'ทหารไทยธนชาต (ttb)', 69.99, NULL, '0789999999', 'จันทบุรี', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
-(72, 'd a', '0265489544', 'sa2779@gmail.com', 'ถนนธนะวิถี, บ้านใหม่ใสสว่าง, อำเภอปะคำ, จังหวัดบุรีรัมย์, ประเทศไทย 98765', 116.99, 'Completed', 'Transfer', NULL, '2026-01-22 01:20:08.371670', '2026-01-22 01:21:32.877945', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_9FL5cKW.png', 'Unknown', 166.99, NULL, 'Unknown', 'บุรีรัมย์', 13.00, 9, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL);
+(71, 'd a', '0946375645', 'sa2779@gmail.com', '3249, พลวง, อำเภอเมืองจันทบุรี, จังหวัดจันทบุรี, ประเทศไทย 34564', 19.99, 'Completed', 'Transfer', NULL, '2026-01-21 09:56:09.549292', '2026-01-23 09:10:17.547938', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_ZAYjQJj.png', 'ทหารไทยธนชาต (ttb)', 69.99, NULL, '0789999999', 'จันทบุรี', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(72, 'd a', '0265489544', 'sa2779@gmail.com', 'ถนนธนะวิถี, บ้านใหม่ใสสว่าง, อำเภอปะคำ, จังหวัดบุรีรัมย์, ประเทศไทย 98765', 116.99, 'Completed', 'Transfer', NULL, '2026-01-22 01:20:08.371670', '2026-01-22 01:21:32.877945', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_9FL5cKW.png', 'Unknown', 166.99, NULL, 'Unknown', 'บุรีรัมย์', 13.00, 9, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(73, 'yu tu', '0594545646', 'tu@gmail.com', 'ถนนนเรศวร, พิษณุโลก, เทศบาลนครพิษณุโลก, อำเภอเมืองพิษณุโลก, จังหวัดพิษณุโลก, 65000, ประเทศไทย 13412', 499.99, 'Completed', 'Transfer', NULL, '2026-01-23 09:11:33.251922', '2026-01-23 09:12:43.089784', 1, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_TbfiaOk.png', 'Unknown', 549.99, NULL, 'Unknown', 'กรุงเทพมหานคร', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(74, 'd a', '0897464656', 'sa2779@gmail.com', '2177, บ้านดอนแดง, บ้านข่า, อำเภอศรีสงคราม, จังหวัดนครพนม, ประเทศไทย 45465', 35000.00, 'Completed', 'Transfer', NULL, '2026-01-27 05:12:14.945139', '2026-01-27 05:23:29.236144', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_bHQFpFg.png', 'Unknown', 35050.00, NULL, 'Unknown', 'นครพนม', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(75, 'd a', '0455454222', 'sa2779@gmail.com', 'นาโสก, อำเภอเมืองมุกดาหาร, จังหวัดมุกดาหาร, ประเทศไทย 13234', 35000.00, 'Completed', 'Transfer', NULL, '2026-01-27 06:30:31.005048', '2026-01-27 06:31:19.581017', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_KYZkWfH.png', 'กรุงไทย (KTB)', 35050.00, NULL, '2435463532', 'มุกดาหาร', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(76, 'd a', '0789513246', 'sa2779@gmail.com', 'บ้านภูเขาขาม, อำเภอเมืองอำนาจเจริญ, จังหวัดอำนาจเจริญ, ประเทศไทย 46543', 126.00, 'Completed', 'Transfer', NULL, '2026-01-27 06:32:26.801526', '2026-01-27 06:35:02.374651', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_VChuvIQ.png', 'Unknown', 176.00, NULL, 'Unknown', 'อำนาจเจริญ', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(77, 'd a', '0876546132', 'sa2779@gmail.com', 'อบ.4019, กุดชมภู, อำเภอพิบูลมังสาหาร, จังหวัดอุบลราชธานี, ประเทศไทย 42526', 25000.00, 'Completed', 'Transfer', NULL, '2026-01-27 09:13:20.694837', '2026-01-27 09:19:11.692993', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_P3XqRhX.png', 'Unknown', 25050.00, NULL, 'Unknown', 'อุบลราชธานี', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(78, 'd a', '0987976546', 'sa2779@gmail.com', 'ตำบลสนวน, สามแวง, อำเภอห้วยราช, จังหวัดบุรีรัมย์, ประเทศไทย 43150', 25000.00, 'Completed', 'Transfer', NULL, '2026-01-27 09:29:13.496727', '2026-01-27 09:30:11.127712', 12, NULL, 'slips/GSMN-APL-17PM256BLTU_7_251020_220200.webp', 'Unknown', 25050.00, NULL, 'Unknown', 'บุรีรัมย์', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(79, 'ro ot', '0864564012', 'root@gmail.com', 'เมืองที, ตำบลเมืองที, อำเภอเมืองสุรินทร์, จังหวัดสุรินทร์, ประเทศไทย 54545', 25000.00, 'Completed', 'Transfer', NULL, '2026-01-27 09:44:36.018530', '2026-01-27 09:45:10.263579', 11, NULL, 'slips/GSMN-APL-17PM256BLTU_7_251020_220200_z2lZyDT.webp', 'Unknown', 25050.00, NULL, 'Unknown', 'สุรินทร์', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(80, 'd a', '0785643216', 'sa2779@gmail.com', 'บ้านหนองคู, ตาดทอง, อำเภอเมืองยโสธร, จังหวัดยโสธร, ประเทศไทย 63253', 120.99, 'Completed', 'Transfer', NULL, '2026-01-28 02:33:33.500094', '2026-01-28 02:34:03.538223', 9, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_3PDeir9.png', 'Unknown', 170.99, NULL, 'Unknown', 'ยโสธร', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(81, 'ro ot', '0832465654', 'root@gmail.com', 'บ้านเมืองพล, อำเภอขุนยวม, จังหวัดแม่ฮ่องสอน, ประเทศไทย 41321', 59.99, 'Completed', 'Transfer', NULL, '2026-01-28 04:48:30.534796', '2026-01-28 04:48:53.654360', 11, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_wKolWVI.png', 'Unknown', 109.99, NULL, 'Unknown', 'แม่ฮ่องสอน', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(82, 'ro ot', '0987456465', 'root@gmail.com', 'บ้านแม่สะป๊อกเหนือ, อำเภอแม่วาง, จังหวัดเชียงใหม่, ประเทศไทย 53213', 100.00, 'Completed', 'Transfer', NULL, '2026-01-28 06:57:15.229929', '2026-01-28 06:58:04.595030', 11, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_xQ9166w.png', 'Unknown', 100.00, NULL, 'Unknown', 'เชียงใหม่', 0.00, NULL, NULL, 0.00, 0.00, 0.00, 50.00, 50.00, NULL),
+(83, 'po tato', '0455222222', 'potat@gail.com', 'บ้านย่านดู่, อำเภอท่าปลา, จังหวัดอุตรดิตถ์, ประเทศไทย 45454', 166.99, 'Completed', 'Transfer', NULL, '2026-01-28 09:54:50.969378', '2026-01-28 09:57:14.617326', 13, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_QgAePsM.png', 'Unknown', 166.99, NULL, 'Unknown', 'อุตรดิตถ์', 13.00, 9, NULL, 0.00, 0.00, 0.00, 129.99, 50.00, NULL),
+(84, 'po tato', '0645674564', 'potat@gail.com', 'บ้านไร่ม่วง, นาอาน, อำเภอเมืองเลย, จังหวัดเลย, 42000, ประเทศไทย 42000', 2349.99, 'Completed', 'Transfer', NULL, '2026-01-28 09:56:27.721221', '2026-01-28 09:57:12.514619', 13, NULL, 'slips/Gemini_Generated_Image_j0z0i1j0z0i1j0z0_1MExfN4.png', 'Unknown', 2349.99, NULL, 'Unknown', 'เลย', 200.00, 12, NULL, 0.00, 0.00, 0.00, 2499.99, 50.00, NULL);
 
 -- --------------------------------------------------------
 
@@ -811,7 +852,19 @@ INSERT INTO `order_items` (`id`, `quantity`, `price_at_purchase`, `order_id`, `p
 (70, 1, 4499.00, 69, 190, 0.00, NULL, 'normal'),
 (71, 1, 35000.00, 70, 195, 0.00, NULL, 'normal'),
 (72, 1, 19.99, 71, 185, 0.00, NULL, 'normal'),
-(73, 1, 129.99, 72, 173, 0.00, NULL, 'normal');
+(73, 1, 129.99, 72, 173, 0.00, NULL, 'normal'),
+(74, 1, 499.99, 73, 136, 0.00, NULL, 'normal'),
+(75, 1, 35000.00, 74, 205, 0.00, NULL, 'normal'),
+(76, 1, 35000.00, 75, 205, 0.00, NULL, 'normal'),
+(77, 1, 126.00, 76, 194, 0.00, NULL, 'normal'),
+(78, 1, 25000.00, 77, 205, 0.00, NULL, 'normal'),
+(79, 1, 25000.00, 78, 205, 0.00, NULL, 'normal'),
+(80, 1, 25000.00, 79, 205, 0.00, NULL, 'normal'),
+(81, 1, 120.99, 80, 7, 0.00, NULL, 'normal'),
+(82, 1, 59.99, 81, 43, 0.00, NULL, 'normal'),
+(83, 1, 50.00, 82, 149, 0.00, NULL, 'normal'),
+(84, 1, 129.99, 83, 173, 0.00, NULL, 'normal'),
+(85, 1, 2499.99, 84, 12, 0.00, NULL, 'normal');
 
 -- --------------------------------------------------------
 
@@ -832,9 +885,9 @@ CREATE TABLE `products` (
   `is_active` tinyint(1) NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `updated_at` datetime(6) DEFAULT NULL,
-  `seller_id` bigint DEFAULT NULL,
+  `admin_id` bigint DEFAULT NULL,
   `original_price` decimal(10,2) DEFAULT NULL,
-  `sku` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sku` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `weight` decimal(10,2) DEFAULT NULL,
   `width` decimal(10,2) DEFAULT NULL,
   `height` decimal(10,2) DEFAULT NULL,
@@ -845,19 +898,19 @@ CREATE TABLE `products` (
 -- Dumping data for table `products`
 --
 
-INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `seller_id`, `original_price`, `sku`, `weight`, `width`, `height`, `depth`) VALUES
+INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `admin_id`, `original_price`, `sku`, `weight`, `width`, `height`, `depth`) VALUES
 (1, 'Essence Mascara Lash Princess', 'The Essence Mascara Lash Princess is a popular mascara known for its volumizing and lengthening effects. Achieve dramatic lashes with this long-lasting and cruelty-free formula.', 2, 9.99, 98, 'Essence', 'products/thumb_1.jpg', 2.56, 1, '2025-12-11 03:22:24.142868', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (2, 'Eyeshadow Palette with Mirror', 'The Eyeshadow Palette with Mirror offers a versatile range of eyeshadow shades for creating stunning eye looks. With a built-in mirror, it\'s convenient for on-the-go makeup application.', 2, 19.99, 34, 'Glamour Beauty', 'products/thumb_2.jpg', 2.86, 1, '2025-12-11 03:22:25.898452', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (3, 'Powder Canister', 'The Powder Canister is a finely milled setting powder designed to set makeup and control shine. With a lightweight and translucent formula, it provides a smooth and matte finish.', 2, 14.99, 88, 'Velvet Touch', 'products/thumb_3.jpg', 4.64, 1, '2025-12-11 03:22:27.331094', '2026-01-15 08:41:19.110830', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (4, 'Red Lipstick', 'The Red Lipstick is a classic and bold choice for adding a pop of color to your lips. With a creamy and pigmented formula, it provides a vibrant and long-lasting finish.', 2, 12.99, 89, 'Chic Cosmetics', 'products/thumb_4.jpg', 4.36, 1, '2025-12-11 03:22:28.808024', '2026-01-15 05:13:50.916185', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (5, 'Red Nail Polish', 'The Red Nail Polish offers a rich and glossy red hue for vibrant and polished nails. With a quick-drying formula, it provides a salon-quality finish at home.', 2, 8.99, 77, 'Nail Couture', 'products/thumb_5.jpg', 4.32, 1, '2025-12-11 03:22:30.274110', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (6, 'Calvin Klein CK One', 'CK One by Calvin Klein is a classic unisex fragrance, known for its fresh and clean scent. It\'s a versatile fragrance suitable for everyday wear.', 3, 49.99, 29, 'Calvin Klein', 'products/thumb_6.jpg', 4.37, 1, '2025-12-11 03:22:31.732467', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(7, 'Chanel Coco Noir Eau De', 'Coco Noir by Chanel is an elegant and mysterious fragrance, featuring notes of grapefruit, rose, and sandalwood. Perfect for evening occasions.', 3, 129.99, 58, 'Chanel', 'products/thumb_7.jpg', 4.26, 1, '2025-12-11 03:22:35.350992', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(7, 'Chanel Coco Noir Eau De', 'Coco Noir by Chanel is an elegant and mysterious fragrance, featuring notes of grapefruit, rose, and sandalwood. Perfect for evening occasions.', 3, 129.99, 57, 'Chanel', 'products/thumb_7.jpg', 4.26, 1, '2025-12-11 03:22:35.350992', '2026-01-28 02:33:33.499355', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (8, 'Dior J\'adore', 'J\'adore by Dior is a luxurious and floral fragrance, known for its blend of ylang-ylang, rose, and jasmine. It embodies femininity and sophistication.', 3, 89.99, 98, 'Dior', 'products/thumb_8.jpg', 3.80, 1, '2025-12-11 03:22:39.079222', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (9, 'Dolce Shine Eau de', 'Dolce Shine by Dolce & Gabbana is a vibrant and fruity fragrance, featuring notes of mango, jasmine, and blonde woods. It\'s a joyful and youthful scent.', 3, 69.99, 4, 'Dolce & Gabbana', 'products/thumb_9.jpg', 3.96, 1, '2025-12-11 03:22:42.348337', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (10, 'Gucci Bloom Eau de', 'Gucci Bloom by Gucci is a floral and captivating fragrance, with notes of tuberose, jasmine, and Rangoon creeper. It\'s a modern and romantic scent.', 3, 79.99, 91, 'Gucci', 'products/thumb_10.jpg', 2.74, 1, '2025-12-11 03:22:45.004451', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (11, 'Annibale Colombo Bed', 'The Annibale Colombo Bed is a luxurious and elegant bed frame, crafted with high-quality materials for a comfortable and stylish bedroom.', 4, 1899.99, 88, 'Annibale Colombo', 'products/thumb_11.jpg', 4.77, 1, '2025-12-11 03:22:47.170450', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(12, 'Annibale Colombo Sofa', 'The Annibale Colombo Sofa is a sophisticated and comfortable seating option, featuring exquisite design and premium upholstery for your living room.', 4, 2499.99, 60, 'Annibale Colombo', 'products/thumb_12.jpg', 3.92, 1, '2025-12-11 03:22:49.875198', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(12, 'Annibale Colombo Sofa', 'The Annibale Colombo Sofa is a sophisticated and comfortable seating option, featuring exquisite design and premium upholstery for your living room.', 4, 2499.99, 59, 'Annibale Colombo', 'products/thumb_12.jpg', 3.92, 1, '2025-12-11 03:22:49.875198', '2026-01-28 09:56:27.711733', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (13, 'Bedside Table African Cherry', 'The Bedside Table in African Cherry is a stylish and functional addition to your bedroom, providing convenient storage space and a touch of elegance.', 4, 299.99, 64, 'Furniture Co.', 'products/thumb_13.jpg', 2.87, 1, '2025-12-11 03:22:53.118621', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (14, 'Knoll Saarinen Executive Conference Chair', 'The Knoll Saarinen Executive Conference Chair is a modern and ergonomic chair, perfect for your office or conference room with its timeless design.', 4, 499.99, 25, 'Knoll', 'products/thumb_14.jpg', 4.88, 1, '2025-12-11 03:22:56.264049', '2026-01-15 05:54:38.693826', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (15, 'Wooden Bathroom Sink With Mirror', 'The Wooden Bathroom Sink with Mirror is a unique and stylish addition to your bathroom, featuring a wooden sink countertop and a matching mirror.', 4, 799.99, 6, 'Bath Trends', 'products/thumb_15.jpg', 3.59, 1, '2025-12-11 03:22:58.931872', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
@@ -888,7 +941,7 @@ INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `s
 (40, 'Strawberry', 'Sweet and succulent strawberries, great for snacking, desserts, or blending into smoothies.', 5, 3.99, 46, 'Unknown', 'products/thumb_40_crN9yIn.jpg', 3.08, 1, '2025-12-11 03:23:32.891879', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (41, 'Tissue Paper Box', 'Convenient tissue paper box for everyday use, providing soft and absorbent tissues.', 5, 2.49, 86, 'Unknown', 'products/thumb_41_3ho1x8a.jpg', 2.69, 1, '2025-12-11 03:23:34.376886', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (42, 'Water', 'Pure and refreshing bottled water, essential for staying hydrated throughout the day.', 5, 0.99, 53, 'Unknown', 'products/thumb_42_TIuKeKb.jpg', 4.96, 1, '2025-12-11 03:23:36.406324', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(43, 'Decoration Swing', 'The Decoration Swing is a charming addition to your home decor. Crafted with intricate details, it adds a touch of elegance and whimsy to any room.', 27, 59.99, 47, 'Unknown', 'products/thumb_43_MAOg36g.jpg', 3.16, 1, '2025-12-11 03:23:37.362420', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(43, 'Decoration Swing', 'The Decoration Swing is a charming addition to your home decor. Crafted with intricate details, it adds a touch of elegance and whimsy to any room.', 27, 59.99, 46, 'Unknown', 'products/thumb_43_MAOg36g.jpg', 3.16, 1, '2025-12-11 03:23:37.362420', '2026-01-28 04:48:30.519900', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (44, 'Family Tree Photo Frame', 'The Family Tree Photo Frame is a sentimental and stylish way to display your cherished family memories. With multiple photo slots, it tells the story of your loved ones.', 27, 29.99, 77, 'Unknown', 'products/thumb_44_C5i6Z6Q.jpg', 4.53, 1, '2025-12-11 03:23:41.318280', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (45, 'House Showpiece Plant', 'The House Showpiece Plant is an artificial plant that brings a touch of nature to your home without the need for maintenance. It adds greenery and style to any space.', 27, 39.99, 28, 'Unknown', 'products/thumb_45_3QjLdzp.jpg', 4.67, 1, '2025-12-11 03:23:42.516248', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (46, 'Plant Pot', 'The Plant Pot is a stylish container for your favorite plants. With a sleek design, it complements your indoor or outdoor garden, adding a modern touch to your plant display.', 27, 14.99, 59, 'Unknown', 'products/thumb_46_rDscyeQ.jpg', 3.01, 1, '2025-12-11 03:23:46.411316', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
@@ -981,21 +1034,21 @@ INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `s
 (133, 'Samsung Galaxy S10', 'The Samsung Galaxy S10 is a flagship device featuring a dynamic AMOLED display, versatile camera system, and powerful performance. It represents innovation and excellence in smartphone technology.', 15, 699.99, 19, 'Samsung', 'products/thumb_133_7S4a1vR.jpg', 3.06, 1, '2025-12-11 03:27:09.810691', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (134, 'Vivo S1', 'The Vivo S1 is a stylish and mid-range smartphone offering a blend of design and performance. It features a vibrant display, capable camera system, and reliable functionality.', 15, 249.99, 50, 'Vivo', 'products/thumb_134_D4Zwk3U.jpg', 3.50, 1, '2025-12-11 03:27:11.966238', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (135, 'Vivo V9', 'The Vivo V9 is a smartphone known for its sleek design and emphasis on capturing high-quality selfies. It features a notch display, dual-camera setup, and a modern design.', 15, 299.99, 81, 'Vivo', 'products/thumb_135_BbH9Rmi.jpg', 3.60, 1, '2025-12-11 03:27:14.108779', '2026-01-06 07:12:07.621867', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(136, 'Vivo X21', 'The Vivo X21 is a premium smartphone with a focus on cutting-edge technology. It features an in-display fingerprint sensor, a high-resolution display, and advanced camera capabilities.', 15, 499.99, 3, 'Vivo', 'products/thumb_136_oFFGFiQ.jpg', 5.00, 1, '2025-12-11 03:27:16.492311', '2026-01-22 01:33:27.266503', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(136, 'Vivo X21', 'The Vivo X21 is a premium smartphone with a focus on cutting-edge technology. It features an in-display fingerprint sensor, a high-resolution display, and advanced camera capabilities.', 15, 499.99, 2, 'Vivo', 'products/thumb_136_oFFGFiQ.jpg', 5.00, 1, '2025-12-11 03:27:16.492311', '2026-01-23 09:11:33.247388', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (137, 'American Football', 'The American Football is a classic ball used in American football games. It is designed for throwing and catching, making it an essential piece of equipment for the sport.', 29, 19.99, 53, 'Unknown', 'products/thumb_137_2MyrzJL.jpg', 4.91, 1, '2025-12-11 03:27:18.625073', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (138, 'Baseball Ball', 'The Baseball Ball is a standard baseball used in baseball games. It features a durable leather cover and is designed for pitching, hitting, and fielding in the game of baseball.', 29, 8.99, 100, 'Unknown', 'products/thumb_138_au1SfKo.jpg', 2.57, 1, '2025-12-11 03:27:20.084822', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (139, 'Baseball Glove', 'The Baseball Glove is a protective glove worn by baseball players. It is designed to catch and field the baseball, providing players with comfort and control during the game.', 29, 24.99, 21, 'Unknown', 'products/thumb_139_0SaFZrH.jpg', 3.96, 1, '2025-12-11 03:27:21.064081', '2026-01-05 07:45:05.601733', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (140, 'Basketball', 'The Basketball is a standard ball used in basketball games. It is designed for dribbling, shooting, and passing in the game of basketball, suitable for both indoor and outdoor play.', 29, 14.99, 75, 'Unknown', 'products/thumb_140_ZMh3w77.jpg', 4.66, 1, '2025-12-11 03:27:23.750703', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (141, 'Basketball Rim', 'The Basketball Rim is a sturdy hoop and net assembly mounted on a basketball backboard. It provides a target for shooting and scoring in the game of basketball.', 29, 39.99, 43, 'Unknown', 'products/thumb_141_9d5MUiT.jpg', 4.60, 1, '2025-12-11 03:27:25.406556', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (142, 'Cricket Ball', 'The Cricket Ball is a hard leather ball used in the sport of cricket. It is bowled and batted in the game, and its hardness and seam contribute to the dynamics of cricket play.', 29, 12.99, 30, 'Unknown', 'products/thumb_142_pt9l8NY.jpg', 3.53, 1, '2025-12-11 03:27:27.253468', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `seller_id`, `original_price`, `sku`, `weight`, `width`, `height`, `depth`) VALUES
+INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `stock`, `brand`, `thumbnail`, `rating`, `is_active`, `created_at`, `updated_at`, `admin_id`, `original_price`, `sku`, `weight`, `width`, `height`, `depth`) VALUES
 (143, 'Cricket Bat', 'The Cricket Bat is an essential piece of cricket equipment used by batsmen to hit the cricket ball. It is made of wood and comes in various sizes and designs.', 29, 29.99, 98, 'Unknown', 'products/thumb_143_sElCyxe.jpg', 3.17, 1, '2025-12-11 03:27:28.895604', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (144, 'Cricket Helmet', 'The Cricket Helmet is a protective headgear worn by cricket players, especially batsmen and wicketkeepers. It provides protection against fast bowling and bouncers.', 29, 44.99, 10, 'Unknown', 'products/thumb_144_YHgmE3j.jpg', 4.69, 1, '2025-12-11 03:27:30.536336', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (145, 'Cricket Wicket', 'The Cricket Wicket is a set of three stumps and two bails, forming a wicket used in the sport of cricket. Batsmen aim to protect the wicket while scoring runs.', 29, 29.99, 25, 'Unknown', 'products/thumb_145_lncHFW8.jpg', 4.73, 1, '2025-12-11 03:27:35.502952', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (146, 'Feather Shuttlecock', 'The Feather Shuttlecock is used in the sport of badminton. It features natural feathers and is designed for high-speed play, providing stability and accuracy during matches.', 29, 5.99, 94, 'Unknown', 'products/thumb_146_hoHhcnM.jpg', 2.85, 1, '2025-12-11 03:27:37.263818', '2026-01-05 03:13:47.583746', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (147, 'Football', 'The Football, also known as a soccer ball, is the standard ball used in the sport of football (soccer). It is designed for kicking and passing in the game.', 29, 17.99, 96, 'Unknown', 'products/thumb_147_utZvc5O.jpg', 3.28, 1, '2025-12-11 03:27:38.946055', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (148, 'Golf Ball', 'The Golf Ball is a small ball used in the sport of golf. It features dimples on its surface, providing aerodynamic lift and distance when struck by a golf club.', 29, 9.99, 83, 'Unknown', 'products/thumb_148_Gyqsz3m.jpg', 4.30, 1, '2025-12-11 03:27:39.919637', '2026-01-05 04:04:50.652118', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(149, 'Iron Golf', 'The Iron Golf is a type of golf club designed for various golf shots. It features a solid metal head and is used for approach shots, chipping, and other golfing techniques.', 29, 49.99, 90, 'Unknown', 'products/thumb_149_SjrGYna.jpg', 4.41, 1, '2025-12-11 03:27:41.618287', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(149, 'Iron Golf', 'The Iron Golf is a type of golf club designed for various golf shots. It features a solid metal head and is used for approach shots, chipping, and other golfing techniques.', 29, 50.00, 89, 'Unknown', 'products/thumb_149_SjrGYna.jpg', 4.41, 1, '2025-12-11 03:27:41.618287', '2026-01-28 06:57:15.227280', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (150, 'Metal Baseball Bat', 'The Metal Baseball Bat is a durable and lightweight baseball bat made from metal alloys. It is commonly used in baseball games for hitting and batting practice.', 29, 29.99, 16, 'Unknown', 'products/thumb_150_jkjjkyV.jpg', 4.66, 1, '2025-12-11 03:27:42.125026', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (151, 'Tennis Ball', 'The Tennis Ball is a standard ball used in the sport of tennis. It is designed for bouncing and hitting with tennis rackets during matches or practice sessions.', 29, 6.99, 28, 'Unknown', 'products/thumb_151_kObWPIE.jpg', 4.06, 1, '2025-12-11 03:27:43.533143', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (152, 'Tennis Racket', 'The Tennis Racket is an essential piece of equipment used in the sport of tennis. It features a frame with strings and a grip, allowing players to hit the tennis ball.', 29, 49.99, 5, 'Unknown', 'products/thumb_152_slVShsR.jpg', 4.03, 1, '2025-12-11 03:27:45.142136', '2026-01-05 03:05:32.220051', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
@@ -1019,7 +1072,7 @@ INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `s
 (170, 'Durango SXT RWD', 'The Durango SXT RWD is a spacious and versatile SUV, known for its strong performance and family-friendly features.', 20, 36999.99, 95, 'Dodge', 'products/thumb_170_wPfjnCW.jpg', 4.07, 1, '2025-12-11 03:28:56.399902', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (171, 'Pacifica Touring', 'The Pacifica Touring is a stylish and well-equipped minivan, offering comfort and convenience for family journeys.', 20, 31999.99, 52, 'Chrysler', 'products/thumb_171_TLn8lK2.jpg', 3.62, 1, '2025-12-11 03:29:00.855953', '2026-01-13 02:46:15.076924', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (172, 'Blue Women\'s Handbag', 'The Blue Women\'s Handbag is a stylish and spacious accessory for everyday use. With a vibrant blue color and multiple compartments, it combines fashion and functionality.', 26, 49.99, 76, 'Fashionista', 'products/thumb_172_yVn7pPK.jpg', 2.92, 1, '2025-12-11 03:29:06.430590', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(173, 'Heshe Women\'s Leather Bag', 'The Heshe Women\'s Leather Bag is a luxurious and high-quality leather bag for the sophisticated woman. With a timeless design and durable craftsmanship, it\'s a versatile accessory.', 26, 129.99, 98, 'Heshe', 'products/thumb_173_Zi8Zvd0.jpg', 4.92, 1, '2025-12-11 03:29:09.327421', '2026-01-22 01:20:08.364345', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(173, 'Heshe Women\'s Leather Bag', 'The Heshe Women\'s Leather Bag is a luxurious and high-quality leather bag for the sophisticated woman. With a timeless design and durable craftsmanship, it\'s a versatile accessory.', 26, 129.99, 97, 'Heshe', 'products/thumb_173_Zi8Zvd0.jpg', 4.92, 1, '2025-12-11 03:29:09.327421', '2026-01-28 09:54:50.964266', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (174, 'Prada Women Bag', 'The Prada Women Bag is an iconic designer bag that exudes elegance and luxury. Crafted with precision and featuring the Prada logo, it\'s a statement piece for fashion enthusiasts.', 26, 599.99, 75, 'Prada', 'products/thumb_174_jXOtS7J.jpg', 2.71, 1, '2025-12-11 03:29:14.525355', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (175, 'White Faux Leather Backpack', 'The White Faux Leather Backpack is a trendy and practical backpack for the modern woman. With a sleek white design and ample storage space, it\'s perfect for both casual and on-the-go styles.', 26, 39.99, 39, 'Urban Chic', 'products/thumb_175_eaj5lfx.jpg', 3.36, 1, '2025-12-11 03:29:17.831057', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (176, 'Women Handbag Black', 'The Women Handbag in Black is a classic and versatile accessory that complements various outfits. With a timeless black color and functional design, it\'s a must-have in every woman\'s wardrobe.', 26, 59.99, 10, 'Elegance Collection', 'products/thumb_176_mF6XLbA.jpg', 2.89, 1, '2025-12-11 03:29:19.970742', '2025-12-23 08:30:20.964715', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
@@ -1039,9 +1092,9 @@ INSERT INTO `products` (`id`, `title`, `description`, `category_id`, `price`, `s
 (190, 'IWC Ingenieur Automatic Steel', 'The IWC Ingenieur Automatic Steel watch is a durable and sophisticated timepiece. With a stainless steel case and automatic movement, it combines precision and style for watch enthusiasts.', 36, 4999.99, 89, 'IWC', 'products/thumb_190_M7gB2YV.jpg', 2.93, 1, '2025-12-11 03:30:16.203968', '2026-01-20 10:00:51.490901', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (191, 'Rolex Cellini Moonphase', 'The Rolex Cellini Moonphase watch is a masterpiece of horology. Featuring a moon phase complication, it showcases the craftsmanship and elegance that Rolex is renowned for.', 36, 15999.99, 47, 'Rolex', 'products/thumb_191_NSlTusx.jpg', 3.83, 1, '2025-12-11 03:30:18.458329', '2026-01-05 03:35:45.575687', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (192, 'Rolex Datejust Women', 'The Rolex Datejust Women\'s watch is an iconic timepiece designed for women. With a timeless design and a date complication, it offers both elegance and functionality.', 36, 10999.99, 26, 'Rolex', 'products/thumb_192_ahZ8bv0.jpg', 2.86, 1, '2025-12-11 03:30:22.404300', '2026-01-06 09:31:20.743391', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(193, 'Watch Gold for Women', '', 36, 799.00, 0, 'Fashion Gold', 'products/thumb_193_8rccSlX.jpg', 4.24, 1, '2025-12-11 03:30:25.491168', '2026-01-05 09:47:33.196536', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(194, 'Women\'s Wrist Watch', '', 36, 130.00, 38, 'Fashion Co.', 'products/thumb_194_2qjasaO.jpg', 4.00, 1, '2025-12-11 03:30:27.751801', '2026-01-16 09:42:39.372977', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(195, 'IPHONE 17', '', 15, 35000.00, 20, '', 'products/GSMN-APL-17PM256BLTU_7_251020_220200_3utxPUM.webp', 4.75, 1, '2025-12-23 09:32:01.141166', '2026-01-22 01:29:45.370168', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(193, 'Watch Gold for Women', '', 36, 799.00, 23, 'Fashion Gold', 'products/thumb_193_8rccSlX.jpg', 4.24, 1, '2025-12-11 03:30:25.491168', '2026-01-26 09:33:46.855844', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(194, 'Women\'s Wrist Watch', '', 36, 250.00, 51, 'Fashion Co.', 'products/thumb_194_2qjasaO.jpg', 4.00, 1, '2025-12-11 03:30:27.751801', '2026-01-27 06:32:26.800283', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(205, 'iphone17', '', 15, 35000.00, 10, '', 'products/iphone-card-40-17pro-202509_FMT_WHH_z7llJkH.jpg', 0.00, 1, '2026-01-27 03:34:22.689968', '2026-01-27 09:44:36.016747', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1547,7 +1600,8 @@ INSERT INTO `product_images` (`id`, `image_url`, `created_at`, `product_id`) VAL
 (472, 'products/gallery/gallery_194_0_DasdQqX.jpg', '2025-12-23 09:38:12.918341', 194),
 (473, 'products/gallery/gallery_194_1_JKvqBcQ.jpg', '2025-12-23 09:38:12.918341', 194),
 (474, 'products/gallery/gallery_194_2_BFc4cSR.jpg', '2025-12-23 09:38:12.918341', 194),
-(484, 'products/gallery/iphone-17-finish-unselect-gallery-1-202509_FMT_WHH_HyLcq3q.jpg', '2025-12-30 01:42:39.496492', 195);
+(484, 'products/gallery/iphone-17-finish-unselect-gallery-1-202509_FMT_WHH_HyLcq3q.jpg', '2025-12-30 01:42:39.496492', 195),
+(485, 'products/gallery/GSMN-APL-17PM256BLTU_7_251020_220200.webp', '2026-01-27 03:34:22.739305', 205);
 
 -- --------------------------------------------------------
 
@@ -1662,18 +1716,6 @@ CREATE TABLE `tags` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `test_coupon`
---
-
-CREATE TABLE `test_coupon` (
-  `id` int NOT NULL,
-  `start_date` datetime(6) NOT NULL,
-  `end_date` datetime(6) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `users`
 --
 
@@ -1687,7 +1729,7 @@ CREATE TABLE `users` (
   `phone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `address` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `image` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `role` enum('admin','seller','customer','new_user') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'new_user',
+  `role` enum('admin','customer','new_user') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'new_user',
   `is_active` tinyint(1) NOT NULL,
   `date_joined` datetime(6) NOT NULL,
   `last_login` datetime(6) DEFAULT NULL,
@@ -1699,14 +1741,16 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `password`, `username`, `first_name`, `last_name`, `email`, `phone`, `address`, `image`, `role`, `is_active`, `date_joined`, `last_login`, `updated_at`) VALUES
-(1, 'pbkdf2_sha256$1000000$fO3zWGz0f5pSLK2auUroml$by0ySIFOjYjoBbaSqp7IKJho2Vnl0XdQZBJHoMQslw4=', 'admin', '', '', 'admin@gmail.com', '0999999998', 'แยกอุทยานสวรรค์, ถนนพหลโยธิน, นครสวรรค์, เทศบาลนครสวรรค์, อำเภอเมืองนครสวรรค์, จังหวัดนครสวรรค์, 60000, ประเทศไทย', 'avatars/Lego_Man.jpg', 'admin', 1, '2025-12-25 03:07:04.491326', '2026-01-12 06:35:52.305954', '2026-01-22 08:38:01.858220'),
+(1, 'pbkdf2_sha256$1000000$fO3zWGz0f5pSLK2auUroml$by0ySIFOjYjoBbaSqp7IKJho2Vnl0XdQZBJHoMQslw4=', 'admin', '', '', 'admin@gmail.com', '0999999998', 'แยกอุทยานสวรรค์, ถนนพหลโยธิน, นครสวรรค์, เทศบาลนครสวรรค์, อำเภอเมืองนครสวรรค์, จังหวัดนครสวรรค์, 60000, ประเทศไทย', 'avatars/Lego_Man.jpg', 'admin', 1, '2025-12-25 03:07:04.491326', '2026-01-27 01:45:48.413141', '2026-01-22 08:38:01.858220'),
 (2, 'pbkdf2_sha256$1000000$0wLYOu6zZXeKMcuZlaS24v$fNRMdKtF8aGrKu56EIxLGzZOoGBV60Hc/S4UyY1gWFU=', 'sa2020', 'sa', 'ds', 'sa2020@gmail.com', '02485', 'ถนนราชดำเนินกลาง, ชุมชนหลังวัดราชนัดดา, แขวงบวรนิเวศ, เขตพระนคร, กรุงเทพมหานคร, 10200, ประเทศไทย', 'avatars/Batman_NFT.jpg', 'customer', 1, '2025-12-25 05:33:35.993405', NULL, '2026-01-12 07:59:49.384657'),
-(3, 'pbkdf2_sha256$1000000$6xg06C3UThCuI9SYVTN0xK$KyULSKLa4XLWWAtXLZx7Usn5VVE5/I18lYPVp+vYeew=', 'seller', 'ss', 'dd', 'sa1234@gmail.com', '0987456123', 'ada', 'avatars/download.jpg', 'seller', 1, '2025-12-25 09:41:01.290523', NULL, '2026-01-05 02:17:18.204498'),
+(3, 'pbkdf2_sha256$1000000$6xg06C3UThCuI9SYVTN0xK$KyULSKLa4XLWWAtXLZx7Usn5VVE5/I18lYPVp+vYeew=', 'seller', 'ss', 'dd', 'sa1234@gmail.com', '0987456123', 'ada', 'avatars/download.jpg', 'admin', 1, '2025-12-25 09:41:01.290523', NULL, '2026-01-05 02:17:18.204498'),
 (5, 'pbkdf2_sha256$1000000$qGolOCyTkQ8YyaB0HmzI5Q$PT1E3OhCgdx7hqZ1vz9h8KDH0uhA1yiw3qkY9ug6EVQ=', 'sa2234', 'sa', '2234', 'sa2234@gmail.com', '08795464', NULL, '', 'new_user', 1, '2025-12-31 02:24:55.684430', NULL, '2025-12-31 02:24:55.958814'),
 (8, 'pbkdf2_sha256$1000000$4tK2Xd9ZNQGIdmBcCFNCWj$f17sC5mmqQcCDWz4SVOAUiH3kG9M0DTxXDwCTn2y5Zk=', 'admin_check', '', '', 'admin@check.com', '', '', '', 'admin', 1, '2026-01-06 09:26:27.787205', NULL, '2026-01-13 09:10:30.445664'),
-(9, 'pbkdf2_sha256$1000000$9L3B6QQUHp3kLdLxTAFbsg$3985t5AVIBa0V71Sa72b6sZgLYzQeAgGmE49IornFGA=', 'a', 'd', 'a', 'sa2779@gmail.com', '0123456789', 'ถนนราชดำเนินกลาง, ชุมชนหลังวัดราชนัดดา, แขวงบวรนิเวศ, เขตพระนคร, กรุงเทพมหานคร, 10200, ประเทศไทย', 'avatars/4f2ed4b8-d693-45c4-85c6-3f614f82f3c0.jpg', 'new_user', 1, '2026-01-12 04:13:24.996043', NULL, '2026-01-15 05:16:18.492491'),
+(9, 'pbkdf2_sha256$1000000$9L3B6QQUHp3kLdLxTAFbsg$3985t5AVIBa0V71Sa72b6sZgLYzQeAgGmE49IornFGA=', 'a', 'd', 'a', 'sa2779@gmail.com', '0123456789', 'ถนนราชดำเนินกลาง, ชุมชนหลังวัดราชนัดดา, แขวงบวรนิเวศ, เขตพระนคร, กรุงเทพมหานคร, 10200, ประเทศไทย', 'avatars/4f2ed4b8-d693-45c4-85c6-3f614f82f3c0.jpg', 'customer', 1, '2026-01-12 04:13:24.996043', NULL, '2026-01-27 09:13:20.726468'),
 (10, 'pbkdf2_sha256$1000000$R3q2zcsOqbK09RGDs174mL$XoMPf921vnCaIX7KPAKrGn186hn9T7F4t14ZEScHjkw=', 'tu', 'yu', 'tu', 'tu@gmail.com', '0878787878', 'ถนนนเรศวร, พิษณุโลก, เทศบาลนครพิษณุโลก, อำเภอเมืองพิษณุโลก, จังหวัดพิษณุโลก, 65000, ประเทศไทย', 'avatars/OIP_24.jpg', 'new_user', 1, '2026-01-12 08:01:31.219342', NULL, '2026-01-12 08:02:28.756563'),
-(11, 'pbkdf2_sha256$1000000$z5reNFfi3YhTJL5ksjs4zQ$OsYxqaBrGQiBnsHjwvpd5EAT9P87WcDSzH2fko/y6eI=', 'root12', 'ro', 'ot', 'root@gmail.com', '0444444444', 'วังหิน, อำเภอวังหิน, จังหวัดศรีสะเกษ, ประเทศไทย', 'avatars/cafa_amazon.png', 'new_user', 1, '2026-01-12 08:46:46.337968', NULL, '2026-01-13 09:06:49.800693');
+(11, 'pbkdf2_sha256$1000000$z5reNFfi3YhTJL5ksjs4zQ$OsYxqaBrGQiBnsHjwvpd5EAT9P87WcDSzH2fko/y6eI=', 'root12', 'ro', 'ot', 'root@gmail.com', '0444444444', 'วังหิน, อำเภอวังหิน, จังหวัดศรีสะเกษ, ประเทศไทย', 'avatars/cafa_amazon.png', 'customer', 1, '2026-01-12 08:46:46.337968', NULL, '2026-01-27 09:44:36.034170'),
+(12, 'pbkdf2_sha256$1000000$gN5CgXfv5WW1K400hU4el4$joLP+ipUneParWvGdD9xpp5YTA/h4/WDkVpLCyPGvUs=', 'lo', 'lo', 'go', 'l@gmail.com', '0897654654', NULL, 'avatars/products58324_800.jpg', 'customer', 1, '2026-01-27 09:28:36.440020', NULL, '2026-01-27 09:29:13.499215'),
+(13, 'pbkdf2_sha256$1000000$IMitdDAJPQOksV78f62929$NN7Y5lrWUaofpseu343lQAhtwD82hx0UIgwCnCZDkos=', 'potato', 'po', 'tato', 'potat@gail.com', '0533248765', NULL, 'avatars/AdobeStock_1291706602_Preview.webp', 'customer', 1, '2026-01-28 09:47:54.859642', NULL, '2026-01-28 09:54:50.974042');
 
 -- --------------------------------------------------------
 
@@ -1753,7 +1797,10 @@ CREATE TABLE `user_coupons` (
 --
 
 INSERT INTO `user_coupons` (`id`, `collected_at`, `status`, `used_at`, `coupon_id`, `order_ref_id`, `user_id`) VALUES
-(1, '2026-01-21 09:16:44.220397', 'active', NULL, 9, NULL, 9);
+(1, '2026-01-21 09:16:44.220397', 'active', NULL, 9, NULL, 9),
+(2, '2026-01-28 06:21:40.898715', 'active', NULL, 9, NULL, 11),
+(3, '2026-01-28 09:53:08.593731', 'active', NULL, 9, NULL, 13),
+(4, '2026-01-28 09:55:44.255929', 'active', NULL, 12, NULL, 13);
 
 --
 -- Indexes for dumped tables
@@ -1900,7 +1947,7 @@ ALTER TABLE `order_items`
 ALTER TABLE `products`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `sku` (`sku`),
-  ADD KEY `products_seller_id_76e92f9e_fk_users_id` (`seller_id`),
+  ADD KEY `products_admin_id_76e92f9e_fk_users_id` (`admin_id`),
   ADD KEY `fk_products_category` (`category_id`);
 
 --
@@ -1961,12 +2008,6 @@ ALTER TABLE `tags`
   ADD UNIQUE KEY `name` (`name`);
 
 --
--- Indexes for table `test_coupon`
---
-ALTER TABLE `test_coupon`
-  ADD PRIMARY KEY (`id`);
-
---
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
@@ -2025,13 +2066,13 @@ ALTER TABLE `auth_permission`
 -- AUTO_INCREMENT for table `categories`
 --
 ALTER TABLE `categories`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
 
 --
 -- AUTO_INCREMENT for table `coupons`
 --
 ALTER TABLE `coupons`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `django_content_type`
@@ -2043,25 +2084,25 @@ ALTER TABLE `django_content_type`
 -- AUTO_INCREMENT for table `django_migrations`
 --
 ALTER TABLE `django_migrations`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
 
 --
 -- AUTO_INCREMENT for table `flash_sales`
 --
 ALTER TABLE `flash_sales`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT for table `flash_sale_campaigns`
 --
 ALTER TABLE `flash_sale_campaigns`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
 
 --
 -- AUTO_INCREMENT for table `flash_sale_products`
 --
 ALTER TABLE `flash_sale_products`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
 
 --
 -- AUTO_INCREMENT for table `myapp_review`
@@ -2073,19 +2114,19 @@ ALTER TABLE `myapp_review`
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=85;
 
 --
 -- AUTO_INCREMENT for table `order_items`
 --
 ALTER TABLE `order_items`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=74;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=86;
 
 --
 -- AUTO_INCREMENT for table `products`
 --
 ALTER TABLE `products`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=204;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=206;
 
 --
 -- AUTO_INCREMENT for table `products_tags`
@@ -2097,7 +2138,7 @@ ALTER TABLE `products_tags`
 -- AUTO_INCREMENT for table `product_images`
 --
 ALTER TABLE `product_images`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=485;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=486;
 
 --
 -- AUTO_INCREMENT for table `promotion_schedules`
@@ -2130,22 +2171,16 @@ ALTER TABLE `tags`
   MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `test_coupon`
---
-ALTER TABLE `test_coupon`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `user_coupons`
 --
 ALTER TABLE `user_coupons`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- Constraints for dumped tables

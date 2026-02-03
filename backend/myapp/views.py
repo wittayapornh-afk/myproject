@@ -25,9 +25,27 @@ import calendar
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-User = get_user_model()
-logger = logging.getLogger(__name__)
+# ==========================================
+# 🍌 Mega Menu API
+# ==========================================
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_menu_configs_api(request):
+    """
+    API สำหรับดึง Config ของ Mega Menu ทั้งหมด
+    Frontend: BananaMenu.jsx
+    """
+    try:
+        categories = Category.objects.all().prefetch_related('menu_config')
+        # We need a custom serializer for the list of categories with their config
+        from .serializers import CategorySerializer
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data)
+    except Exception as e:
+        logger.error(f"Error fetching menu configs: {e}")
+        return Response({'error': str(e)}, status=500)
 
+# ==========================================
 # ✅ PromptPay Helper Functions (Native Implementation to avoid Lib Error)
 import binascii
 
@@ -317,6 +335,22 @@ def products_api(request):
         brand = request.query_params.get('brand')
         if brand and brand != "ทั้งหมด":
             products = products.filter(brand=brand)
+        
+        # ✅ Tag Filter - รองรับการเลือกหลาย Tag (Multi-select)
+        tags_param = request.query_params.get('tags') # e.g. "1,2,5"
+        tag_id = request.query_params.get('tag_id')   # Single legacy
+
+        if tags_param:
+            tag_ids = [int(t) for t in tags_param.split(',') if t.isdigit()]
+            if tag_ids:
+                products = products.filter(tags__id__in=tag_ids).distinct()
+        elif tag_id:
+             products = products.filter(tags__id=tag_id).distinct()
+        
+        tag_slug = request.query_params.get('tag')
+        if tag_slug and not tags_param and not tag_id:
+            # ใช้ Slug หรือ Name ในการค้นหา
+            products = products.filter(Q(tags__slug=tag_slug) | Q(tags__name__iexact=tag_slug)).distinct()
 
         # ✅ In Stock Filter
         in_stock = request.query_params.get('in_stock')
@@ -363,7 +397,11 @@ def get_all_products_admin_api(request):
         return Response({"error": "Unauthorized"}, status=403)
     
     # ✅ Fix: Show only Active products (Hide Deleted)
-    products = Product.objects.filter(is_active=True).order_by('-id')
+    # ✅ Fix: Annotate sales_count for Automation
+    # ✅ Fix: Prefetch tags for Edit Tag Modal
+    products = Product.objects.filter(is_active=True).annotate(
+        sales_count=Sum('order_items__quantity')
+    ).prefetch_related('tags').order_by('-id')
     
     data = []
     for p in products:
@@ -372,7 +410,9 @@ def get_all_products_admin_api(request):
             "title": p.title,
             "price": p.price,
             "stock": p.stock,
-            "category": p.category.name if p.category else "-", # ✅ Fix
+            "sales_count": p.sales_count or 0, # ✅ Return sales_count
+            "category": p.category.name if p.category else "-",
+            "tags": [{"id": t.id, "name": t.name} for t in p.tags.all()], # ✅ Return Tags
             "is_active": p.is_active,
             "thumbnail": p.thumbnail.url if p.thumbnail else "/placeholder.png"
         })
@@ -381,8 +421,8 @@ def get_all_products_admin_api(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def manage_user_role(request):
-    # อนุญาตให้ admin และ super_admin จัดการได้
-    if request.user.role not in ['seller', 'admin']:
+    # อนุญาตให้ admin จัดการได้
+    if request.user.role != 'admin':
         return Response({"error": "Unauthorized"}, status=403)
     
     user_id = request.data.get('user_id')
@@ -416,8 +456,8 @@ def manage_user_role(request):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_user_api(request, user_id):
-    # อนุญาตให้ admin และ super_admin ลบผู้ใช้ได้
-    if request.user.role not in ['seller', 'admin']:
+    # อนุญาตให้ admin ลบผู้ใช้ได้
+    if request.user.role != 'admin':
         return Response({"error": "Unauthorized"}, status=403)
 
     try:
@@ -577,7 +617,7 @@ def product_detail_api(request, product_id):
         "stock": product.stock,
         "brand": product.brand,
         "category": product.category.name if product.category else "",
-        "tags": [t.name for t in product.tags.all()], # ✅ Tags
+        "tags": [{"id": t.id, "name": t.name, "icon": t.icon, "color": t.color, "slug": t.slug} for t in product.tags.all()], # ✅ Detailed Tags for URL/Badges
         "sku": product.sku,
         "weight": product.weight,
         "dimensions": {
@@ -590,10 +630,10 @@ def product_detail_api(request, product_id):
         "images": gallery,
         "reviews": reviews, 
         "seller": {
-            "id": product.seller.id,
-            "username": product.seller.username,
-            "shop_name": product.seller.first_name
-        } if product.seller else None,
+            "id": product.admin.id,
+            "username": product.admin.username,
+            "shop_name": product.admin.first_name
+        } if product.admin else None,
         "next_id": next_product.id if next_product else None,
 
 
@@ -664,13 +704,20 @@ def categories_api(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def brands_api(request):
-    brands = Product.objects.filter(is_active=True).exclude(brand__isnull=True).exclude(brand="").values_list('brand', flat=True).distinct()
-    return Response({"brands": ["ทั้งหมด"] + list(brands)})
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def brands_api(request):
-    brands = Product.objects.filter(is_active=True).exclude(brand__isnull=True).exclude(brand="").values_list('brand', flat=True).distinct()
+    """
+    Get all unique brands.
+    Optional query param: ?category=... to filter brands by category logic.
+    """
+    category = request.query_params.get('category')
+    
+    products = Product.objects.filter(is_active=True).exclude(brand__isnull=True).exclude(brand="")
+    
+    if category and category != "ทั้งหมด":
+        products = products.filter(category__name=category)
+        
+    brands = products.values_list('brand', flat=True).distinct().order_by('brand')
+    
+    # Return list, sorted alphabetically usually good
     return Response({"brands": ["ทั้งหมด"] + list(brands)})
 
 # ==========================================
@@ -733,8 +780,8 @@ def create_system_user(request):
     """
     API สำหรับ Admin/SuperUser สร้าง System User ใหม่
     """
-    # ตรวจสอบสิทธิ์: ต้องเป็น Admin, SuperAdmin หรือ Seller
-    if request.user.role not in ['admin', 'super_admin', 'seller']:
+    # ตรวจสอบสิทธิ์: ต้องเป็น Admin เท่านั้น
+    if request.user.role != 'admin':
         return Response({"error": "Unauthorized: คุณไม่มีสิทธิ์สร้างผู้ใช้งาน"}, status=403)
     
     data = request.data
@@ -1677,6 +1724,404 @@ def bulk_update_orders_api(request):
 
 
 # ==========================================
+# 🏷️ Tag System APIs
+# ==========================================
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+@permission_classes([AllowAny])  # GET สามารถเข้าถึงได้ทุกคน, POST/PUT/DELETE ต้องเป็น Admin
+def tag_api(request, tag_id=None):
+    """
+    🏷️ API สำหรับจัดการ Tags
+    
+    Methods:
+    --------
+    GET /api/tags/           # ดึง Tags ทั้งหมด
+    POST /api/tags/          # สร้าง Tag ใหม่ (Admin)
+    PUT /api/tags/:id/       # แก้ไข Tag (Admin)
+    DELETE /api/tags/:id/    # ลบ Tag (Admin)
+    """
+    
+    # ==========================================
+    # 📖 GET - ดึงรายการ Tags ทั้งหมด
+    # ==========================================
+    if request.method == 'GET':
+        try:
+            from .models import Tag
+            from .serializers import TagSerializer
+            
+            # ดึง Tags ทั้งหมด เรียงตามกลุ่ม และชื่อ
+            tags = Tag.objects.all().order_by('group_name', 'name')
+            serializer = TagSerializer(tags, many=True)
+            
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+    
+    # ==========================================
+    # ➕ POST - สร้าง Tag ใหม่
+    # ==========================================
+    elif request.method == 'POST':
+        # ✅ ตรวจสอบสิทธิ์: เฉพาะ Admin เท่านั้น
+        if not request.user.is_authenticated or request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({"error": "Unauthorized"}, status=403)
+        
+        try:
+            from .models import Tag
+            from .serializers import TagSerializer
+            
+            # ใช้ Serializer ในการสร้างเพื่อความง่าย
+            serializer = TagSerializer(data=request.data)
+            if serializer.is_valid():
+                # ตรวจสอบชื่อซ้ำ (Case Insensitive)
+                name = serializer.validated_data.get('name')
+                if Tag.objects.filter(name__iexact=name).exists():
+                    return Response({"error": f"Tag '{name}' มีอยู่แล้ว"}, status=400)
+                
+                serializer.save()
+                return Response(serializer.data, status=201)
+            return Response(serializer.errors, status=400)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+    # ==========================================
+    # 📝 PUT/PATCH - แก้ไข Tag
+    # ==========================================
+    elif request.method in ['PUT', 'PATCH']:
+        if not request.user.is_authenticated or request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({"error": "Unauthorized"}, status=403)
+            
+        if not tag_id:
+            return Response({"error": "ต้องระบุ Tag ID"}, status=400)
+            
+        try:
+            from .models import Tag
+            from .serializers import TagSerializer
+            
+            tag = Tag.objects.get(id=tag_id)
+            serializer = TagSerializer(tag, data=request.data, partial=True)
+            
+            if serializer.is_valid():
+                # ตรวจสอบชื่อซ้ำถ้ามีการเปลี่ยนชื่อ
+                new_name = serializer.validated_data.get('name')
+                if new_name and new_name.lower() != tag.name.lower():
+                    if Tag.objects.filter(name__iexact=new_name).exists():
+                        return Response({"error": f"ชื่อ Tag '{new_name}' ถูกใช้ไปแล้ว"}, status=400)
+                
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=400)
+        except Tag.DoesNotExist:
+            return Response({"error": "ไม่พบ Tag นี้"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+    
+    # ==========================================
+    # 🗑️ DELETE - ลบ Tag
+    # ==========================================
+    elif request.method == 'DELETE':
+        # ✅ ตรวจสอบสิทธิ์: เฉพาะ Admin เท่านั้น
+        if not request.user.is_authenticated or request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({"error": "Unauthorized"}, status=403)
+        
+        if not tag_id:
+            return Response({"error": "ต้องระบุ Tag ID"}, status=400)
+        
+        try:
+            from .models import Tag
+            
+            # ค้นหา Tag
+            tag = Tag.objects.get(id=tag_id)
+            tag_name = tag.name
+            
+            # ลบ Tag (ความสัมพันธ์กับสินค้าจะถูกลบอัตโนมัติ)
+            tag.delete()
+            
+            return Response({"message": f"ลบ Tag '{tag_name}' สำเร็จ"})
+        except Tag.DoesNotExist:
+            return Response({"error": "ไม่พบ Tag นี้"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def product_tags_api(request, product_id):
+    """
+    🔗 API สำหรับกำหนด Tags ให้กับสินค้า
+    
+    ใช้สำหรับ:
+    - บันทึก/อัปเดต Tags ของสินค้าจาก Admin Panel
+    
+    Method:
+    -------
+    POST /api/products/:id/tags/
+    
+    Payload:
+    --------
+    {
+        "tag_ids": [1, 3, 5]  # รายการ Tag IDs ที่ต้องการกำหนด
+    }
+    """
+    
+    # ✅ ตรวจสอบสิทธิ์: เฉพาะ Admin เท่านั้น
+    if request.user.role not in ['admin', 'super_admin', 'seller']:
+        return Response({"error": "Unauthorized"}, status=403)
+    
+    try:
+        from .models import Product, Tag
+        
+        # ค้นหาสินค้า
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({"error": "ไม่พบสินค้านี้"}, status=404)
+        
+        # รับ Tag IDs จาก request
+        tag_ids = request.data.get('tag_ids', [])
+        
+        # ตรวจสอบว่าเป็น list
+        if not isinstance(tag_ids, list):
+            return Response({"error": "tag_ids ต้องเป็น array"}, status=400)
+        
+        # ลบ Tags เก่าทั้งหมด
+        product.tags.clear()
+        
+        # เพิ่ม Tags ใหม่
+        for tag_id in tag_ids:
+            try:
+                tag = Tag.objects.get(id=tag_id)
+                product.tags.add(tag)
+            except Tag.DoesNotExist:
+                # ถ้า Tag ไม่เจอ ข้ามไป (ไม่ error)
+                continue
+        
+        # ส่งผลลัพธ์กลับ
+        from .serializers import TagSerializer
+        updated_tags = TagSerializer(product.tags.all(), many=True)
+        
+        return Response({
+            "message": "บันทึก Tags สำเร็จ",
+            "tags": updated_tags.data
+        })
+        
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+# ==========================================
+# ⚡ Advanced Tag Logic (Automation & Bulk)
+# ==========================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def run_tag_automation_api(request):
+    """
+    🤖 Smart Tag Automation: Enhanced Rule System
+    Rules:
+    - Hot Selling (🔥): > 10 sold in 48h
+    - Best Seller (🏆): > 50 sold in 30d
+    - Last Chance (⌛): Stock < 5
+    - New Arrival (🆕): Created in 7d
+    - Out of Stock (❌): Stock == 0
+    - On Sale (🏷️): price < original_price
+    - Flash Sale (⚡): Active in flash sale
+    """
+    if request.user.role not in ['admin', 'super_admin']:
+        return Response({"error": "Unauthorized"}, status=403)
+        
+    try:
+        from .models import Product, Tag, OrderItem, FlashSaleProduct
+        from django.db import models
+        from django.db.models import Sum, Q, Avg, F
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        stats = {}
+        
+        # Helper to get/create and ensure Tag meta
+        def get_smart_tag(name, color, icon, group="ระบบอัตโนมัติ"):
+             tag, _ = Tag.objects.get_or_create(name=name, defaults={'color': color, 'icon': icon, 'group_name': group})
+             return tag
+
+        # Define Smart Tags with refined metadata for consistency
+        tags_meta = {
+            'best_seller': get_smart_tag('Best Seller', '#fbbf24', 'Award', "ยอดนิยม"),
+            'hot_selling': get_smart_tag('Hot Selling', '#f87171', 'Zap', "ยอดนิยม"),
+            'last_chance': get_smart_tag('Last Chance', '#f472b6', 'Clock', "สถานะสินค้า"),
+            'new_arrival': get_smart_tag('New Arrival', '#10b981', 'Sparkles', "สถานะสินค้า"),
+            'out_of_stock': get_smart_tag('Out of Stock', '#94a3b8', 'Slash', "สถานะสินค้า"),
+            'on_sale': get_smart_tag('On Sale', '#6366f1', 'Percent', "โปรโมชั่น"),
+            'flash_sale': get_smart_tag('Flash Sale', '#f59e0b', 'Activity', "โปรโมชั่น"),
+        }
+
+        # ---------------------------------------------------------
+        # 1. New Arrival (Logic: Created in last 7 days)
+        # ---------------------------------------------------------
+        seven_days_ago = now - timedelta(days=7)
+        new_ids = set(Product.objects.filter(created_at__gte=seven_days_ago).values_list('id', flat=True))
+        
+        # ---------------------------------------------------------
+        # 2. Out of Stock (Logic: stock == 0)
+        # ---------------------------------------------------------
+        oos_ids = set(Product.objects.filter(stock__lte=0).values_list('id', flat=True))
+        
+        # ---------------------------------------------------------
+        # 3. Last Chance (Logic: 0 < stock < 5)
+        # ---------------------------------------------------------
+        last_chance_ids = set(Product.objects.filter(stock__gt=0, stock__lt=5).values_list('id', flat=True))
+
+        # ---------------------------------------------------------
+        # 4. On Sale (Logic: price < original_price)
+        # ---------------------------------------------------------
+        on_sale_ids = set(Product.objects.filter(original_price__gt=0).filter(price__lt=F('original_price')).values_list('id', flat=True))
+
+        # ---------------------------------------------------------
+        # 5. Flash Sale (Logic: Has active Flash Sale item)
+        # ---------------------------------------------------------
+        flash_ids = set(FlashSaleProduct.objects.filter(
+            flash_sale__is_active=True,
+            flash_sale__start_time__lte=now,
+            flash_sale__end_time__gte=now
+        ).values_list('product_id', flat=True))
+
+        # ---------------------------------------------------------
+        # 6. Sales Based (Hot & Best Seller)
+        # ---------------------------------------------------------
+        # Best Seller (>50 in 30d)
+        thirty_days_ago = now - timedelta(days=30)
+        best_seller_ids = set(OrderItem.objects.filter(
+            order__status__in=['Paid', 'Processing', 'Shipped', 'Completed'],
+            order__created_at__gte=thirty_days_ago
+        ).values('product_id').annotate(total=Sum('quantity')).filter(total__gte=50).values_list('product_id', flat=True))
+
+        # Hot Selling (>10 in 48h)
+        forty_eight_hours_ago = now - timedelta(hours=48)
+        hot_selling_ids = set(OrderItem.objects.filter(
+            order__status__in=['Paid', 'Processing', 'Shipped', 'Completed'],
+            order__created_at__gte=forty_eight_hours_ago
+        ).values('product_id').annotate(total=Sum('quantity')).filter(total__gte=10).values_list('product_id', flat=True))
+
+        # ---------------------------------------------------------
+        # Final Processing: Bulk Sync Tags
+        # ---------------------------------------------------------
+        rule_map = {
+            'best_seller': best_seller_ids,
+            'hot_selling': hot_selling_ids,
+            'last_chance': last_chance_ids,
+            'new_arrival': new_ids,
+            'out_of_stock': oos_ids,
+            'on_sale': on_sale_ids,
+            'flash_sale': flash_ids
+        }
+
+        total_updates = 0
+        for key, target_ids in rule_map.items():
+            tag = tags_meta[key]
+            # 1. Remove from those not in list anymore
+            to_remove = Product.objects.filter(tags=tag).exclude(id__in=target_ids)
+            for p in to_remove:
+                p.tags.remove(tag)
+                total_updates += 1
+            
+            # 2. Add to those in list but not tagged
+            to_add = Product.objects.filter(id__in=target_ids).exclude(tags=tag)
+            for p in to_add:
+                p.tags.add(tag)
+                total_updates += 1
+            
+            stats[tag.name] = len(target_ids)
+
+        return Response({
+            "message": "ระบบอัตโนมัติทำงานเสร็จสิ้น",
+            "updated_count": total_updates,
+            "statistics": stats
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Automation Error: {str(e)}")
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def bulk_update_tags_api(request):
+    """
+    📦 Bulk Management: จัดการ Tag สินค้าทีละหลายรายการ
+    """
+    if request.user.role not in ['admin', 'super_admin']:
+        return Response({"error": "Unauthorized"}, status=403)
+        
+    try:
+        from .models import Product, Tag
+        product_ids = request.data.get('product_ids', [])
+        tag_id = request.data.get('tag_id')
+        action = request.data.get('action', 'add') # 'add' หรือ 'remove'
+        
+        if not product_ids or not tag_id:
+            return Response({"error": "ข้อมูลไม่ครบถ้วน (product_ids, tag_id)"}, status=400)
+            
+        tag = Tag.objects.get(id=tag_id)
+        products = Product.objects.filter(id__in=product_ids)
+        
+        if action == 'add':
+            for p in products:
+                p.tags.add(tag)
+        else:
+            for p in products:
+                p.tags.remove(tag)
+                
+        return Response({
+            "message": f"{'เพิ่ม' if action == 'add' else 'ลบ'} Tag '{tag.name}' ให้สินค้า {products.count()} รายการสำเร็จ",
+            "action": action
+        })
+        
+    except Tag.DoesNotExist:
+        return Response({"error": "ไม่พบ Tag ที่ระบุ"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_products_by_tags_api(request):
+    """
+    Fetch all products that have ANY of the given tag IDs.
+    Returns: List of product data needed for Flash Sale (id, title, thumbnail, price, stock).
+    """
+    if request.user.role not in ['admin', 'super_admin', 'seller']:
+        return Response({"error": "Unauthorized"}, status=403)
+
+    tag_ids = request.data.get('tag_ids', [])
+    if not isinstance(tag_ids, list) or not tag_ids:
+        return Response({"error": "tag_ids list is required"}, status=400)
+
+    try:
+        from .models import Product
+        # Filter products that match ANY of the tags
+        products = Product.objects.filter(tags__id__in=tag_ids, is_active=True).distinct()
+        
+        # Serialize only needed fields
+        data = []
+        for p in products:
+            data.append({
+                "id": p.id, # Ensure ID is integer
+                "title": p.title,
+                "price": p.price,
+                "stock": p.stock,
+                "thumbnail": p.thumbnail.url if p.thumbnail else "/placeholder.png",
+                "tags": [{"id": t.id, "name": t.name} for t in p.tags.all()]
+            })
+            
+        return Response(data)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+# ==========================================
 # 🎟️ Coupon & Flash Sale APIs
 # ==========================================
 
@@ -1816,13 +2261,38 @@ def admin_coupon_api(request, coupon_id=None):
              s = CouponSerializer(data=request.data)
              
         if s.is_valid():
-            # ✅ Backend Validation: Start vs End
-            start = s.validated_data.get('start_date')
-            end = s.validated_data.get('end_date')
-            # Check if both exist (for create) or if partial update affects them
+            # ✅ Backend Validation (Enhanced)
+            data = s.validated_data
+            start = data.get('start_date')
+            end = data.get('end_date')
+            dtype = data.get('discount_type')
+            dval = data.get('discount_value', 0)
+            min_spend = data.get('min_spend', 0)
+            usage_limit = data.get('usage_limit', 0)
+
+            # 1. Start < End
             if start and end and start > end:
                  return Response({"error": "วันเริ่มต้องมาก่อนวันสิ้นสุด (Start Date must be before End Date)"}, status=400)
             
+            # 2. Discount Value > 0 (unless free shipping)
+            if dtype != 'free_shipping' and dval <= 0:
+                 return Response({"error": "มูลค่าส่วนลดต้องมากกว่า 0 บาท"}, status=400)
+
+            # 3. Percent <= 100
+            if dtype == 'percent' and dval > 100:
+                 return Response({"error": "ส่วนลดเปอร์เซ็นต์ต้องไม่เกิน 100%"}, status=400)
+
+            # 4. Fixed Discount < Min Spend
+            if dtype == 'fixed' and min_spend > 0 and dval >= min_spend:
+                 return Response({"error": f"ส่วนลด ({dval}) ต้องน้อยกว่ายอดซื้อขั้นต่ำ ({min_spend})"}, status=400)
+
+            # 5. Usage Limit & Per User > 0
+            limit_per_user = data.get('limit_per_user', 1)
+            if usage_limit is not None and usage_limit <= 0:
+                 return Response({"error": "จำนวนสิทธิ์รวม (Usage Limit) ต้องมากกว่า 0"}, status=400)
+            if limit_per_user <= 0:
+                 return Response({"error": "จำนวนสิทธิ์ต่อคน (Limit Per User) ต้องมากกว่า 0"}, status=400)
+
             s.save()
             return Response(s.data)
         return Response(s.errors, status=400)
@@ -1835,17 +2305,39 @@ def admin_coupon_api(request, coupon_id=None):
             # Partial update allowed for PATCH and PUT (for flexibility)
             s = CouponSerializer(c, data=request.data, partial=True)
             if s.is_valid():
-                # ✅ Backend Validation: Logic for Start vs End
-                # For partial updates, we might need to fetch existing instances if only one date is sent?
-                # For simplicity, if both are in payload, check. 
-                # Ideally, we should check against instance data too if one is missing, but let's stick to payload for now or basic check.
-                start = s.validated_data.get('start_date')
-                end = s.validated_data.get('end_date')
+                # ✅ Backend Validation (Enhanced for Update)
+                data = s.validated_data
                 
-                # If we have one but not the other, we should ideally compare with existing, but Model clean() is better place.
-                # Here we just check if BOTH are changed.
+                # Merge with existing data for missing fields (for robust validation on partial updates)
+                start = data.get('start_date', c.start_date)
+                end = data.get('end_date', c.end_date)
+                dtype = data.get('discount_type', c.discount_type)
+                dval = data.get('discount_value', c.discount_value)
+                min_spend = data.get('min_spend', c.min_spend)
+                usage_limit = data.get('usage_limit', c.usage_limit)
+                
+                # 1. Start < End
                 if start and end and start > end:
                      return Response({"error": "วันเริ่มต้องมาก่อนวันสิ้นสุด"}, status=400)
+
+                # 2. Discount Value > 0
+                if dtype != 'free_shipping' and dval <= 0:
+                     return Response({"error": "มูลค่าส่วนลดต้องมากกว่า 0 บาท"}, status=400)
+
+                # 3. Percent <= 100
+                if dtype == 'percent' and dval > 100:
+                     return Response({"error": "ส่วนลดเปอร์เซ็นต์ต้องไม่เกิน 100%"}, status=400)
+
+                # 4. Fixed Discount < Min Spend
+                if dtype == 'fixed' and min_spend > 0 and dval >= min_spend:
+                     return Response({"error": f"ส่วนลด ({dval}) ต้องน้อยกว่ายอดซื้อขั้นต่ำ ({min_spend})"}, status=400)
+
+                # 5. Usage Limit & Per User > 0
+                limit_per_user = data.get('limit_per_user', c.limit_per_user)
+                if usage_limit is not None and usage_limit <= 0:
+                     return Response({"error": "จำนวนสิทธิ์รวม (Usage Limit) ต้องมากกว่า 0"}, status=400)
+                if limit_per_user <= 0:
+                     return Response({"error": "จำนวนสิทธิ์ต่อคน (Limit Per User) ต้องมากกว่า 0"}, status=400)
 
                 s.save()
                 return Response(s.data)
@@ -1865,7 +2357,7 @@ def admin_flash_sale_api(request, fs_id=None):
     # Debug Role
     print(f"DEBUG: Flash Sale Access - User: {request.user.username}, Role: {getattr(request.user, 'role', 'N/A')}, Superuser: {request.user.is_superuser}")
     
-    if request.user.role not in ['admin', 'super_admin', 'seller'] and not request.user.is_superuser and not request.user.is_staff:
+    if request.user.role != 'admin' and not request.user.is_superuser and not request.user.is_staff:
         print(f"DEBUG: Access Denied for {request.user.username}")
         return Response(status=403)
         
@@ -2416,7 +2908,7 @@ def get_admin_logs(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_all_users(request):
-    if request.user.role not in ['admin', 'super_admin', 'seller']:
+    if request.user.role != 'admin':
         return Response(status=403)
     users = User.objects.all().order_by('-id')
     data = [{
@@ -2484,8 +2976,18 @@ def edit_product_api(request, product_id):
         
         if 'title' in data: product.title = data['title']
         if 'description' in data: product.description = data['description']
-        if 'price' in data: product.price = data['price']
-        if 'stock' in data: product.stock = data['stock']
+        if 'price' in data and data['price'] != '':
+            try:
+                product.price = float(data['price'])
+            except ValueError:
+                pass # Keep old price if invalid
+
+        if 'stock' in data and data['stock'] != '':
+             try:
+                product.stock = int(data['stock'])
+             except ValueError:
+                pass
+
         if 'brand' in data: product.brand = data['brand']
         
         if 'category' in data and data['category']:
@@ -2496,10 +2998,11 @@ def edit_product_api(request, product_id):
             product.thumbnail = request.FILES['thumbnail']
 
         # ✅ NEW: Add new gallery images during edit (เพิ่มรูปใหม่เข้าไปใน Gallery)
-        if 'images' in request.FILES:
-            images = request.FILES.getlist('images')
-            for img in images:
-                ProductImage.objects.create(product=product, image_url=img)
+        # Support both 'images' and 'new_gallery_images' keys
+        gallery_files = request.FILES.getlist('images') + request.FILES.getlist('new_gallery_images')
+        
+        for img in gallery_files:
+            ProductImage.objects.create(product=product, image_url=img)
             
         product.save()
         return Response({"message": "Product updated"})
@@ -2630,7 +3133,8 @@ def get_related_products(request, product_id):
             "id": p.id,
             "title": p.title,
             "price": p.price,
-            "thumbnail": p.thumbnail.url if p.thumbnail else ""
+            "thumbnail": p.thumbnail.url if p.thumbnail else "",
+            "tags": [{"id": t.id, "name": t.name, "icon": t.icon, "color": t.color, "slug": t.slug} for t in p.tags.all()]
         } for p in related]
         return Response(data)
     except:

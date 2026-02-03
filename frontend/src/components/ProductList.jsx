@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
 import { 
-  ShoppingCart, Search, Eye, ChevronLeft, ChevronRight, 
-  CheckCircle, Heart, Star, SlidersHorizontal, XCircle, Filter, X, ShoppingBag, Zap,
+  ShoppingCart, Search, Eye, ChevronLeft, ChevronRight, ChevronDown, 
+  CheckCircle, Heart, Star, SlidersHorizontal, XCircle, Filter, X, ShoppingBag, Zap, Tag,
   Flower2, Sofa, Utensils, Shirt, Footprints, Watch, Sparkles, Gem, Smartphone, Monitor, ShoppingBasket, Gift, Rocket, LayoutGrid, Glasses,
-  Tablet, Headphones, Bike, Car, Trophy, Laptop, CookingPot, Dumbbell, Pipette, Briefcase
+  Tablet, Headphones, Bike, Car, Trophy, Laptop, CookingPot, Dumbbell, Pipette, Briefcase, Menu, CreditCard
 } from 'lucide-react'; 
 import { useCart } from '../context/CartContext';
 import Swal from 'sweetalert2';
 // Wishlist removed
 import { useAuth } from '../context/AuthContext';
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
+import ProductBadge from './ProductBadge';
 
 // Skeleton Loader
 const ProductSkeleton = () => (
@@ -24,6 +25,137 @@ const ProductSkeleton = () => (
     </div>
   </div>
 );
+
+// ✅ Collapsible Filter Section Component
+const FilterSection = ({ title, icon: Icon, id, openSections, toggleSection, children }) => (
+    <div className="border-b border-gray-100 last:border-0">
+        <button 
+            onClick={() => toggleSection(id)} 
+            className="w-full flex items-center justify-between py-4 px-1 hover:text-[#1a4d2e] transition-colors group"
+        >
+            <span className="font-bold text-gray-800 text-sm flex items-center gap-2 group-hover:text-[#1a4d2e]">
+                {Icon && <Icon size={16} className="text-gray-400 group-hover:text-[#1a4d2e]"/>}
+                {title}
+            </span>
+            <ChevronDown size={16} className={`text-gray-400 transition-transform duration-300 ${openSections[id] ? 'rotate-180' : ''}`} />
+        </button>
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openSections[id] ? 'max-h-[600px] opacity-100 mb-4' : 'max-h-0 opacity-0'}`}>
+            {children}
+        </div>
+    </div>
+);
+
+// 🎓 Icon Mapping Helper (Enhanced with Thai & Modern Icons)
+const getCategoryConfig = (catName) => {
+    if (!catName) return { icon: LayoutGrid, label: '', color: 'bg-gray-200' };
+    const lower = String(catName).toLowerCase();
+    
+    // 💄 Beauty & Health
+    if (lower.includes('beauty') && !lower.includes('health') && !lower.includes('skin')) return {
+        icon: Sparkles, label: 'เครื่องสำอาง / ความงาม', color: 'bg-pink-50 text-pink-600'
+    };
+    // 🧴 Skin Care
+    if (lower.includes('skin') || lower.includes('serum') || lower.includes('cream')) return {
+        icon: Pipette, label: 'ผลิตภัณฑ์ดูแลผิว', color: 'bg-blue-50 text-blue-400'
+    };
+    // 🌸 Fragrances
+    if (lower.includes('fragrance') || lower.includes('perfume') || lower.includes('น้ำหอม')) return {
+        icon: Gem, label: 'น้ำหอม', color: 'bg-purple-50 text-purple-600'
+    };
+
+    // 🛋️ Furniture
+    if (lower.includes('furniture') || lower.includes('sofa') || lower.includes('armchair')) return {
+        icon: Sofa, label: 'เฟอร์นิเจอร์', color: 'bg-orange-50 text-stone-600'
+    };
+    // 🏠 Home Decoration
+    if (lower.includes('decor') || lower.includes('home')) return {
+        icon: Flower2, label: 'ของตกแต่งบ้าน', color: 'bg-teal-50 text-teal-600'
+    };
+    // 🍳 Kitchen Accessories
+    if (lower.includes('kitchen') || lower.includes('pan') || lower.includes('knife')) return {
+        icon: CookingPot, label: 'อุปกรณ์ครัว', color: 'bg-gray-100 text-gray-800'
+    };
+
+    // 🥬 Groceries
+    if (lower.includes('grocery') || lower.includes('groceries') || lower.includes('vegetable') || lower.includes('food')) return {
+        icon: ShoppingBasket, label: 'สินค้าอุปโภคบริโภค', color: 'bg-green-50 text-green-700'
+    };
+
+    // 💻 Laptops
+    if (lower.includes('laptop')) return {
+        icon: Laptop, label: 'โน้ตบุ๊ก / แล็ปท็อป', color: 'bg-slate-100 text-blue-600'
+    };
+    // 📱 Smartphones
+    if (lower.includes('smartphone') || (lower.includes('phone') && !lower.includes('access'))) return {
+        icon: Smartphone, label: 'สมาร์ทโฟน', color: 'bg-gray-900 text-white'
+    };
+    // 📱 Tablets
+    if (lower.includes('tablet') || lower.includes('ipad')) return {
+        icon: Tablet, label: 'แท็บเล็ต', color: 'bg-gray-200 text-gray-700'
+    };
+    // 🎧 Mobile Accessories
+    if (lower.includes('mobile access') || lower.includes('earbud') || lower.includes('case')) return {
+        icon: Headphones, label: 'อุปกรณ์เสริมมือถือ', color: 'bg-cyan-50 text-cyan-500'
+    };
+
+    // 👔 Mens Shirts
+    if (lower.includes('mens shirt') || (lower.includes('shirt') && lower.includes('men'))) return {
+        icon: Shirt, label: 'เสื้อเชิ้ตผู้ชาย', color: 'bg-blue-50 text-blue-900'
+    };
+    // 👞 Mens Shoes
+    if (lower.includes('mens shoes') || (lower.includes('shoe') && lower.includes('men'))) return {
+        icon: Footprints, label: 'รองเท้าผู้ชาย', color: 'bg-amber-100 text-amber-800'
+    };
+    // ⌚ Mens Watches
+    if (lower.includes('mens watch') || (lower.includes('watch') && lower.includes('men'))) return {
+        icon: Watch, label: 'นาฬิกาผู้ชาย', color: 'bg-gray-100 text-slate-600'
+    };
+
+    // 👗 Tops (Women)
+    if (lower.includes('top') || lower.includes('t-shirt')) return {
+        icon: Shirt, label: 'เสื้อผ้าส่วนบน (ทั่วไป)', color: 'bg-sky-50 text-sky-400'
+    };
+    // 👜 Womens Bags
+    if (lower.includes('womens bag') || lower.includes('handbag')) return {
+        icon: ShoppingBag, label: 'กระเป๋าผู้หญิง', color: 'bg-rose-50 text-rose-800'
+    };
+    // 👗 Womens Dresses
+    if (lower.includes('dress')) return {
+        icon: Shirt, label: 'ชุดเดรสผู้หญิง', color: 'bg-orange-50 text-orange-400'
+    };
+    // 💍 Womens Jewellery
+    if (lower.includes('jewel') || lower.includes('ring') || lower.includes('necklace')) return {
+        icon: Gem, label: 'เครื่องประดับผู้หญิง', color: 'bg-slate-50 text-slate-400'
+    };
+    // 👠 Womens Shoes
+    if (lower.includes('womens shoes') || lower.includes('heels') || lower.includes('pumps')) return {
+        icon: Footprints, label: 'รองเท้าผู้หญิง', color: 'bg-red-50 text-red-600'
+    };
+    // ⌚ Womens Watches
+    if (lower.includes('womens watch')) return {
+        icon: Watch, label: 'นาฬิกาผู้หญิง', color: 'bg-rose-50 text-rose-500'
+    };
+
+    // 🏍️ Motorcycle
+    if (lower.includes('motorcycle') || lower.includes('helmet')) return {
+        icon: Bike, label: 'มอเตอร์ไซค์', color: 'bg-stone-900 text-orange-500'
+    };
+    // 🚗 Vehicle
+    if (lower.includes('vehicle') || lower.includes('car')) return {
+        icon: Car, label: 'ยานยนต์ / รถยนต์', color: 'bg-blue-50 text-blue-500'
+    };
+    
+    // 🏋️ Sports Accessories
+    if (lower.includes('sport') || lower.includes('dumbbell') || lower.includes('gym')) return {
+        icon: Dumbbell, label: 'อุปกรณ์กีฬา', color: 'bg-red-50 text-red-600'
+    };
+    // 🕶️ Sunglasses
+    if (lower.includes('sunglass') || lower.includes('glass')) return {
+        icon: Glasses, label: 'แว่นกันแดด', color: 'bg-yellow-50 text-yellow-800'
+    };
+
+    return { icon: LayoutGrid, label: catName, color: 'bg-gray-50 text-gray-600' }; // Default
+};
 
 function ProductList() {
   const { addToCart, cartItems } = useCart(); 
@@ -55,21 +187,101 @@ function ProductList() {
   const [selectedBrand, setSelectedBrand] = useState('ทั้งหมด');
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   const [activeFlashSales, setActiveFlashSales] = useState({}); // Map: productId -> { sale_price, limit, sold }
+  
+  // ✅ Tag Filter States
+  const [allTags, setAllTags] = useState([]);
+  const [selectedTagIds, setSelectedTagIds] = useState([]);
+  
+  // ✅ Layout State
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [openSections, setOpenSections] = useState({ category: true, price: true, brand: true, tags: false });
+
+  const toggleSection = (section) => {
+      setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const API_BASE_URL = "http://localhost:8000";
 
-  // 1. โหลดหมวดหมู่
+  // ✅ Dynamic Grouping Logic (Backend Driven)
+  const groupTags = (tags) => {
+    const groups = {};
+    
+    // Define Display Names
+    const groupDisplayNames = {
+      'promotion': 'โปรโมชั่น (Promotion)',
+      'category': 'หมวดหมู่ (Category)',
+      'feature': 'คุณสมบัติ (Feature)',
+      'brand': 'แบรนด์ (Brand)',
+      'other': 'อื่นๆ (Other)'
+    };
+
+    tags.forEach(tag => {
+      const groupKey = tag.group_name || 'other';
+      const groupName = groupDisplayNames[groupKey] || 'อื่นๆ (Other)';
+      
+      if (!groups[groupName]) {
+        groups[groupName] = [];
+      }
+      groups[groupName].push(tag);
+    });
+
+    // Sort groups logic if needed (Promotion first)
+    return groups;
+  };
+
+  const tagGroups = groupTags(allTags);
+
+  // 1. โหลดหมวดหมู่ (ใช้ API เดียวกับ Navbar เพื่อความตรงกัน)
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/categories/`)
+    fetch(`${API_BASE_URL}/api/menu-configs/`)
       .then(res => res.json())
       .then(data => {
-        const uniqueCats = data.categories ? [...new Set(data.categories)] : [];
-        setCategories(uniqueCats);
+        // Data is array of objects: [{ id, name, menu_config }, ...]
+        // We set the full objects to state
+        setCategories(data || []);
       })
       .catch(err => console.error(err));
   }, []);
-  
-  // ✅ 1.0.5 Initialize Filter from URL (e.g. ?category=Sofa&page=2)
+
+  // ... (Keep existing useEffects)
+
+// ...
+
+             {/* 1. Category Section */}
+             <FilterSection title="หมวดหมู่สินค้า" icon={LayoutGrid} id="category" openSections={openSections} toggleSection={toggleSection}>
+                 <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                     <button 
+                        onClick={() => { setSelectedCategory('ทั้งหมด'); updatePage(1); }}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-sm font-bold ${selectedCategory === 'ทั้งหมด' ? 'bg-[#1a4d2e] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-[#1a4d2e]'}`}
+                     >
+                        <span>ดูทั้งหมด</span>
+                        {selectedCategory === 'ทั้งหมด' && <CheckCircle size={14} />}
+                     </button>
+
+                     {categories.map(catObj => {
+                         // ✅ Handle both object (from new API) and legacy string format
+                         const catName = typeof catObj === 'string' ? catObj : catObj.name;
+                         
+                         // Helper to get icon (assuming getCategoryConfig works with name)
+                         const config = getCategoryConfig(catName); 
+                         const isSelected = selectedCategory === catName;
+                         
+                         return (
+                            <button 
+                                key={catName}
+                                onClick={() => { setSelectedCategory(catName); updatePage(1); }}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-sm font-bold ${isSelected ? 'bg-[#1a4d2e] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-[#1a4d2e]'}`}
+                            >
+                                <span className="flex items-center gap-2 text-left line-clamp-1">
+                                    {config.icon && <config.icon size={14} className={isSelected ? 'text-white' : 'text-gray-400'} />} 
+                                    {catName}
+                                </span>
+                                {isSelected && <CheckCircle size={14} />}
+                            </button>
+                         );
+                     })}
+                 </div>
+             </FilterSection>
   const location = useLocation();
 
   useEffect(() => {
@@ -129,12 +341,34 @@ function ProductList() {
     fetchActiveFlashSales();
   }, []);
 
-  // 1.2 โหลดแบรนด์
+  // 1.2 โหลดแบรนด์ Dynamic ตาม Category
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/brands/`)
+    let url = `${API_BASE_URL}/api/brands/`;
+    if (selectedCategory !== 'ทั้งหมด') {
+        url += `?category=${encodeURIComponent(selectedCategory)}`;
+    }
+
+    fetch(url)
       .then(res => res.json())
-      .then(data => setBrands(data.brands || []))
+      .then(data => {
+          setBrands(data.brands || []);
+          // ถ้า Brand ที่เลือกอยู่ ไม่ได้อยู่ใน List ใหม่ ให้ Reset เป็น 'ทั้งหมด'
+          if (selectedBrand !== 'ทั้งหมด' && data.brands && !data.brands.includes(selectedBrand)) {
+              setSelectedBrand('ทั้งหมด');
+          }
+      })
       .catch(err => console.error(err));
+  }, [selectedCategory]); // ✅ Run whenever Category changes
+
+  // 1.3 Load Tags (Global)
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/tags/`)
+        .then(res => res.json())
+        .then(data => {
+            const activeTags = (data || []).filter(t => t.is_active !== false);
+            setAllTags(activeTags);
+        })
+        .catch(err => console.error(err));
   }, []);
 
   // 2. ฟังก์ชันโหลดสินค้า (รวมทุกเงื่อนไข)
@@ -150,6 +384,11 @@ function ProductList() {
         if (searchQuery) url += `&search=${encodeURIComponent(searchQuery.trim())}`;
         if (minPrice) url += `&min_price=${minPrice}`;
         if (maxPrice) url += `&max_price=${maxPrice}`;
+        
+        // ✅ Multi-select Tag Support
+        if (selectedTagIds.length > 0) {
+            url += `&tags=${selectedTagIds.join(',')}`;
+        }
 
         const res = await fetch(url);
         const data = await res.json();
@@ -168,7 +407,7 @@ function ProductList() {
     } finally {
         setLoading(false);
     }
-  }, [currentPage, selectedCategory, selectedBrand, showInStockOnly, sortOption, searchQuery, minPrice, maxPrice, minRating]);
+  }, [currentPage, selectedCategory, selectedBrand, showInStockOnly, sortOption, searchQuery, minPrice, maxPrice, minRating, selectedTagIds]);
 
   // Debounce Search
   useEffect(() => {
@@ -194,6 +433,13 @@ function ProductList() {
       setCurrentPage(newPage);
   };
 
+  const toggleTag = (id) => {
+      setSelectedTagIds(prev => 
+          prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+      );
+      updatePage(1);
+  };
+
   const clearFilters = () => {
       setSelectedCategory('ทั้งหมด');
       setSelectedBrand('ทั้งหมด');
@@ -203,325 +449,268 @@ function ProductList() {
       setMaxPrice('');
       setMinRating(0);
       setSortOption('newest');
-      updatePage(1); // ✅ ใช้ updatePage แทน setCurrentPage
+      setSelectedTagIds([]); // Clear Tags
+      updatePage(1);
   };
-
-    // 🎓 Icon Mapping Helper (Enhanced with Thai & Modern Icons)
-    const getCategoryConfig = (catName) => {
-        if (!catName) return { icon: LayoutGrid, label: '', color: 'bg-gray-200' };
-        const lower = String(catName).toLowerCase();
-        // console.log("Matching Category:", lower); // 🔍 Debug
-
-        // 💄 Beauty & Health
-        if (lower.includes('beauty') && !lower.includes('health') && !lower.includes('skin')) return {
-            icon: Sparkles, label: 'เครื่องสำอาง / ความงาม', color: 'bg-pink-50 text-pink-600'
-        };
-        // 🧴 Skin Care
-        if (lower.includes('skin') || lower.includes('serum') || lower.includes('cream')) return {
-            icon: Pipette, label: 'ผลิตภัณฑ์ดูแลผิว', color: 'bg-blue-50 text-blue-400'
-        };
-        // 🌸 Fragrances
-        if (lower.includes('fragrance') || lower.includes('perfume') || lower.includes('น้ำหอม')) return {
-            icon: Gem, label: 'น้ำหอม', color: 'bg-purple-50 text-purple-600'
-        };
-
-        // 🛋️ Furniture
-        if (lower.includes('furniture') || lower.includes('sofa') || lower.includes('armchair')) return {
-            icon: Sofa, label: 'เฟอร์นิเจอร์', color: 'bg-orange-50 text-stone-600'
-        };
-        // 🏠 Home Decoration
-        if (lower.includes('decor') || lower.includes('home')) return {
-            icon: Flower2, label: 'ของตกแต่งบ้าน', color: 'bg-teal-50 text-teal-600'
-        };
-        // 🍳 Kitchen Accessories
-        if (lower.includes('kitchen') || lower.includes('pan') || lower.includes('knife')) return {
-            icon: CookingPot, label: 'อุปกรณ์ครัว', color: 'bg-gray-100 text-gray-800'
-        };
-
-        // 🥬 Groceries
-        if (lower.includes('grocery') || lower.includes('groceries') || lower.includes('vegetable') || lower.includes('food')) return {
-            icon: ShoppingBasket, label: 'สินค้าอุปโภคบริโภค', color: 'bg-green-50 text-green-700'
-        };
-
-        // 💻 Laptops
-        if (lower.includes('laptop')) return {
-            icon: Laptop, label: 'โน้ตบุ๊ก / แล็ปท็อป', color: 'bg-slate-100 text-blue-600'
-        };
-        // 📱 Smartphones
-        if (lower.includes('smartphone') || (lower.includes('phone') && !lower.includes('access'))) return {
-            icon: Smartphone, label: 'สมาร์ทโฟน', color: 'bg-gray-900 text-white'
-        };
-        // 📱 Tablets
-        if (lower.includes('tablet') || lower.includes('ipad')) return {
-            icon: Tablet, label: 'แท็บเล็ต', color: 'bg-gray-200 text-gray-700'
-        };
-        // 🎧 Mobile Accessories
-        if (lower.includes('mobile access') || lower.includes('earbud') || lower.includes('case')) return {
-            icon: Headphones, label: 'อุปกรณ์เสริมมือถือ', color: 'bg-cyan-50 text-cyan-500'
-        };
-
-        // 👔 Mens Shirts
-        if (lower.includes('mens shirt') || (lower.includes('shirt') && lower.includes('men'))) return {
-            icon: Shirt, label: 'เสื้อเชิ้ตผู้ชาย', color: 'bg-blue-50 text-blue-900'
-        };
-        // 👞 Mens Shoes
-        if (lower.includes('mens shoes') || (lower.includes('shoe') && lower.includes('men'))) return {
-            icon: Footprints, label: 'รองเท้าผู้ชาย', color: 'bg-amber-100 text-amber-800'
-        };
-        // ⌚ Mens Watches
-        if (lower.includes('mens watch') || (lower.includes('watch') && lower.includes('men'))) return {
-            icon: Watch, label: 'นาฬิกาผู้ชาย', color: 'bg-gray-100 text-slate-600'
-        };
-
-        // 👗 Tops (Women)
-        if (lower.includes('top') || lower.includes('t-shirt')) return {
-            icon: Shirt, label: 'เสื้อผ้าส่วนบน (ทั่วไป)', color: 'bg-sky-50 text-sky-400'
-        };
-        // 👜 Womens Bags
-        if (lower.includes('womens bag') || lower.includes('handbag')) return {
-            icon: ShoppingBag, label: 'กระเป๋าผู้หญิง', color: 'bg-rose-50 text-rose-800'
-        };
-        // 👗 Womens Dresses
-        if (lower.includes('dress')) return {
-            icon: Shirt, label: 'ชุดเดรสผู้หญิง', color: 'bg-orange-50 text-orange-400'
-        };
-        // 💍 Womens Jewellery
-        if (lower.includes('jewel') || lower.includes('ring') || lower.includes('necklace')) return {
-            icon: Gem, label: 'เครื่องประดับผู้หญิง', color: 'bg-slate-50 text-slate-400'
-        };
-        // 👠 Womens Shoes
-        if (lower.includes('womens shoes') || lower.includes('heels') || lower.includes('pumps')) return {
-            icon: Footprints, label: 'รองเท้าผู้หญิง', color: 'bg-red-50 text-red-600'
-        };
-        // ⌚ Womens Watches
-        if (lower.includes('womens watch')) return {
-            icon: Watch, label: 'นาฬิกาผู้หญิง', color: 'bg-rose-50 text-rose-500'
-        };
-
-        // 🏍️ Motorcycle
-        if (lower.includes('motorcycle') || lower.includes('helmet')) return {
-            icon: Bike, label: 'มอเตอร์ไซค์', color: 'bg-stone-900 text-orange-500'
-        };
-        // 🚗 Vehicle
-        if (lower.includes('vehicle') || lower.includes('car')) return {
-            icon: Car, label: 'ยานยนต์ / รถยนต์', color: 'bg-blue-50 text-blue-500'
-        };
-        
-        // 🏋️ Sports Accessories
-        if (lower.includes('sport') || lower.includes('dumbbell') || lower.includes('gym')) return {
-            icon: Dumbbell, label: 'อุปกรณ์กีฬา', color: 'bg-red-50 text-red-600'
-        };
-        // 🕶️ Sunglasses
-        if (lower.includes('sunglass') || lower.includes('glass')) return {
-            icon: Glasses, label: 'แว่นกันแดด', color: 'bg-yellow-50 text-yellow-800'
-        };
-
-        return { icon: LayoutGrid, label: catName, color: 'bg-gray-50 text-gray-600' }; // Default
-    };
 
   const isInCart = (id) => cartItems.some(item => item.id === id);
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] font-sans selection:bg-[#1a4d2e] selection:text-white pb-12">
+    <div className="min-h-screen bg-[#F8F9FA] font-sans selection:bg-[#1a4d2e] selection:text-white pb-12">
       
-      {/* 🌟 Sticky Glass Header */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm transition-all duration-300">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 h-20 flex justify-between items-center gap-4">
+      {/* 🌟 Header */}
+      <div className="bg-white border-b border-gray-200">
+          <div className="max-w-[1920px] mx-auto px-4 md:px-6 h-16 flex justify-between items-center gap-4">
                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 bg-[#1a4d2e] rounded-xl flex items-center justify-center text-white shadow-lg shadow-green-900/20">
-                       <ShoppingBag size={20} />
+                   <div className="w-9 h-9 bg-[#1a4d2e] rounded-lg flex items-center justify-center text-white shadow-lg shadow-green-900/20">
+                       <ShoppingBag size={18} />
                    </div>
-                   <h1 className="text-2xl font-black text-[#263A33] tracking-tight uppercase">Shop All</h1>
+                   <h1 className="text-xl font-black text-[#263A33] tracking-tight uppercase">Shop All</h1>
                </div>
 
                {/* Mobile Filter Toggle */}
-               <button onClick={() => setShowMobileFilter(true)} className="md:hidden p-2.5 bg-white rounded-xl shadow-sm border border-gray-200 text-gray-500 hover:text-[#1a4d2e] active:scale-95 transition-all">
-                   <Filter size={20} />
+               <button onClick={() => setShowMobileFilter(true)} className="lg:hidden p-2.5 bg-white rounded-xl shadow-sm border border-gray-200 text-gray-500 hover:text-[#1a4d2e] active:scale-95 transition-all flex items-center gap-2 font-bold text-xs">
+                   <Filter size={18} /> ตัวกรอง
                </button>
           </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-8 mt-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          
-          {/* ✅ Sidebar Filter (Responsive + Sticky) */}
-          <aside className={`fixed inset-0 z-50 bg-white/95 backdrop-blur-xl lg:backdrop-blur-none lg:bg-transparent p-6 lg:p-0 lg:static lg:w-72 lg:block transition-all duration-300 ${showMobileFilter ? 'translate-x-0 opacity-100' : '-translate-x-full lg:translate-x-0 lg:opacity-100'}`}>
-             <div className="flex justify-between items-center mb-6 lg:hidden">
-                 <h3 className="font-black text-2xl text-[#1a4d2e]">Filters</h3>
-                 <button onClick={() => setShowMobileFilter(false)} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200"><X size={24} /></button>
-             </div>
+      <div className="max-w-[1920px] mx-auto px-4 md:px-6 mt-8 flex flex-col lg:flex-row gap-8 items-start">
+        
+        {/* 🍌 LEFT SIDEBAR (Desktop Only - Modern Redesign) */}
+        <aside className="hidden lg:block w-[280px] flex-shrink-0 sticky top-24 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden px-4 py-2">
+             
+             {/* 1. Category Section */}
+             <FilterSection title="หมวดหมู่สินค้า" icon={LayoutGrid} id="category" openSections={openSections} toggleSection={toggleSection}>
+                 <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                     <button 
+                        onClick={() => { setSelectedCategory('ทั้งหมด'); updatePage(1); }}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-sm font-bold ${selectedCategory === 'ทั้งหมด' ? 'bg-[#1a4d2e] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-[#1a4d2e]'}`}
+                     >
+                        <span>ดูทั้งหมด</span>
+                        {selectedCategory === 'ทั้งหมด' && <CheckCircle size={14} />}
+                     </button>
 
-             <div className="bg-white lg:p-6 lg:rounded-[2rem] lg:shadow-sm lg:border lg:border-gray-100 space-y-8 sticky top-28 transition-all hover:shadow-md">
-                {/* หมวดหมู่ */}
-                <div>
-                    <h3 className="font-black text-xs text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <SlidersHorizontal size={14} /> Categories
-                    </h3>
-                    <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                        {['ทั้งหมด', ...categories].filter((v, i, a) => a.indexOf(v) === i).map(cat => {
-                            const config = getCategoryConfig(cat);
-                            const isSelected = selectedCategory === cat;
-                            // ✅ Use config.label (Thai) if available, otherwise fallback to cat
-                            const label = config.label || (cat === 'ทั้งหมด' ? 'สินค้าทั้งหมด' : cat); 
+                     {categories.map(catObj => {
+                         // ✅ Handle both object (from new API) and legacy string format
+                         const catName = typeof catObj === 'string' ? catObj : catObj.name;
+                         
+                         // Helper to get icon (assuming getCategoryConfig works with name)
+                         const config = getCategoryConfig(catName); 
+                         const isSelected = selectedCategory === catName;
+                         
+                         return (
+                            <button 
+                                key={catName}
+                                onClick={() => { setSelectedCategory(catName); updatePage(1); }}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-sm font-bold ${isSelected ? 'bg-[#1a4d2e] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-[#1a4d2e]'}`}
+                            >
+                                <span className="flex items-center gap-2 text-left line-clamp-1">
+                                    {config.icon && <config.icon size={14} className={isSelected ? 'text-white' : 'text-gray-400'} />} 
+                                    {catName}
+                                </span>
+                                {isSelected && <CheckCircle size={14} />}
+                            </button>
+                         );
+                     })}
+                 </div>
+             </FilterSection>
 
-                            return (
-                                <label key={cat} className={`flex items-center gap-3 cursor-pointer group p-2 rounded-xl transition-all ${isSelected ? 'bg-green-50/80 shadow-sm' : 'hover:bg-gray-50'}`}>
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0 overflow-hidden ${isSelected ? 'bg-white shadow-sm ' /*+ config.color*/ : 'bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-gray-600'}`}>
-                                        <config.icon size={16} strokeWidth={2.5} className={isSelected ? config.color.replace('text-', '') : ''} />
-                                    </div>
-                                    <span className={`text-sm font-bold truncate flex-1 ${isSelected ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e] transition-colors`}>
-                                        {label}
-                                    </span>
-                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#1a4d2e] mr-2" />}
-                                    <input type="radio" name="category" className="hidden" checked={isSelected} onChange={() => { setSelectedCategory(cat); updatePage(1); }} />
-                                </label>
-                            );
-                        })}
-                    </div>
-                </div>
+             {/* 2. Price Range */}
+             <FilterSection title="ช่วงราคา" icon={CreditCard} id="price" openSections={openSections} toggleSection={toggleSection}>
+                 <div className="flex items-center gap-2 p-1">
+                     <input 
+                        type="number" 
+                        placeholder="Min" 
+                        value={minPrice} 
+                        onChange={e => setMinPrice(e.target.value)} 
+                        className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium border border-gray-200 focus:border-[#1a4d2e] focus:ring-1 focus:ring-[#1a4d2e] outline-none transition-all placeholder:text-gray-300" 
+                     />
+                     <span className="text-gray-300 font-medium">-</span>
+                     <input 
+                        type="number" 
+                        placeholder="Max" 
+                        value={maxPrice} 
+                        onChange={e => setMaxPrice(e.target.value)} 
+                        className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium border border-gray-200 focus:border-[#1a4d2e] focus:ring-1 focus:ring-[#1a4d2e] outline-none transition-all placeholder:text-gray-300" 
+                     />
+                 </div>
+             </FilterSection>
 
-                {/* แบรนด์ */}
-                <div>
-                    <h3 className="font-black text-xs text-gray-400 uppercase tracking-widest mb-4">Brands</h3>
-                    <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                        {brands.map(brand => (
-                            <label key={brand} className="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-gray-50 transition-colors">
-                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${selectedBrand === brand ? 'border-[#1a4d2e]' : 'border-gray-200 group-hover:border-gray-300'}`}>
-                                    {selectedBrand === brand && <div className="w-2.5 h-2.5 bg-[#1a4d2e] rounded-full" />}
-                                </div>
-                                <span className={`text-sm font-bold ${selectedBrand === brand ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>{brand}</span>
-                                <input type="radio" name="brand" className="hidden" checked={selectedBrand === brand} onChange={() => { setSelectedBrand(brand); updatePage(1); }} />
-                            </label>
-                        ))}
-                    </div>
-                </div>
+             {/* 3. Brands */}
+             {brands.length > 0 && (
+                 <FilterSection title="แบรนด์" icon={Star} id="brand" openSections={openSections} toggleSection={toggleSection}>
+                     <div className="flex flex-wrap gap-2 p-1">
+                         {brands.slice(0, 15).map(brand => (
+                             <button 
+                                 key={brand}
+                                 onClick={() => { setSelectedBrand(selectedBrand === brand ? 'ทั้งหมด' : brand); updatePage(1); }}
+                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedBrand === brand ? 'bg-[#1a4d2e] border-[#1a4d2e] text-white' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-[#1a4d2e]'}`}
+                             >
+                                 {brand}
+                             </button>
+                         ))}
+                     </div>
+                 </FilterSection>
+             )}
 
-                {/* สถานะสินค้า */}
-                <div>
-                    <h3 className="font-black text-xs text-gray-400 uppercase tracking-widest mb-4">Status</h3>
-                    <label className="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-green-50/50 transition-colors border border-transparent hover:border-green-100">
-                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-all ${showInStockOnly ? 'bg-[#1a4d2e] border-[#1a4d2e]' : 'border-gray-300 bg-white'}`}>
-                             {showInStockOnly && <CheckCircle size={14} className="text-white" />}
-                        </div>
-                        <span className={`text-sm font-bold ${showInStockOnly ? 'text-[#1a4d2e]' : 'text-gray-500'} group-hover:text-[#1a4d2e]`}>เฉพาะสินค้าพร้อมส่ง</span>
-                        <input type="checkbox" className="hidden" checked={showInStockOnly} onChange={(e) => { setShowInStockOnly(e.target.checked); updatePage(1); }} />
-                    </label>
-                </div>
-
-                {/* เรตติ้งดาว */}
-                <div>
-                    <h3 className="font-black text-xs text-gray-400 uppercase tracking-widest mb-4">Rating</h3>
-                    <div className="space-y-1">
-                        {[4, 3, 2, 1].map(star => (
-                            <button key={star} onClick={() => setMinRating(star)} className={`flex items-center gap-3 text-sm font-bold w-full p-2 rounded-xl transition-colors ${minRating === star ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'text-gray-500 hover:bg-gray-50 border border-transparent'}`}>
-                                <div className="flex text-orange-400">
-                                    {[...Array(5)].map((_, i) => <Star key={i} size={14} fill={i < star ? "currentColor" : "none"} className={i >= star ? "text-gray-200" : ""} />)}
-                                </div>
-                                <span className="text-xs">& Up</span>
+             {/* 4. Tags (NEW) */}
+             {allTags.length > 0 && (
+                <FilterSection title="แท็กสินค้า" icon={Tag} id="tags" openSections={openSections} toggleSection={toggleSection}>
+                    <div className="flex flex-wrap gap-2 p-1">
+                        {allTags.slice(0, 20).map(tag => (
+                            <button
+                                key={tag.id}
+                                onClick={() => toggleTag(tag.id)}
+                                className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all flex items-center gap-1 ${selectedTagIds.includes(tag.id) ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-500 border-gray-100 hover:bg-gray-100'}`}
+                            >
+                                {tag.icon && <span>{tag.icon}</span>}
+                                {tag.name}
                             </button>
                         ))}
                     </div>
-                </div>
+                </FilterSection>
+             )}
 
-                <div className="pt-4 border-t border-gray-100">
-                    <h3 className="font-black text-xs text-gray-400 uppercase tracking-widest mb-4">Price Range</h3>
-                    <div className="flex gap-2 mb-4">
-                        <input type="number" placeholder="Min" value={minPrice} onChange={e => setMinPrice(e.target.value)} className="w-full p-2 bg-gray-50 rounded-lg text-xs font-bold border border-gray-200 outline-none focus:border-[#1a4d2e] focus:ring-1 focus:ring-[#1a4d2e]" />
-                        <span className="text-gray-300 self-center">-</span>
-                        <input type="number" placeholder="Max" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} className="w-full p-2 bg-gray-50 rounded-lg text-xs font-bold border border-gray-200 outline-none focus:border-[#1a4d2e] focus:ring-1 focus:ring-[#1a4d2e]" />
+             {/* 5. Status & Reset */}
+             <div className="pt-4 border-t border-gray-100 space-y-3">
+                <label className="flex items-center justify-between cursor-pointer group p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-[#1a4d2e] transition-all">
+                    <span className="text-xs font-bold text-gray-700">พร้อมส่งเท่านั้น</span>
+                    <div className={`w-8 h-5 rounded-full p-1 transition-colors ${showInStockOnly ? 'bg-[#1a4d2e]' : 'bg-gray-300'}`}>
+                        <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${showInStockOnly ? 'translate-x-3' : 'translate-x-0'}`}></div>
                     </div>
-                </div>
-
-                <button onClick={clearFilters} className="w-full py-3 bg-gray-100 text-gray-500 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 transition-colors uppercase text-xs tracking-widest flex items-center justify-center gap-2">
-                    <XCircle size={16} /> Clear Filters
+                    <input type="checkbox" className="hidden" checked={showInStockOnly} onChange={(e) => { setShowInStockOnly(e.target.checked); updatePage(1); }} />
+                </label>
+                
+                <button onClick={clearFilters} className="w-full py-3 bg-white border border-gray-200 text-gray-400 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all uppercase text-xs tracking-widest flex items-center justify-center gap-2">
+                    <Filter size={14} /> ล้างตัวกรอง
                 </button>
              </div>
-          </aside>
+        </aside>
 
-          {/* Product Grid */}
-          <main className="flex-1">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 bg-white p-4 rounded-[1.5rem] shadow-sm border border-gray-100 gap-4">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Found <span className="text-[#1a4d2e] font-black text-base mx-1">{products.length}</span> items</p>
-                <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-                    <span className="text-xs font-bold text-gray-500">Sort by:</span>
-                    <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); updatePage(1); }} className="bg-transparent text-sm font-black text-[#1a4d2e] outline-none cursor-pointer">
-                        <option value="newest">Newest</option>
-                        <option value="price_asc">Price: Low - High</option>
-                        <option value="price_desc">Price: High - Low</option>
-                    </select>
-                </div>
-            </div>
+        {/* 📱 MOBILE FILTER DRAWER (Hidden on Desktop) */}
+        {showMobileFilter && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowMobileFilter(false)}></div>
+             <aside className="absolute bottom-0 left-0 w-full h-[85vh] bg-white rounded-t-[2rem] shadow-2xl flex flex-col animate-slide-up">
+                 <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                     <h3 className="font-black text-xl text-[#263A33]">ตัวกรองสินค้า</h3>
+                     <button onClick={() => setShowMobileFilter(false)} className="bc-gray-100 p-2 rounded-full"><X size={20}/></button>
+                 </div>
+                 <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                     {/* Mobile Filter Content (Simplified) */}
+                     <div>
+                        <h4 className="font-bold mb-3">หมวดหมู่</h4>
+                        <div className="flex flex-wrap gap-2">
+                            {categories.map(catObj => {
+                                const catName = typeof catObj === 'string' ? catObj : catObj.name;
+                                return (
+                                    <button key={catName} onClick={() => { setSelectedCategory(catName); setShowMobileFilter(false); updatePage(1); }} className={`px-4 py-2 rounded-lg border text-sm font-bold ${selectedCategory === catName ? 'bg-[#1a4d2e] text-white' : 'bg-white'}`}>
+                                        {catName}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                     </div>
+                     {/* Include Price/Brand inputs here if needed for mobile completeness */}
+                 </div>
+             </aside>
+          </div>
+        )}
+
+      <main className="flex-1 w-full min-w-0">
+         {/* Sort & Status Bar */}
+         <div className="flex justify-between items-center mb-6">
+             <p className="text-gray-500 font-medium">พบสินค้า <span className="text-[#1a4d2e] font-bold">{loading ? '...' : (products.length || 0)}</span> รายการ</p>
+             <select 
+                value={sortOption} 
+                onChange={(e) => { setSortOption(e.target.value); updatePage(1); }} 
+                className="bg-white border border-gray-200 px-4 py-2 rounded-lg text-sm font-bold text-gray-700 outline-none focus:border-[#1a4d2e]"
+            >
+                <option value="newest">มาใหม่ล่าสุด</option>
+                <option value="price_asc">ราคา: ต่ำ - สูง</option>
+                <option value="price_desc">ราคา: สูง - ต่ำ</option>
+            </select>
+         </div>
+
+         {/* Active Filters Tags */}
+         {(selectedTagIds.length > 0 || selectedBrand !== 'ทั้งหมด' || minPrice || maxPrice || showInStockOnly) && (
+             <div className="mb-6 flex flex-wrap items-center gap-2">
+                 {/* ... (Keep existing Active Filter display logic if needed or simplify) ... */}
+                 {showInStockOnly && <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">พร้อมส่ง</span>}
+             </div>
+         )}
+
+
 
             {loading ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => <ProductSkeleton key={i} />)}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {[...Array(10)].map((_, i) => <ProductSkeleton key={i} />)}
               </div>
             ) : products.length > 0 ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-20">
                 {products.map((product) => {
-                  // ✅ Check if in active flash sale
                   const flashSaleItem = activeFlashSales[product.id];
-                  // Prioritize the frontend fetched flash sale data, fallback to product.flash_sale if backend already populated it (optional, but map is fresher)
                   const flashSale = flashSaleItem || product.flash_sale;
 
                   return (
-                  <div key={product.id} className={`group bg-white rounded-[2.5rem] p-4 shadow-sm hover:shadow-2xl hover:shadow-green-900/10 transition-all duration-300 relative border border-gray-100/50 hover:border-[#1a4d2e]/20 flex flex-col hover:-translate-y-2 ${flashSale ? 'ring-2 ring-red-500/10' : ''}`}>
+                  <div key={product.id} className={`group bg-white rounded-3xl p-3 shadow-sm hover:shadow-2xl hover:shadow-green-900/10 transition-all duration-500 relative border border-gray-100 hover:border-transparent flex flex-col hover:-translate-y-2 ${flashSale ? 'ring-2 ring-red-50' : ''}`}>
                     
                     {/* Flash Sale Badge */}
                     {flashSale && (
                         <div className="absolute top-4 left-4 z-30 flex flex-col items-start gap-1">
-                             <div className="bg-red-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg animate-pulse">
-                                <Zap size={12} fill="currentColor" /> FLASH SALE
-                            </div>
-                            {/* Calculate Discount % */}
-                            <div className="bg-orange-500 text-white text-[9px] font-bold px-2 py-1 rounded-lg shadow-md">
-                                -{Math.round((1 - (flashSale.sale_price || flashSale.price) / product.price) * 100)}%
+                             <div className="bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-lg shadow-red-500/30 animate-pulse">
+                                <Zap size={10} fill="currentColor" /> FLASH SALE
                             </div>
                         </div>
                     )}
+                    
+                    {/* Discount Badge */}
+                     {flashSale && (
+                        <div className="absolute top-4 right-4 z-30 bg-white/90 backdrop-blur text-red-600 text-[10px] font-black px-2 py-1 rounded-lg shadow-sm border border-red-100">
+                             -{Math.round((1 - (flashSale.sale_price || flashSale.price) / product.price) * 100)}%
+                        </div>
+                    )}
 
-                    {/* Icons Overlay */}
-                    <div className="absolute top-5 right-5 z-20 flex flex-col gap-2 translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300">
-                        <Link to={`/product/${product.id}`} className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg text-gray-400 hover:text-[#1a4d2e] hover:scale-110 transition-all delay-75">
-                            <Eye size={18} />
-                        </Link>
-                    </div>
-
+                    {/* Image Area */}
                     <Link 
                         to={`/product/${product.id}`} 
-                        onClick={() => sessionStorage.setItem('shopCurrentPage', currentPage)} // 🔖 บันทึกหน้าปัจจุบัน
-                        className="block relative aspect-square mb-5 bg-[#F8F9FA] rounded-[2rem] overflow-hidden p-6 group-hover:bg-[#f0fdf4] transition-colors"
+                        onClick={() => sessionStorage.setItem('shopCurrentPage', currentPage)}
+                        className="block relative aspect-[4/5] mb-4 bg-[#F8F9FA] rounded-2xl overflow-hidden p-6 group-hover:bg-white transition-colors"
                     >
-                       <img src={getImageUrl(product.thumbnail || product.image)} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500 mix-blend-multiply" alt={product.title} />
-                       {product.stock <= 0 && <span className="absolute inset-0 bg-white/60 flex items-center justify-center text-red-600 font-black text-xs uppercase tracking-widest rotate-[-12deg] border-4 border-red-600 rounded-[2rem] m-6">Out of Stock</span>}
-                    </Link>
-                    
-                    <div className="space-y-2 flex-grow flex flex-col px-1">
-                        <div className="flex justify-between items-start">
-                            <p className="text-[10px] font-black text-[#1a4d2e] uppercase tracking-widest bg-green-50 px-2 py-1 rounded-lg w-fit">{product.category}</p>
-                            {isInCart(product.id) && <CheckCircle size={16} className="text-[#1a4d2e]" />}
-                        </div>
-                        <Link to={`/product/${product.id}`} className="block font-bold text-gray-800 text-base leading-snug line-clamp-2 hover:text-[#1a4d2e] transition-colors flex-grow">{product.title}</Link>
-                        
-                        <div className="flex items-end justify-between pt-4 mt-auto border-t border-gray-50 border-dashed">
-                            <div>
-                                <p className="text-[10px] text-gray-400 font-bold mb-0.5 uppercase tracking-wide">Price</p>
-                                {flashSale ? (
-                                    <div className="flex flex-col">
-                                        <span className="text-xs text-gray-400 line-through decoration-red-400">{formatPrice(product.price)}</span>
-                                        <span className="font-black text-xl text-red-500 flex items-center gap-1">
-                                            {formatPrice(flashSale.sale_price)} <Zap size={12} fill="currentColor"/>
-                                        </span>
-                                    </div>
-                                ) : (
-                                    <span className="font-black text-xl text-[#1a4d2e]">{formatPrice(product.price)}</span>
-                                )}
-                            </div>
+                       <img src={getImageUrl(product.thumbnail || product.image)} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700 mix-blend-multiply group-hover:mix-blend-normal" alt={product.title} />
+                       
+                       {/* Hover Actions */}
+                       <div className="absolute inset-x-4 bottom-4 flex gap-2 translate-y-20 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 z-20">
                             {!isRestricted && product.stock > 0 && (
-                                <button onClick={() => handleAddToCart(product)} className="w-11 h-11 rounded-2xl bg-[#1a4d2e] text-white flex items-center justify-center shadow-lg shadow-green-900/20 hover:bg-[#143d24] transition-all active:scale-95 hover:-translate-y-1 group-hover:shadow-green-500/30">
-                                    <ShoppingCart size={20} />
+                                <button onClick={(e) => { e.preventDefault(); handleAddToCart(product); }} className="flex-1 h-10 bg-[#1a4d2e] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-green-900/30 hover:bg-[#143d24]">
+                                    <ShoppingBag size={14} /> Add
                                 </button>
                             )}
+                       </div>
+                       
+                       {product.stock <= 0 && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center"><span className="bg-black/80 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl">Out of Stock</span></div>}
+                    </Link>
+                    
+                    {/* Info Area */}
+                    <div className="space-y-2 flex-grow flex flex-col px-1">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                             {product.tags && product.tags.slice(0,2).map(tag => (
+                                 <span key={tag.id} className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-bold rounded-md whitespace-nowrap">{tag.name}</span>
+                             ))}
+                        </div>
+
+                        <Link to={`/product/${product.id}`} className="font-bold text-[#263A33] text-sm leading-snug line-clamp-2 hover:text-[#1a4d2e] transition-colors">{product.title}</Link>
+                        
+                        <div className="mt-auto pt-2 flex items-baseline gap-2">
+                             {flashSale ? (
+                                <>
+                                    <span className="font-black text-lg text-red-500">{formatPrice(flashSale.sale_price)}</span>
+                                    <span className="text-xs text-gray-300 line-through font-bold">{formatPrice(product.price)}</span>
+                                </>
+                             ) : (
+                                <span className="font-black text-lg text-[#1a4d2e]">{formatPrice(product.price)}</span>
+                             )}
                         </div>
                    </div>
                   </div>
@@ -529,34 +718,33 @@ function ProductList() {
                 })}
               </div>
             ) : (
-                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border border-dashed border-gray-200">
-                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100">
+                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6 animate-bounce">
                         <Search size={32} className="text-gray-300" />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-800">ไม่พบสินค้าที่คุณค้นหา</h3>
-                    <p className="text-gray-400 font-medium mt-2 mb-6">ลองเปลี่ยนคำค้นหาหรือตัวกรองดูนะครับ</p>
-                    <button onClick={clearFilters} className="px-6 py-2.5 bg-[#1a4d2e] text-white rounded-xl font-bold hover:bg-[#153e25] transition-colors">ล้างตัวกรองทั้งหมด</button>
+                    <h3 className="text-xl font-black text-[#263A33]">No products found</h3>
+                    <p className="text-gray-400 text-sm font-bold mt-2 mb-8 max-w-xs text-center">We couldn't find any products matching your filters.</p>
+                    <button onClick={clearFilters} className="px-8 py-3 bg-[#1a4d2e] text-white rounded-2xl font-bold hover:bg-[#153e25] transition-all shadow-xl shadow-green-900/20 active:scale-95">Clear All Filters</button>
                 </div>
             )}
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-4 mt-16 pb-12">
-                    <button onClick={() => { updatePage(Math.max(1, currentPage - 1)); window.scrollTo(0,0); }} disabled={currentPage === 1} className="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm hover:-translate-x-1"><ChevronLeft size={24} className="text-gray-600"/></button>
+                <div className="flex justify-center items-center gap-3 pb-8">
+                    <button onClick={() => { updatePage(Math.max(1, currentPage - 1)); window.scrollTo(0,0); }} disabled={currentPage === 1} className="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm hover:-translate-x-1"><ChevronLeft size={24} className="text-gray-600"/></button>
                     
                     <div className="flex items-center gap-2 bg-white px-6 py-3 rounded-2xl border border-gray-100 shadow-sm">
                         <span className="font-black text-[#1a4d2e] text-xl">{currentPage}</span>
-                        <span className="text-gray-300 font-medium">/</span>
-                        <span className="font-bold text-gray-400 text-sm">{totalPages}</span>
+                        <span className="text-gray-300 font-bold">/</span>
+                        <span className="font-bold text-gray-400">{totalPages}</span>
                     </div>
 
-                    <button onClick={() => { updatePage(Math.min(totalPages, currentPage + 1)); window.scrollTo(0,0); }} disabled={currentPage === totalPages} className="w-12 h-12 rounded-2xl bg-[#1a4d2e] text-white flex items-center justify-center hover:bg-[#143d24] disabled:opacity-50 disabled:hover:bg-[#1a4d2e] transition-all shadow-lg hover:translate-x-1"><ChevronRight size={24}/></button>
+                    <button onClick={() => { updatePage(Math.min(totalPages, currentPage + 1)); window.scrollTo(0,0); }} disabled={currentPage === totalPages} className="w-12 h-12 rounded-2xl bg-[#1a4d2e] text-white flex items-center justify-center hover:bg-[#143d24] disabled:opacity-50 transition-all shadow-lg hover:translate-x-1"><ChevronRight size={24}/></button>
                 </div>
             )}
           </main>
         </div>
       </div>
-    </div>
   );
 }
 

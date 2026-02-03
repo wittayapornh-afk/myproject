@@ -22,19 +22,23 @@ const NavTooltip = ({ text, children }) => (
     </div>
 );
 
+
+
 export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const { user, token, logout, loading } = useAuth();
   const { cartItems } = useCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownRef = useRef(null);
+
   const API_BASE_URL = "http://localhost:8000"; // ✅ Defined at top
 
   // ✅ Smart Search State
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const [categories, setCategories] = useState([]);
+
   const searchTimeoutRef = useRef(null);
 
   // ✅ Notification State
@@ -46,6 +50,8 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const [flashSaleItems, setFlashSaleItems] = useState({});
 
   useEffect(() => {
+
+
     // Fetch Active Flash Sales for Mini Cart Badge
     axios.get(`${API_BASE_URL}/api/flash-sales/active/`)
         .then(res => {
@@ -99,12 +105,13 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
       }
   };
 
-  // ✅ Close Notification when clicking outside
+  // ✅ Close Menus when clicking outside
   useEffect(() => {
       const handleClickOutside = (event) => {
           if (notificationRef.current && !notificationRef.current.contains(event.target)) {
               setShowNotifications(false);
           }
+
       };
       document.addEventListener("mousedown", handleClickOutside);
       return () => {
@@ -280,107 +287,62 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   };
 
   return (
-    <nav className="bg-white/80 backdrop-blur-md fixed w-full z-[999] top-0 border-b border-gray-100 shadow-sm transition-all duration-300">
-      <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+    <nav className="bg-white/95 backdrop-blur-md fixed w-full z-[999] top-0 border-b border-gray-100 shadow-sm transition-all duration-300">
+      <div className="max-w-[1920px] mx-auto px-4 lg:px-6 py-3 flex justify-between items-center relative gap-4">
 
-        {/* ✅ Left Section */}
-        <div className="flex items-center gap-4">
+        {/* ✅ Left Section: Logo & Category Toggle */}
+        <div className={`flex items-center gap-6 relative z-[1002] transition-all duration-300 ${user ? 'md:ml-[80px]' : ''}`}>
             <Link 
                 to="/" 
-                className="flex items-center gap-2 group"
-                onClick={() => {
-                    setSearchQuery('');
-                    setSearchResults([]);
-                }}
+                className="flex items-center gap-2 group mr-2"
+                onClick={() => { setSearchQuery(''); setSearchResults([]); }}
             >
-            <NavTooltip text="หน้าแรก">
                 <div className="w-10 h-10 bg-[#1a4d2e] rounded-xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform duration-300">
                     <Sparkles size={20} className="group-hover:animate-pulse" />
                 </div>
-            </NavTooltip>
-            <span className="text-2xl font-bold text-[#1a4d2e] tracking-tighter uppercase">Shop.</span>
+                <span className="text-2xl font-black text-[#1a4d2e] tracking-tighter uppercase hidden sm:block">Shop.</span>
             </Link>
         </div>
 
         {/* ✅ Middle Section: Smart Search */}
-        <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative z-[1001] transition-all" ref={dropdownRef}> 
+        <div className="hidden md:flex flex-1 max-w-2xl relative z-[1001] transition-all" ref={dropdownRef}> 
             <div className="relative w-full group">
                 <input 
                     type="text" 
-                    placeholder="Search for products, brands, and more..." 
+                    placeholder="ค้นหาสินค้า แบรนด์ หรือโปรโมชั่น..." 
                     className="w-full pl-12 pr-4 py-3 bg-[#F4F4F5] border-2 border-transparent focus:border-[#1a4d2e] rounded-2xl text-sm font-medium transition-all duration-300 outline-none shadow-sm focus:bg-white focus:shadow-lg placeholder-gray-400 text-gray-700"
-                    onChange={(e) => {
-                        const val = e.target.value;
-                        handleSearch(val);
-                        if (!val.trim()) {
-                             axios.get(`${API_BASE_URL}/api/products/`).then(res => {
-                                 if (res.data && res.data.results) {
-                                     setSearchResults(res.data.results.sort(() => 0.5 - Math.random()).slice(0, 4));
-                                 }
-                             });
-                        }
-                    }}
+                    onChange={(e) => handleSearch(e.target.value)}
                     onFocus={() => {
-                        if (categories.length === 0) {
-                            axios.get(`${API_BASE_URL}/api/categories/`).then(res => setCategories(res.data.slice(0, 6))).catch(err => console.error(err));
-                        }
                         if (!searchQuery) {
                              axios.get(`${API_BASE_URL}/api/products/`).then(res => {
-                                 if (res.data && res.data.results) {
-                                     setSearchResults(res.data.results.sort(() => 0.5 - Math.random()).slice(0, 4));
-                                 }
+                                 if (res.data && res.data.results) setSearchResults(res.data.results.sort(() => 0.5 - Math.random()).slice(0, 4));
                              }).catch(console.error);
                         }
                     }}
                 />
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#1a4d2e] transition-colors" size={20} />
                 
-                {(searchResults.length > 0 || categories.length > 0) && (
-                    <div 
-                        onMouseDown={(e) => e.preventDefault()} 
-                        className="absolute top-full left-0 w-full mt-3 bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-300 flex flex-col md:flex-row min-h-[300px]"
-                    >
-                        <div className="w-1/3 bg-[#F9F9F9] p-4 border-r border-gray-100">
-                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-2">หมวดหมู่แนะนำ</h4>
-                             <div className="space-y-1">
-                                 {categories.length > 0 ? categories.map((cat, idx) => (
-                                     <button key={idx} className="flex items-center gap-3 w-full p-2.5 rounded-xl text-sm font-bold text-gray-600 hover:bg-white hover:text-[#1a4d2e] hover:shadow-sm transition-all text-left">
-                                         <span className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center text-xs">🏷️</span>
-                                         {cat.name}
-                                     </button>
-                                 )) : (
-                                     [1,2,3,4].map(i => <div key={i} className="h-10 w-full bg-gray-200/50 rounded-xl animate-pulse"></div>)
-                                 )}
-                             </div>
-                        </div>
-
-                        <div className="w-2/3 p-4">
+                {(searchResults.length > 0) && (
+                    <div onMouseDown={(e) => e.preventDefault()} className="absolute top-full left-0 w-full mt-3 bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-300 flex flex-col md:flex-row min-h-[300px]">
+                        <div className="w-full p-4">
                             <div className="flex justify-between items-center mb-3 px-2">
                                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                                     {searchQuery ? "ผลการค้นหา" : "แนะนำสำหรับคุณ"}
                                 </h4>
-                                {searchQuery && <span className="text-[10px] font-bold bg-[#1a4d2e]/10 text-[#1a4d2e] px-2 py-0.5 rounded-full">{searchResults.length} Results</span>}
                             </div>
-                            
                             <div className="grid grid-cols-2 gap-3">
                                 {searchResults.slice(0, 4).map((product) => (
-                                    <Link 
-                                        to={`/product/${product.id}`} 
-                                        key={product.id}
-                                        className="group/card flex flex-col bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md hover:border-[#1a4d2e]/20 transition-all cursor-pointer"
-                                    >
-                                        <div className="h-24 w-full bg-gray-50 relative overflow-hidden">
+                                    <Link to={`/product/${product.id}`} key={product.id} className="group/card flex flex-col bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md hover:border-[#1a4d2e]/20 transition-all cursor-pointer">
+                                        <div className="h-24 w-full bg-white relative overflow-hidden flex items-center justify-center p-2">
                                             {product.thumbnail ? (
-                                                <img src={API_BASE_URL + product.thumbnail} alt={product.title} className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500" />
+                                                <img src={API_BASE_URL + product.thumbnail} alt={product.title} className="w-full h-full object-contain group-hover/card:scale-105 transition-transform duration-500" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center bg-gray-100 text-xs font-bold text-gray-300">No Image</div>
                                             )}
                                         </div>
                                         <div className="p-3">
                                             <h4 className="text-xs font-bold text-gray-800 line-clamp-1 group-hover/card:text-[#1a4d2e] transition-colors">{product.title}</h4>
-                                            <div className="flex justify-between items-center mt-1">
-                                                <span className="text-xs font-bold text-[#1a4d2e]">฿{product.price.toLocaleString()}</span>
-                                            </div>
+                                            <span className="text-xs font-bold text-[#1a4d2e]">฿{product.price.toLocaleString()}</span>
                                         </div>
                                     </Link>
                                 ))}
@@ -391,7 +353,8 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
             </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-6">
+        {/* ✅ Right Section: Notifications, Cart, Profile */}
+        <div className="hidden md:flex items-center gap-4 lg:gap-6">
           
           {/* ✅ Notification Center */}
           <div className="relative group/noti">
@@ -644,6 +607,9 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
         </button>
       </div>
 
+
+
+      {/* Mobile Menu (Keep existing) */}
       {isMenuOpen && (
         <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 shadow-2xl py-6 px-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
           <Link to="/shop" className="block text-lg font-bold text-gray-800 px-4 py-2 hover:bg-gray-50 rounded-xl">สินค้าทั้งหมด</Link>

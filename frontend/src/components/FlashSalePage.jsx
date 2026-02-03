@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { Zap, Flame, Clock, ShoppingBag, AlertCircle } from 'lucide-react';
 import Navbar from './Navbar';
+import ProductBadge from './ProductBadge';
 
 // 🎠 Swiper - สำหรับทำ Slider สินค้า Flash Sale
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -202,6 +203,13 @@ const FlashSalePage = () => {
                                                         {/* 🏷️ Badge ส่วนลด (มุมขวาบน) */}
                                                         <div className="absolute top-0 right-0 bg-yellow-400 text-red-900 font-black text-xs px-2 py-1 rounded-bl-lg z-10 shadow-sm">
                                                             -{percentDiscount}%
+                                                        </div>
+
+                                                        {/* 🏷️ NEW: Enriched Tag Badges (มุมซ้ายบน) */}
+                                                        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-20">
+                                                            {item.product_tags && Array.isArray(item.product_tags) && item.product_tags.map(tag => (
+                                                                <ProductBadge key={tag.id} tag={tag} />
+                                                            ))}
                                                         </div>
                                                         
                                                         {/* รูปสินค้า */}

@@ -35,6 +35,7 @@ import MarketingPopup from './components/MarketingPopup'; // ✅ Global Popup
 import FlashSaleManagement from './components/FlashSaleManagement'; // ✅ Flash Sale Management
 import FlashSalePage from './components/FlashSalePage'; // ✅ Flash Sale Page
 import MyCoupons from './components/MyCoupons'; // ✅ My Coupons Page
+import TagManagement from './components/TagManagement'; // 🏷️ Tag Management
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -73,7 +74,7 @@ const AppContent = () => {
 
 
       {/* Content Wrapper */}
-      <div className={`flex flex-col min-h-screen transition-all duration-300 ease-in-out ${showSidebar && isSidebarOpen ? 'md:ml-[300px]' : 'md:ml-[100px]'}`}>
+      <div className={`flex flex-col min-h-screen transition-all duration-300 ease-in-out ${showSidebar && isSidebarOpen ? 'md:ml-[300px]' : 'md:ml-[84px]'} ${showSidebar ? 'px-4 md:px-8' : ''}`}>
 
         {/* ✅ Toggle Button handled in Sidebar/Navbar now */}
 
@@ -172,6 +173,7 @@ const AppContent = () => {
                 <Route path="/admin/users" element={<UserListAdmin />} />
                 <Route path="/admin/coupons" element={<CouponManagement />} />
                 <Route path="/admin/flash-sales" element={<FlashSaleManagement />} />
+                <Route path="/admin/tags" element={<TagManagement />} /> {/* 🏷️ Tag Management */}
               </Route>
 
               {/* --- 🏜️ 404 Route (Rule 29) --- */}
