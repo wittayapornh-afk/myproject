@@ -6,7 +6,10 @@ import Swal from 'sweetalert2';
 import axios from 'axios'; // ✅ Standard Import
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
 
+import { useAuth } from '../context/AuthContext'; // ✅ Import useAuth
+
 function CartPage() {
+  const { user } = useAuth(); // ✅ Get user from AuthContext
   const { 
     cartItems, 
     removeFromCart, 
@@ -19,6 +22,12 @@ function CartPage() {
   } = useCart();
   
   const navigate = useNavigate();
+  
+  // ✅ Ref to hold latest cartItems for interval access
+  const cartItemsRef = React.useRef(cartItems);
+  React.useEffect(() => {
+      cartItemsRef.current = cartItems;
+  }, [cartItems]);
 
   // ✅ State for Real-time Flash Sale Check
   const [flashSaleItems, setFlashSaleItems] = React.useState({});
@@ -48,6 +57,24 @@ function CartPage() {
     if (!selectedItems || selectedItems.length === 0) {
       Swal.fire('ยังไม่ได้เลือกสินค้า', 'กรุณาเลือกสินค้าที่ต้องการชำระเงินอย่างน้อย 1 รายการ', 'warning');
       return;
+    }
+
+    // 🔒 Login Gate: ต้องล็อกอินก่อนสั่งซื้อ
+    if (!user) {
+        Swal.fire({
+            title: 'กรุณาเข้าสู่ระบบ',
+            text: 'คุณต้องเข้าสู่ระบบสมาชิกก่อนดำเนินการสั่งซื้อ',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'เข้าสู่ระบบ',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#1a4d2e',
+        }).then((result) => {
+            if (result.isConfirmed) {
+                navigate('/login');
+            }
+        });
+        return;
     }
 
     navigate('/checkout');
@@ -163,19 +190,59 @@ function CartPage() {
                     <p className="text-sm text-gray-400 font-bold">{item.brand}</p>
                   </div>
                   
-                  <div className="flex items-end justify-between mt-2">
+                    <div className="flex items-end justify-between mt-2">
                     <div className="flex items-center bg-gray-50 rounded-xl p-1 border border-gray-100 main-shadow">
                       <button 
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="p-2 hover:bg-white rounded-lg shadow-sm text-gray-600 hover:text-[#1a4d2e] transition-all disabled:opacity-30"
+                         type="button"
+                         onMouseDown={() => {
+                            // Initial action
+                            updateQuantity(item.id, Math.max(1, item.quantity - 1));
+                            
+                            const interval = setInterval(() => {
+                                const currentList = cartItemsRef.current || [];
+                                const currentItem = currentList.find(i => (i.id || i.product_id) === (item.id || item.product_id));
+                                if (currentItem && currentItem.quantity > 1) {
+                                    updateQuantity(currentItem.id, currentItem.quantity - 1);
+                                }
+                            }, 100);
+                            
+                            const cleanup = () => {
+                                clearInterval(interval);
+                                document.removeEventListener('mouseup', cleanup);
+                                document.removeEventListener('mouseleave', cleanup);
+                            };
+                            document.addEventListener('mouseup', cleanup);
+                            document.addEventListener('mouseleave', cleanup);
+                        }}
+                        className="p-2 hover:bg-white rounded-lg shadow-sm text-gray-600 hover:text-[#1a4d2e] transition-all disabled:opacity-30 touch-manipulation active:scale-90"
                         disabled={item.quantity <= 1}
                       >
                         <Minus size={14} strokeWidth={3} />
                       </button>
                       <span className="w-8 text-center font-black text-[#263A33] text-sm">{item.quantity}</span>
                       <button 
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="p-2 hover:bg-white rounded-lg shadow-sm text-gray-600 hover:text-[#1a4d2e] transition-all"
+                        type="button"
+                        onMouseDown={() => {
+                            // Initial action
+                            updateQuantity(item.id, item.quantity + 1);
+                            
+                            const interval = setInterval(() => {
+                                const currentList = cartItemsRef.current || [];
+                                const currentItem = currentList.find(i => (i.id || i.product_id) === (item.id || item.product_id));
+                                if (currentItem) {
+                                    updateQuantity(currentItem.id, currentItem.quantity + 1);
+                                }
+                            }, 100);
+                            
+                            const cleanup = () => {
+                                clearInterval(interval);
+                                document.removeEventListener('mouseup', cleanup);
+                                document.removeEventListener('mouseleave', cleanup);
+                            };
+                            document.addEventListener('mouseup', cleanup);
+                            document.addEventListener('mouseleave', cleanup);
+                        }}
+                        className="p-2 hover:bg-white rounded-lg shadow-sm text-gray-600 hover:text-[#1a4d2e] transition-all touch-manipulation active:scale-90"
                       >
                         <Plus size={14} strokeWidth={3} />
                       </button>

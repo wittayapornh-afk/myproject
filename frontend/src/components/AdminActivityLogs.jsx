@@ -1,8 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Filter, RefreshCw, FileText, Activity, User, Clock, Tag } from 'lucide-react';
+import { 
+    Search, Filter, RefreshCw, Activity, User, Clock, 
+    Box, ShoppingBag, Truck, Edit, Trash2, Key, AlertCircle, CheckCircle, Smartphone,
+    Ticket, Zap
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config';
+
+const ACTION_ICONS = {
+    'Login': <Key size={16} />,
+    'Order': <ShoppingBag size={16} />,
+    'Product': <Box size={16} />,
+    'Stock': <Truck size={16} />,
+    'Delete': <Trash2 size={16} />,
+    'Edit': <Edit size={16} />,
+    'Promo': <Ticket size={16} />,
+    'Sale': <Zap size={16} />,
+    'Error': <AlertCircle size={16} />,
+    'System': <CheckCircle size={16} />
+};
 
 function AdminActivityLogs() {
     const { token, logout } = useAuth();
@@ -10,13 +27,12 @@ function AdminActivityLogs() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [displaySearch, setDisplaySearch] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('All');
 
     useEffect(() => {
         fetchLogs();
     }, []);
 
-    // Debounce
+    // Debounce Search
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             setSearchTerm(displaySearch);
@@ -33,155 +49,169 @@ function AdminActivityLogs() {
             const response = await axios.get(`${API_BASE_URL}/api/admin/logs/`, {
                 headers: { Authorization: `Token ${activeToken}` }
             });
-            setLogs(response.data);
+            // Enrich logs with icons and categories derived from text
+            const enriched = response.data.map(log => {
+                let type = 'System';
+                if (log.action.toLowerCase().includes('login')) type = 'Login';
+                else if (log.action.toLowerCase().includes('order')) type = 'Order';
+                else if (log.action.toLowerCase().includes('product')) type = 'Product';
+                else if (log.action.toLowerCase().includes('stock')) type = 'Stock';
+                else if (log.action.toLowerCase().includes('coupon')) type = 'Promo';
+                else if (log.action.toLowerCase().includes('flash sale') || log.action.toLowerCase().includes('campaign')) type = 'Sale';
+                else if (log.action.toLowerCase().includes('delete')) type = 'Delete';
+                else if (log.action.toLowerCase().includes('edit') || log.action.toLowerCase().includes('update')) type = 'Edit';
+                
+                return { ...log, type };
+            });
+            setLogs(enriched);
         } catch (error) {
             console.error("Fetch Logs Error", error);
-            if (error.response && error.response.status === 401) {
-                logout();
-            }
+            if (error.response && error.response.status === 401) logout();
         } finally {
             setLoading(false);
         }
     };
 
-    const filteredLogs = logs.filter(log => {
-        const matchesSearch = log.action.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                              log.admin.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = categoryFilter === 'All' || log.category === categoryFilter;
-        return matchesSearch && matchesCategory;
+    // Group logs by Date
+    const groupedLogs = {};
+    const filteredLogs = logs.filter(log => 
+        log.action.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        log.admin.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    filteredLogs.forEach(log => {
+        if (!log.timestamp) return; // Skip if no timestamp
+        const dateKey = log.timestamp.split(' ')[0]; // YYYY-MM-DD
+        if (!groupedLogs[dateKey]) groupedLogs[dateKey] = [];
+        groupedLogs[dateKey].push(log);
     });
 
-    const categories = ['All', ...new Set(logs.map(log => log.category))];
+    const sortedDates = Object.keys(groupedLogs).sort((a, b) => new Date(b) - new Date(a));
 
-    const getCategoryBadge = (cat) => {
-        let colorClass = "bg-gray-50 text-gray-600 border border-gray-100";
-        if (cat === 'Product') colorClass = 'bg-blue-50 text-blue-600 border border-blue-100';
-        if (cat === 'Order') colorClass = 'bg-green-50 text-green-600 border border-green-100';
-        if (cat === 'User') colorClass = 'bg-purple-50 text-purple-600 border border-purple-100';
-        if (cat === 'Auth') colorClass = 'bg-orange-50 text-orange-600 border border-orange-100';
+    const formatDateHeader = (dateStr) => {
+        const date = new Date(dateStr);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
 
-        return (
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${colorClass}`}>
-                {cat}
-            </span>
-        );
-    };
-
-    const handleReset = () => {
-        setDisplaySearch('');
-        setCategoryFilter('All');
-        fetchLogs();
+        if (date.toDateString() === today.toDateString()) return 'วันนี้ (Today)';
+        if (date.toDateString() === yesterday.toDateString()) return 'เมื่อวาน (Yesterday)';
+        return date.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     };
 
     return (
-        <div className="space-y-6 animate-fade-in pb-20">
+        <div className="space-y-6 animate-fade-in pb-20 max-w-5xl mx-auto">
              {/* 🌟 Header & Toolbar */}
-             <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col xl:flex-row gap-6 items-end xl:items-center">
-                
-                {/* Search */}
-                <div className="flex-1 w-full">
-                    <label className="text-[10px] font-black text-gray-400 mb-1 block ml-1 uppercase tracking-widest">ค้นหากิจกรรม</label>
-                    <div className="relative group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#1a4d2e] transition-colors" size={20}/>
+             <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-black text-[#1a4d2e] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#1a4d2e] text-white flex items-center justify-center shadow-lg shadow-green-900/20">
+                            <Activity size={20} />
+                        </div>
+                        Activity Timeline
+                    </h1>
+                    <p className="text-xs text-gray-400 font-bold ml-14 mt-1">ประวัติการทำงานของผู้ดูแลระบบ ({filteredLogs.length} กิจกรรม)</p>
+                </div>
+
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="relative group w-full md:w-64">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#1a4d2e] transition-colors" size={18}/>
                         <input 
                             type="text" 
-                            placeholder="ค้นหา: การกระทำ หรือ ชื่อแอดมิน..." 
-                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 transition-all font-bold text-sm text-gray-700" 
+                            placeholder="ค้นหา..." 
+                            className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-[#1a4d2e] focus:ring-2 focus:ring-green-500/10 transition-all font-bold text-sm text-gray-700" 
                             value={displaySearch} 
                             onChange={(e) => setDisplaySearch(e.target.value)} 
                         />
                     </div>
+                    <button onClick={fetchLogs} className="h-[42px] px-4 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all active:scale-95 flex items-center justify-center">
+                        <RefreshCw size={18}/>
+                    </button>
                 </div>
-
-                {/* Filter */}
-                <div className="w-full xl:w-64">
-                    <label className="text-[10px] font-black text-gray-400 mb-1 block ml-1 uppercase tracking-widest">หมวดหมู่</label>
-                    <div className="relative">
-                        <select 
-                            className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 appearance-none cursor-pointer font-bold text-xs text-gray-700" 
-                            value={categoryFilter} 
-                            onChange={(e) => setCategoryFilter(e.target.value)}
-                        >
-                            <option value="All">ทั้งหมด</option>
-                            {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                        <Filter className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16}/>
-                    </div>
-                </div>
-
-                {/* Refresh */}
-                <button onClick={fetchLogs} className="w-full xl:w-auto h-[46px] px-6 bg-[#1a4d2e] text-white rounded-2xl flex items-center justify-center gap-2 hover:bg-[#143d24] transition-all active:scale-95 shadow-lg shadow-green-900/20 mt-auto">
-                    <RefreshCw size={18}/>
-                    <span className="font-bold text-xs">รีเฟรช</span>
-                </button>
             </div>
 
-            {/* 📋 Logs Table */}
-            <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-gray-100 flex flex-col min-h-[400px]">
-                <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500">
-                        <Activity size={20} />
+            {/* 🕰️ Timeline View */}
+            <div className="space-y-8 pl-4">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <div className="w-10 h-10 border-4 border-[#1a4d2e] border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <span className="text-gray-400 font-bold text-xs uppercase tracking-widest">Loading Timeline...</span>
                     </div>
-                    <div>
-                        <h3 className="font-black text-lg text-gray-800">บันทึกกิจกรรม (Activity Logs)</h3>
-                        <p className="text-xs text-gray-400 font-bold tracking-wide">พบข้อมูลทั้งหมด {filteredLogs.length} รายการ</p>
+                ) : filteredLogs.length === 0 ? (
+                    <div className="text-center py-20 opacity-50">
+                        <Activity size={48} className="mx-auto mb-4 text-gray-300"/>
+                        <p className="font-bold text-gray-400">ไม่พบประวัติกิจกรรม</p>
                     </div>
-                </div>
-                
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-[#f8fafc] text-gray-400 font-bold uppercase text-[10px] tracking-wider border-b border-gray-100">
-                            <tr>
-                                <th className="p-5 pl-8 w-24">#ID</th>
-                                <th className="p-5 flex items-center gap-2 w-40"><Clock size={14}/> วัน-เวลา</th>
-                                <th className="p-5 overflow-hidden text-ellipsis whitespace-nowrap min-w-[150px]"><div className="flex items-center gap-2"><User size={14}/> ผู้ดูแลระบบ</div></th>
-                                <th className="p-5 w-32"><div className="flex items-center gap-2"><Tag size={14}/> หมวดหมู่</div></th>
-                                <th className="p-5"><div className="flex items-center gap-2"><FileText size={14}/> รายละเอียด</div></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {loading ? (
-                                <tr><td colSpan="5" className="p-20 text-center">
-                                    <div className="flex flex-col items-center justify-center">
-                                        <div className="w-8 h-8 border-2 border-[#1a4d2e] border-t-transparent rounded-full animate-spin mb-4"></div>
-                                        <span className="text-gray-400 font-bold text-xs uppercase tracking-widest">กำลังโหลดข้อมูล...</span>
-                                    </div>
-                                </td></tr>
-                            ) : filteredLogs.length === 0 ? (
-                                <tr><td colSpan="5" className="p-20 text-center">
-                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
-                                        <FileText size={32} />
-                                    </div>
-                                    <p className="text-gray-400 font-bold">ไม่พบประวัติกิจกรรม</p>
-                                </td></tr>
-                            ) : (
-                                filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-[#fcfdfc] transition-colors group">
-                                        <td className="p-5 pl-8 text-gray-400 font-mono text-xs font-bold">#{log.id}</td>
-                                        <td className="p-5 text-gray-600 font-bold text-xs whitespace-nowrap">
+                ) : (
+                    sortedDates.map(dateKey => (
+                        <div key={dateKey} className="relative animate-fade-in-up">
+                            {/* Date Header */}
+                            <div className="sticky top-24 z-10 mb-6 flex items-center gap-4">
+                                <div className="px-4 py-1.5 bg-[#1a4d2e] text-white text-xs font-black rounded-full shadow-md shadow-green-900/10">
+                                    {formatDateHeader(dateKey)}
+                                </div>
+                                <div className="h-[1px] flex-1 bg-gradient-to-r from-gray-200 to-transparent"></div>
+                            </div>
 
-                                            {(log.date || '').split(' ')[0]} <span className="text-gray-400 font-medium ml-1">{(log.date || '').split(' ')[1]}</span>
-                                        </td>
-                                        <td className="p-5">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#1a4d2e] flex items-center justify-center text-xs font-black border border-emerald-100">
-                                                    {log.admin.charAt(0).toUpperCase()}
-                                                </div>
-                                                <span className="font-bold text-gray-700 text-sm">{log.admin}</span>
+                            {/* Cards Container */}
+                            <div className="space-y-4 pl-4 border-l-2 border-gray-100 ml-4 relative">
+                                {groupedLogs[dateKey].map((log, index) => (
+                                    <div key={log.id} className="relative group">
+                                        {/* Dot on Timeline */}
+                                        <div className={`absolute -left-[21px] top-6 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-colors ${
+                                            log.type === 'Delete' ? 'bg-red-500' :
+                                            log.type === 'Login' ? 'bg-blue-500' :
+                                            log.type === 'Order' ? 'bg-emerald-500' :
+                                            log.type === 'Promo' ? 'bg-indigo-500' :
+                                            log.type === 'Sale' ? 'bg-orange-500' :
+                                            'bg-gray-300'
+                                        }`}></div>
+
+                                        {/* Card */}
+                                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex items-start gap-4">
+                                            {/* Icon */}
+                                            <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${
+                                                log.type === 'Delete' ? 'bg-red-50 text-red-500' :
+                                                log.type === 'Login' ? 'bg-blue-50 text-blue-500' :
+                                                log.type === 'Order' ? 'bg-emerald-50 text-emerald-500' :
+                                                log.type === 'Promo' ? 'bg-indigo-50 text-indigo-500' :
+                                                log.type === 'Sale' ? 'bg-orange-50 text-orange-500' :
+                                                'bg-gray-50 text-gray-500'
+                                            }`}>
+                                                {ACTION_ICONS[log.type] || <Activity size={16}/>}
                                             </div>
-                                        </td>
-                                        <td className="p-5">
-                                            {getCategoryBadge(log.category)}
-                                        </td>
-                                        <td className="p-5 text-gray-600 text-sm font-medium leading-relaxed group-hover:text-gray-900 transition-colors">
-                                            {log.action}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+
+                                            {/* Content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <h4 className="font-bold text-gray-800 text-sm truncate">{log.action}</h4>
+                                                    <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100">
+                                                        <Clock size={10}/> {log.timestamp ? log.timestamp.split(' ')[1].slice(0,5) : '--:--'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 leading-relaxed mb-3 line-clamp-2">
+                                                    {log.details || 'No details provided'}
+                                                </p>
+                                                
+                                                {/* Footer Info */}
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
+                                                        <User size={10}/> {log.admin}
+                                                    </div>
+                                                    {log.ip_address && (
+                                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md hidden sm:flex">
+                                                            <Smartphone size={10}/> {log.ip_address}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );

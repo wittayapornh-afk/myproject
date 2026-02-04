@@ -211,6 +211,71 @@ export default function GenAdminOrders() {
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
+    // 🚚 Shipping Logic (Inputs for Tracking)
+    if (newStatus === 'Shipped') {
+        const result = await Swal.fire({
+            title: `<span class="text-[#1a4d2e] font-black text-2xl">จัดส่งสินค้า</span>`,
+            html: `
+                <div class="space-y-4 text-left p-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">เลขพัสดุ (Tracking No.)</label>
+                        <input id="tracking-input" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold text-gray-700" placeholder="เช่น TH0123456789" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">บริษัทขนส่ง (Courier)</label>
+                        <select id="courier-input" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold text-gray-700">
+                            <option value="Kerry Express">Kerry Express</option>
+                            <option value="J&T Express">J&T Express</option>
+                            <option value="Flash Express">Flash Express</option>
+                            <option value="Thai Post">ไปรษณีย์ไทย</option>
+                            <option value="Other">อื่นๆ</option>
+                        </select>
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '✅ ยืนยันจัดส่ง',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#1a4d2e',
+            customClass: { popup: 'rounded-[2.5rem]', confirmButton: 'rounded-xl', cancelButton: 'rounded-xl' },
+            preConfirm: () => {
+                const tracking = document.getElementById('tracking-input').value;
+                const courier = document.getElementById('courier-input').value;
+                if (!tracking) {
+                    Swal.showValidationMessage('กรุณากรอกเลขพัสดุ');
+                }
+                return { tracking, courier };
+            }
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const activeToken = token || localStorage.getItem('token');
+                await axios.post(`${API_BASE_URL}/api/admin/order_status/${orderId}/`, 
+                    { 
+                        status: newStatus,
+                        tracking_number: result.value.tracking,
+                        courier_name: result.value.courier
+                    },
+                    { headers: { Authorization: `Token ${activeToken}` } }
+                );
+                fetchOrders();
+                Swal.fire({
+                    icon: 'success', 
+                    title: 'บันทึกจัดส่งสำเร็จ',
+                    text: `Tracking: ${result.value.tracking}`,
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            } catch (e) {
+                console.error(e);
+                Swal.fire('Error', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
+            }
+        }
+        return;
+    }
+
+    // Default Logic for Other Statuses
     const result = await Swal.fire({
         title: 'เปลี่ยนสถานะ?',
         text: `ต้องการเปลี่ยนเป็น "${getStatusLabel(newStatus)}" ใช่หรือไม่`,

@@ -18,7 +18,7 @@ import {
     Bell,
     Truck,
     Ticket, List,
-    User
+    User, RotateCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DatePicker, { registerLocale } from 'react-datepicker';
@@ -186,33 +186,68 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
     const hh = dateValue.getHours().toString().padStart(2, '0');
     const mm = dateValue.getMinutes().toString().padStart(2, '0');
 
-    // 🕒 Smart Cascading Logic: Minute -> Hour -> Day
-    const adjustDate = (type, direction) => {
-        const newDate = new Date(dateValue);
-        if (type === 'mm') {
-            newDate.setMinutes(newDate.getMinutes() + direction);
-        } else {
-            newDate.setHours(newDate.getHours() + direction);
-        }
 
-        // ✅ V3 Validation: Allow Future Adjustments, Block Past (Minute Precision)
-        const now = new Date();
-        const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
-        const targetMinute = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), newDate.getHours(), newDate.getMinutes());
-
-        if (targetMinute < currentMinute) return; // Block strictly past minutes
-
-        onDateChange(newDate);
-    };
 
     // ⌨️ Local State for Typing Handling
     const [hInput, setHInput] = useState(dateValue.getHours().toString().padStart(2, '0'));
     const [mInput, setMInput] = useState(dateValue.getMinutes().toString().padStart(2, '0'));
 
+    // ✅ Ref for Long Press to access latest state
+    const dateValueRef = useRef(dateValue);
     useEffect(() => {
+        dateValueRef.current = dateValue;
         setHInput(dateValue.getHours().toString().padStart(2, '0'));
         setMInput(dateValue.getMinutes().toString().padStart(2, '0'));
     }, [dateValue]);
+
+    // 🕒 Internal Adjust Logic (Pure)
+    const calculateNewDate = (baseDate, type, direction) => {
+        const newDate = new Date(baseDate);
+        if (type === 'mm') {
+            newDate.setMinutes(newDate.getMinutes() + direction);
+        } else {
+            newDate.setHours(newDate.getHours() + direction);
+        }
+        return newDate;
+    };
+
+
+
+    // ⚡ Long Press Handler
+    const handleLongPress = (type, direction) => {
+        const validateAndClamp = (targetDate) => {
+            const now = new Date();
+            const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
+            const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), targetDate.getHours(), targetDate.getMinutes());
+            
+            // If target is in the past, return Current Time (Clamp)
+            // This allows moving from Past -> Present, and prevents Future -> Past
+            if (target < currentMinute) {
+                return currentMinute; 
+            }
+            return targetDate;
+        };
+
+        // 1. Immediate Trigger
+        const initialDate = dateValueRef.current;
+        const newDate = calculateNewDate(initialDate, type, direction);
+        onDateChange(validateAndClamp(newDate));
+
+        // 2. Interval Trigger
+        const interval = setInterval(() => {
+            const currentBase = dateValueRef.current;
+            const nextDate = calculateNewDate(currentBase, type, direction);
+            onDateChange(validateAndClamp(nextDate));
+        }, 100);
+
+        const cleanup = () => {
+            clearInterval(interval);
+            document.removeEventListener('mouseup', cleanup);
+            document.removeEventListener('mouseleave', cleanup);
+        };
+        document.addEventListener('mouseup', cleanup);
+        document.addEventListener('mouseleave', cleanup);
+    };
 
     const handleInputCommit = (type) => {
         const newDate = new Date(dateValue);
@@ -227,17 +262,7 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
             newDate.setMinutes(val);
         }
         
-        // ✅ V3 Validation: Allow Future Adjustments, Block Past (Minute Precision)
-        const now = new Date();
-        const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
-        const targetMinute = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), newDate.getHours(), newDate.getMinutes());
 
-        if (targetMinute < currentMinute) {
-             // Rollback if invalid past time
-             setHInput(dateValue.getHours().toString().padStart(2, '0'));
-             setMInput(dateValue.getMinutes().toString().padStart(2, '0'));
-             return;
-        }
 
         onDateChange(newDate);
     };
@@ -285,7 +310,7 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
             <div className="flex items-center justify-around gap-2 bg-white rounded-2xl p-3 border border-gray-100 shadow-inner group">
                 {/* 🕒 Hour Spinner */}
                 <div className="flex flex-col items-center">
-                    <button type="button" onClick={() => adjustDate('hh', 1)} className="p-1 text-gray-300 hover:text-orange-500 hover:scale-125 transition-all"><ChevronUp size={16}/></button>
+                    <button type="button" onMouseDown={() => handleLongPress('hh', 1)} className="p-1 text-gray-300 hover:text-orange-500 hover:scale-125 transition-all outline-none md:active:scale-90"><ChevronUp size={16}/></button>
                     <input 
                         type="text" 
                         value={hInput}
@@ -296,7 +321,7 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
                         className="w-12 text-center text-2xl font-black text-gray-800 font-mono leading-none tracking-tighter bg-transparent focus:text-orange-600 focus:outline-none transition-colors"
                         maxLength={2}
                     />
-                    <button type="button" onClick={() => adjustDate('hh', -1)} className="p-1 text-gray-300 hover:text-orange-500 hover:scale-125 transition-all"><ChevronDown size={16}/></button>
+                    <button type="button" onMouseDown={() => handleLongPress('hh', -1)} className="p-1 text-gray-300 hover:text-orange-500 hover:scale-125 transition-all outline-none md:active:scale-90"><ChevronDown size={16}/></button>
                 </div>
                 
                 <div className="flex flex-col items-center pb-1">
@@ -305,7 +330,7 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
 
                 {/* 🕒 Minute Spinner (1-min steps) */}
                 <div className="flex flex-col items-center">
-                    <button type="button" onClick={() => adjustDate('mm', 1)} className="p-1 text-gray-300 hover:text-orange-500 hover:scale-125 transition-all"><ChevronUp size={16}/></button>
+                    <button type="button" onMouseDown={() => handleLongPress('mm', 1)} className="p-1 text-gray-300 hover:text-orange-500 hover:scale-125 transition-all outline-none md:active:scale-90"><ChevronUp size={16}/></button>
                     <input 
                         type="text" 
                         value={mInput}
@@ -316,7 +341,7 @@ const ThaiTimePicker = ({ label, value, onDateChange, icon: Icon }) => {
                         className="w-12 text-center text-2xl font-black text-gray-800 font-mono leading-none tracking-tighter bg-transparent focus:text-orange-600 focus:outline-none transition-colors"
                         maxLength={2}
                     />
-                    <button type="button" onClick={() => adjustDate('mm', -1)} className="p-1 text-gray-300 hover:text-orange-500 hover:scale-125 transition-all"><ChevronDown size={16}/></button>
+                    <button type="button" onMouseDown={() => handleLongPress('mm', -1)} className="p-1 text-gray-300 hover:text-orange-500 hover:scale-125 transition-all outline-none md:active:scale-90"><ChevronDown size={16}/></button>
                 </div>
                 
                 <div className="bg-orange-50 text-orange-500 text-[10px] font-black px-1.5 py-0.5 rounded-md self-center">น.</div>
@@ -668,93 +693,97 @@ const FlashSaleManagement = () => {
 
     // ✅ NEW: Handle Add Products by Tag
     // ✅ NEW: Handle Add Products by Tag (Backend Integrated)
-    const handleAddProductsByTags = async () => {
-        if (selectedTags.length === 0) {
-            Swal.fire('Warning', 'กรุณาเลือกป้ายกำกับอย่างน้อย 1 รายการ', 'warning');
-            return;
-        }
-        if (!tagDiscountValue || parseFloat(tagDiscountValue) < 0) {
-            Swal.fire('Warning', 'กรุณาระบุส่วนลดที่ถูกต้อง', 'warning');
-            return;
-        }
+const handleAddProductsByTags = async (tagsToFetch = selectedTags) => { // Accept tags argument
+    // 🛡️ Fix: If called via onClick (Event Object), fallback to selectedTags
+    const targetTags = Array.isArray(tagsToFetch) ? tagsToFetch : selectedTags;
 
-        try {
-            // Show Loading State
-            Swal.fire({
-                title: 'กำลังค้นหาสินค้า...',
-                text: 'กรุณารอสักครู่',
-                allowOutsideClick: false,
-                didOpen: () => Swal.showLoading()
-            });
+    if (!targetTags || targetTags.length === 0) return; // Silent return if empty
 
-            const token = authContextToken || localStorage.getItem('token');
-            const res = await axios.post(`${API_BASE_URL}/api/products/by-tags/`, {
-                tag_ids: selectedTags
-            }, {
-                headers: { Authorization: `Token ${token}` }
-            });
+    // Note: We don't block if discount is 0/empty, we just apply 0 discount (default behavior)
+    const discountVal = parseFloat(tagDiscountValue) || 0; 
+    if (discountVal < 0) return; // Double check safety
 
-            const matchingProducts = res.data;
+    try {
+        // Optional: Show mini-loading if needed, but for "Auto-fetch" it might be too intrusive.
+        // Let's use a non-blocking toast or just rely on speed. 
+        // Or checking strictly:
+        const token = authContextToken || localStorage.getItem('token');
+        const res = await axios.post(`${API_BASE_URL}/api/products/by-tags/`, {
+            tag_ids: targetTags // Use the argument
+        }, {
+            headers: { Authorization: `Token ${token}` }
+        });
 
-            if (matchingProducts.length === 0) {
-                Swal.fire('Info', 'ไม่พบสินค้าที่มีป้ายกำกับที่เลือก', 'info');
-                return;
-            }
+        const matchingProducts = res.data;
+        if (matchingProducts.length === 0) return;
 
-            const discountVal = parseFloat(tagDiscountValue);
-            let addedCount = 0;
-            const newProducts = [...formData.products];
+        let addedCount = 0;
+        // Logic: Merge new products, update prices for ALL matching tag products? 
+        // Current logic: Add new products. 
+        // User perception: "I select tag -> products appear". 
+        // If they assume "Pricing Rule" applies to them, we apply it.
+        
+        setFormData(prev => {
+            const newProducts = [...prev.products];
             const existingIds = new Set(newProducts.map(p => p.product_id || p.id));
-
+            
             matchingProducts.forEach(product => {
-                // Avoid duplicates
-                if (existingIds.has(product.id)) return;
-
                 let salePrice = 0;
                 const originalPrice = parseFloat(product.price);
 
-                // 2. Calculate Price
                 if (tagDiscountType === 'percent') {
-                    // Formula: Original - (Original * % / 100)
-                    salePrice = originalPrice - (originalPrice * discountVal / 100);
+                     salePrice = originalPrice - (originalPrice * discountVal / 100);
                 } else {
-                    // Fixed Price
-                    salePrice = discountVal;
+                     salePrice = discountVal > 0 ? discountVal : originalPrice; 
                 }
+                
+                salePrice = Math.max(0, Math.floor(salePrice));
 
-                // Safety Clamp
-                salePrice = Math.max(0, Math.floor(salePrice)); // Floor to integer for cleanliness
-                
-                // 3. Add to list
-                newProducts.push({
-                    product_id: product.id,
-                    product_name: product.title,
-                    product_image: product.thumbnail,
-                    original_price: product.price,
-                    sale_price: salePrice,
-                    stock: product.stock, // Show stock for reference
-                    stock: product.stock, // Show stock for reference
-                    limit: product.stock // Default quota to Max Stock (User friendly)
-                });
-                
+                if (existingIds.has(product.id)) {
+                    // ✅ Update existing product price
+                    const index = newProducts.findIndex(p => (p.product_id || p.id) === product.id);
+                    if (index !== -1) {
+                        const currentProduct = newProducts[index];
+                        newProducts[index] = {
+                            ...currentProduct,
+                            sale_price: salePrice, 
+                            // ✅ Fix: Only update stock/limit if it was missing/undefined (Auto-Correction)
+                            stock: currentProduct.stock !== undefined ? currentProduct.stock : product.stock,
+                            limit: (currentProduct.limit !== undefined && currentProduct.limit !== null && currentProduct.limit !== '') 
+                                    ? currentProduct.limit 
+                                    : product.stock // Default to Stock if missing
+                        };
+                    }
+                } else {
+                    // ✅ Add new product
+                    newProducts.push({
+                        product_id: product.id,
+                        product_name: product.title,
+                        product_image: product.thumbnail,
+                        original_price: product.price,
+                        sale_price: salePrice,
+                        stock: product.stock,
+                        limit: product.stock,
+                        tags: product.tags
+                    });
+                }
                 addedCount++;
             });
+            return { ...prev, products: newProducts };
+        });
 
-            setFormData({ ...formData, products: newProducts });
-            
-            Swal.fire({
-                icon: 'success',
-                title: 'เพิ่มสินค้าเรียบร้อย',
-                text: `เพิ่มสินค้า ${addedCount} รายการจากป้ายกำกับ`,
-                timer: 1500
-            });
-
-        } catch (error) {
-            console.error("Error fetching matching products:", error);
-            Swal.fire('Error', 'เกิดข้อผิดพลาดในการดึงข้อมูลสินค้าจากระบบ', 'error');
+        if (addedCount > 0) {
+             // Optional: Toast
+             const Toast = Swal.mixin({
+                toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, timerProgressBar: true
+             });
+             Toast.fire({ icon: 'success', title: `+${addedCount} สินค้า` });
         }
-    };
 
+    } catch (error) {
+        console.error("Error fetching matching products:", error);
+    }
+};
     // ✅ NEW: Campaign API Functions
     const fetchCampaigns = async () => {
         try {
@@ -1305,7 +1334,7 @@ const FlashSaleManagement = () => {
                                     <th onClick={() => handleSort('start_time')} className="px-8 py-8 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] cursor-pointer hover:text-orange-600 transition-colors">
                                         <div className="flex items-center gap-2">ช่วงเวลา {sortConfig.key === 'start_time' && (sortConfig.direction === 'asc' ? <ChevronUp size={14}/> : <ChevronDown size={14}/>)}</div>
                                     </th>
-                                    <th className="px-8 py-8 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] text-center">จำนวนสินค้า</th>
+                                    <th className="px-8 py-8 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] text-center">สินค้า (จอง/ทั้งหมด)</th>
                                     <th className="px-10 py-8 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] text-right">จัดการ</th>
                                 </tr>
                             </thead>
@@ -1313,6 +1342,13 @@ const FlashSaleManagement = () => {
                                 {displayedSales.length > 0 ? displayedSales.map((fs) => {
                                      const statusClass = fs.status === 'Live' ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 
                                                         fs.status === 'Ended' ? 'bg-gray-100 text-gray-400' : 'bg-blue-500 text-white shadow-lg shadow-blue-100';
+                                     
+                                     // 📊 Calculate Stocks
+                                     const totalItems = fs.products?.length || 0;
+                                     const totalReserved = fs.products?.reduce((acc, p) => acc + (p.reserved_stock || 0), 0) || 0;
+                                     const totalLimit = fs.products?.reduce((acc, p) => acc + (p.quantity_limit || 0), 0) || 0;
+                                     const totalSold = fs.products?.reduce((acc, p) => acc + (p.sold_count || 0), 0) || 0;
+                                     
                                      return (
                                         <tr key={fs.id} className="group/row hover:bg-orange-50/20 transition-all duration-300">
                                             <td className="px-10 py-6">
@@ -1330,13 +1366,13 @@ const FlashSaleManagement = () => {
                                                 <div className="flex flex-col gap-3 items-start">
                                                     <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-transparent transition-all ${
                                                         fs.status === 'Live' && fs.is_active
-                                                        ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' 
+                                                        ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm animate-pulse' 
                                                         : fs.status === 'Ended' 
-                                                            ? 'bg-gray-50 text-gray-400' 
+                                                            ? 'bg-gray-100 text-gray-400 border-gray-200' 
                                                             : 'bg-blue-50 text-blue-600 border-blue-100 shadow-sm'
                                                     }`}>
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${fs.status === 'Live' && fs.is_active ? 'bg-orange-500 animate-pulse' : fs.status === 'Ended' ? 'bg-gray-300' : 'bg-blue-500'}`}></div>
-                                                        {fs.status === 'Live' ? 'กำลังใช้งาน' : fs.status === 'Upcoming' ? 'รอเริ่ม' : 'จบแล้ว'}
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${fs.status === 'Live' && fs.is_active ? 'bg-orange-500 animate-ping' : fs.status === 'Ended' ? 'bg-gray-400' : 'bg-blue-500'}`}></div>
+                                                        {fs.status === 'Live' ? 'LIVE NOW' : fs.status === 'Upcoming' ? 'UPCOMING' : 'ENDED'}
                                                     </span>
 
                                                     {/* 🔘 Active/Inactive Toggle */}
@@ -1348,7 +1384,7 @@ const FlashSaleManagement = () => {
                                                             <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-all absolute top-0.5 ${fs.is_active ? 'left-[14px]' : 'left-0.5'}`} />
                                                         </div>
                                                         <span className={`text-[9px] font-black uppercase ${fs.is_active ? 'text-green-600' : 'text-gray-400'}`}>
-                                                            {fs.is_active ? 'เปิดใช้งาน' : 'ปิด'}
+                                                            {fs.is_active ? 'Active' : 'Disabled'}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1362,9 +1398,25 @@ const FlashSaleManagement = () => {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6 text-center">
-                                                <div className="inline-flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-                                                    <Package size={14} className="text-gray-400" />
-                                                    <span className="text-sm font-black text-gray-600">{fs.products?.length || 0}</span>
+                                                <div className="flex flex-col gap-1 items-end">
+                                                     {/* 📦 Total Items */}
+                                                     <div className="inline-flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">
+                                                        <Package size={12} className="text-gray-400" />
+                                                        <span className="text-xs font-black text-gray-600">{totalItems} SKU</span>
+                                                     </div>
+                                                     
+                                                     {/* 🔴 Reserved Stock Monitor (New) */}
+                                                     {totalReserved > 0 && (
+                                                         <div className="inline-flex items-center gap-2 bg-red-50 px-3 py-1 rounded-lg border border-red-100 animate-pulse">
+                                                            <Clock size={12} className="text-red-500" />
+                                                            <span className="text-xs font-black text-red-600">Jamming: {totalReserved}</span>
+                                                         </div>
+                                                     )}
+                                                     
+                                                     {/* 📊 Sold Stat */}
+                                                     <div className="text-[9px] text-gray-400 font-bold mt-1">
+                                                         Sold: {totalSold} / {totalLimit}
+                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-10 py-6 text-right">
@@ -1375,7 +1427,11 @@ const FlashSaleManagement = () => {
                                                                 ...fs,
                                                                 start_time: new Date(fs.start_time),
                                                                 end_time: new Date(fs.end_time),
-                                                                products: fs.products || [],
+                                                                products: (fs.products || []).map(p => ({
+                                                                    ...p,
+                                                                    limit: p.quantity_limit,
+                                                                    product_id: p.product
+                                                                })),
                                                                 campaign_id: typeof fs.campaign === 'object' ? fs.campaign?.id : fs.campaign
                                                             });
                                                             setPreviewImage(fs.banner_image ? (fs.banner_image.startsWith('http') ? fs.banner_image : API_BASE_URL + fs.banner_image) : null);
@@ -1456,7 +1512,11 @@ const FlashSaleManagement = () => {
                             start_time: new Date(sale.start_time),
                             end_time: new Date(sale.end_time),
                             banner_image: sale.banner_image,
-                            products: sale.products || [],
+                            products: (sale.products || []).map(p => ({
+                                ...p,
+                                limit: p.quantity_limit,
+                                product_id: p.product
+                            })),
                             campaign_id: sale.campaign?.id || ''
                         });
                         setPreviewImage(sale.banner_image);
@@ -1529,7 +1589,11 @@ const FlashSaleManagement = () => {
                             start_time: new Date(sale.start_time),
                             end_time: new Date(sale.end_time),
                             banner_image: sale.banner_image,
-                            products: sale.products || [],
+                            products: (sale.products || []).map(p => ({
+                                ...p,
+                                limit: p.quantity_limit,
+                                product_id: p.product
+                            })),
                             campaign_id: sale.campaign?.id || ''
                         });
                         setPreviewImage(sale.banner_image);
@@ -1557,7 +1621,7 @@ const FlashSaleManagement = () => {
                                 initial={{ scale: 0.95, opacity: 0, y: 20 }}
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
                                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                                className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-6xl overflow-visible relative z-[1001] border border-orange-100 flex flex-col max-h-[90vh] ml-[280px]"
+                                className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-[95vw] overflow-visible relative z-[1001] border border-orange-100 flex flex-col max-h-[90vh] ml-[280px]"
                             >
                                 {/* 🎨 Premium Glassmorphism Header */}
                                 <div className="bg-gradient-to-r from-orange-600 to-red-600 p-8 text-white shrink-0 relative overflow-hidden backdrop-blur-md">
@@ -1896,13 +1960,29 @@ const FlashSaleManagement = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* 🚀 TAG MODE UI */}
+                                                    {/* 🚀 TAG MODE UI (DEAL INVENTORY STYLE) */}
                                                     {useTagMode && (
-                                                        <div className="bg-orange-50/50 rounded-[2rem] p-6 border border-orange-100 animation-fade-in-up">
-                                                            <div className="flex flex-col gap-6">
-                                                                {/* 1. Tag List */}
+                                                        <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm animate-in fade-in zoom-in duration-300">
+                                                            
+                                                            {/* Header */}
+                                                            <div className="flex items-center gap-3 mb-6">
+                                                                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                                                                    <Package size={20} className="animate-pulse" />
+                                                                </div>
                                                                 <div>
-                                                                    <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3">
+                                                                    <h4 className="text-lg font-black text-gray-800 tracking-tight">Deal Inventory</h4>
+                                                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">จัดการสินค้าด้วยระบบอัตโนมัติ</p>
+                                                                </div>
+                                                                <div className="ml-auto bg-black text-white px-3 py-1 rounded-full text-xs font-black">
+                                                                    {selectedTags.length}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex flex-col gap-8">
+                                                                {/* 1. Tag List (Chips) */}
+                                                                <div className="bg-orange-50/50 p-6 rounded-[1.5rem] border border-orange-100/50">
+                                                                    <label className="block text-[11px] font-black text-orange-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                                        <Tag size={12} />
                                                                         1. เลือกกลุ่มสินค้า (Tags)
                                                                     </label>
                                                                     <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar p-1">
@@ -1913,15 +1993,40 @@ const FlashSaleManagement = () => {
                                                                                     key={tag.id}
                                                                                     type="button"
                                                                                     onClick={() => {
-                                                                                        if (isSelected) setSelectedTags(prev => prev.filter(id => id !== tag.id));
-                                                                                        else setSelectedTags(prev => [...prev, tag.id]);
+                                                                                        if (isSelected) {
+                                                                                            // ✅ Smart Removal Logic
+                                                                                            const newTags = selectedTags.filter(id => id !== tag.id);
+                                                                                            setSelectedTags(newTags);
+                                                                                            
+                                                                                            // Remove products that are ONLY associated with the removed tag (and no other active tags)
+                                                                                            setFormData(prev => ({
+                                                                                                ...prev,
+                                                                                                products: prev.products.filter(p => {
+                                                                                                    const pTagIds = p.tags ? p.tags.map(t => t.id) : [];
+                                                                                                    // If product has this tag...
+                                                                                                    if (pTagIds.includes(tag.id)) {
+                                                                                                        // Check if it has any OTHER active tag
+                                                                                                        const hasOtherActiveTag = pTagIds.some(tid => newTags.includes(tid));
+                                                                                                        return hasOtherActiveTag; // Keep only if it matches another active tag
+                                                                                                    }
+                                                                                                    return true; // Keep products not related to this tag
+                                                                                                })
+                                                                                            }));
+
+                                                                                        } else {
+                                                                                            const newTags = [...selectedTags, tag.id];
+                                                                                            setSelectedTags(newTags);
+                                                                                            // ✅ Auto-Fetch Logic: Add products immediately
+                                                                                            handleAddProductsByTags(newTags); 
+                                                                                        }
                                                                                     }}
-                                                                                    className={`px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
+                                                                                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                                                                                         isSelected 
-                                                                                        ? 'bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-200 scale-105' 
-                                                                                        : 'bg-white border-gray-100 text-gray-500 hover:border-orange-200 hover:text-orange-500'
+                                                                                        ? 'bg-white border-2 border-orange-500 text-orange-600 shadow-md scale-105' 
+                                                                                        : 'bg-white border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-orange-500'
                                                                                     }`}
                                                                                 >
+                                                                                    {isSelected && <Check size={12} strokeWidth={4} />}
                                                                                     {tag.name}
                                                                                 </button>
                                                                             );
@@ -1931,65 +2036,89 @@ const FlashSaleManagement = () => {
                                                                 </div>
 
                                                                 {/* 2. Pricing Rule */}
-                                                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-end">
-                                                                    <div className="lg:col-span-2">
-                                                                        <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3">
-                                                                            2. ตั้งราคาทั้งกลุ่ม (Pricing Rule)
-                                                                        </label>
-                                                                        <div className="flex flex-col sm:flex-row gap-6 p-6 bg-white rounded-2xl border border-orange-100 shadow-sm">
-                                                                            <div className="flex-1">
-                                                                                <label className="text-xs text-gray-400 font-bold mb-2 block">รูปแบบราคา</label>
-                                                                                <div className="flex bg-gray-50 rounded-xl p-1.5 gap-1">
-                                                                                    <button 
-                                                                                        type="button" 
-                                                                                        onClick={() => setTagDiscountType('percent')}
-                                                                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${tagDiscountType === 'percent' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-400 hover:bg-gray-100'}`}
-                                                                                    >
-                                                                                        % ส่วนลด
-                                                                                    </button>
-                                                                                    <button 
-                                                                                        type="button" 
-                                                                                        onClick={() => setTagDiscountType('fixed')}
-                                                                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${tagDiscountType === 'fixed' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-400 hover:bg-gray-100'}`}
-                                                                                    >
-                                                                                        ราคาเดียว
-                                                                                    </button>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="hidden sm:block w-px bg-gray-100 my-2" />
-                                                                            <div className="flex-1">
-                                                                                <label className="text-xs text-xs text-gray-400 font-bold mb-2 block">
-                                                                                    {tagDiscountType === 'percent' ? 'ลดกี่ % (จากราคาเต็ม)' : 'ขายราคาเท่าไหร่ (บาท)'}
-                                                                                </label>
-                                                                                <div className="relative">
-                                                                                    <input 
-                                                                                        type="number" 
-                                                                                        value={tagDiscountValue}
-                                                                                        onChange={e => setTagDiscountValue(e.target.value)}
-                                                                                        className="w-full bg-gray-50 border-2 border-transparent focus:border-orange-100 rounded-xl px-4 py-2.5 font-black text-gray-900 focus:ring-4 focus:ring-orange-50 outline-none text-lg transition-all"
-                                                                                        placeholder="0"
-                                                                                    />
-                                                                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm pointer-events-none">
-                                                                                        {tagDiscountType === 'percent' ? '%' : '฿'}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
+                                                                <div>
+                                                                    <label className="block text-[11px] font-black text-orange-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                                        <Zap size={12} />
+                                                                        2. ตั้งราคาทั้งกลุ่ม (Pricing Rule)
+                                                                    </label>
                                                                     
-                                                                    {/* 3. Action Button */}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={handleAddProductsByTags}
-                                                                        disabled={selectedTags.length === 0}
-                                                                        className="h-[108px] w-full bg-gray-900 text-white rounded-[1.5rem] font-black hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-200 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50 disabled:grayscale active:scale-95 group"
-                                                                    >
-                                                                        <div className="bg-white/10 p-2 rounded-full mb-1 group-hover:bg-white/20 transition-all">
-                                                                            <Plus size={20} className={selectedTags.length > 0 ? 'animate-bounce' : ''} />
+                                                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                                                        {/* Pricing Config */}
+                                                                        <div className="md:col-span-8 bg-white p-2 rounded-[1.5rem] border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-2">
+                                                                            {/* Type Toggle */}
+                                                                            <div className="bg-gray-50 p-1.5 rounded-xl flex sm:flex-col gap-1 sm:w-32 shrink-0">
+                                                                                <button 
+                                                                                    type="button" 
+                                                                                    onClick={() => setTagDiscountType('percent')}
+                                                                                    className={`flex-1 py-3 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 ${
+                                                                                        tagDiscountType === 'percent' 
+                                                                                        ? 'bg-white text-orange-600 shadow-sm border border-gray-100' 
+                                                                                        : 'text-gray-400 hover:text-gray-600'
+                                                                                    }`}
+                                                                                >
+                                                                                    <span className="text-lg">%</span>
+                                                                                    ส่วนลด
+                                                                                </button>
+                                                                                <button 
+                                                                                    type="button" 
+                                                                                    onClick={() => setTagDiscountType('fixed')}
+                                                                                    className={`flex-1 py-3 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 ${
+                                                                                        tagDiscountType === 'fixed' 
+                                                                                        ? 'bg-white text-orange-600 shadow-sm border border-gray-100' 
+                                                                                        : 'text-gray-400 hover:text-gray-600'
+                                                                                    }`}
+                                                                                >
+                                                                                    <span className="text-lg">฿</span>
+                                                                                    ราคาเดียว
+                                                                                </button>
+                                                                            </div>
+
+                                                                            {/* Value Input */}
+                                                                            <div className="flex-1 relative flex items-center justify-center bg-gray-50 rounded-xl group hover:bg-white hover:shadow-inner transition-all border border-transparent hover:border-orange-100">
+                                                                                <input 
+                                                                                    type="number" 
+                                                                                    value={tagDiscountValue}
+                                                                                    onChange={e => {
+                                                                                        // ✅ Strict Non-Negative Input
+                                                                                        const val = e.target.value;
+                                                                                        if (val === '') {
+                                                                                            setTagDiscountValue('');
+                                                                                        } else {
+                                                                                            const num = parseFloat(val);
+                                                                                            if (!isNaN(num)) {
+                                                                                                setTagDiscountValue(Math.max(0, num)); // Force positive
+                                                                                            }
+                                                                                        }
+                                                                                    }}
+                                                                                    className="w-full h-full bg-transparent text-center font-black text-5xl text-gray-800 outline-none placeholder-gray-200"
+                                                                                    placeholder="0"
+                                                                                    min="0" // HTML5 Validation
+                                                                                />
+                                                                                <span className="absolute bottom-4 text-xs font-bold text-gray-400 uppercase tracking-widest pointer-events-none">
+                                                                                    {tagDiscountType === 'percent' ? 'ลดกี่เปอร์เซ็นต์' : 'ขายราคาเท่าไหร่'}
+                                                                                </span>
+                                                                            </div>
                                                                         </div>
-                                                                        <span className="text-sm tracking-widest uppercase">ดึงสินค้าลงตาราง</span>
-                                                                        <span className="text-[10px] text-gray-400 font-normal group-hover:text-white/80">พร้อมคำนวณราคาอัตโนมัติ</span>
-                                                                    </button>
+
+                                                                        {/* Action Button */}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={handleAddProductsByTags}
+                                                                            disabled={selectedTags.length === 0}
+                                                                            className="md:col-span-4 bg-gray-900 text-white rounded-[1.5rem] font-black hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-200 transition-all flex flex-col items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale active:scale-95 group relative overflow-hidden"
+                                                                        >
+                                                                            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                            <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform mb-1">
+                                                                                <RotateCw size={24} className={selectedTags.length > 0 ? 'animate-spin-slow' : ''} />
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="block text-sm tracking-widest uppercase">คำนวณราคาใหม่</span>
+                                                                                <span className="block text-[9px] text-gray-400 font-normal group-hover:text-white/80 mt-0.5 opacity-60">
+                                                                                    (อัปเดตราคาตามกฎ)
+                                                                                </span>
+                                                                            </div>
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2015,57 +2144,57 @@ const FlashSaleManagement = () => {
                                                     {formData.products.length > 0 ? (
                                                         <div className="overflow-x-auto">
                                                             <table className="w-full text-left">
-                                                                <thead className="bg-white/50 backdrop-blur-sm text-gray-400 text-[10px] uppercase font-black tracking-[0.2em] border-b border-gray-100">
+                                                                <thead className="bg-gray-50/50 text-[10px] uppercase text-gray-400 font-bold tracking-wider sticky top-0 z-10 backdrop-blur-md">
                                                                     <tr>
-                                                                        <th className="px-6 py-4">รายละเอียดสินค้า</th>
-                                                                        <th className="px-6 py-4 text-center">ราคาปกติ</th>
-                                                                        <th className="px-4 py-3 w-[200px] text-center">ราคา FLASH SALE</th>
-                                                                        <th className="px-4 py-3 text-center w-32">โควต้า</th>
-                                                                        <th className="px-4 py-3 text-center w-10"></th>
+                                                                        <th className="px-4 py-3 text-left w-[35%]">สินค้า</th>
+                                                                        <th className="px-4 py-3 text-center w-[15%]">ราคาปกติ</th>
+                                                                        <th className="px-4 py-3 text-center w-[20%]">ราคา FLASH SALE</th>
+                                                                        <th className="px-4 py-3 text-center w-[20%]">โควต้า</th>
+                                                                        <th className="px-4 py-3 text-center w-[10%]"></th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody className="divide-y divide-gray-100">
                                                                     {formData.products.map((item, idx) => (
                                                                         <tr key={idx} className="border-b border-gray-50 hover:bg-orange-50/20 transition-all group/row">
-                                                                            <td className="px-6 py-5">
-                                                                                <div className="flex items-center gap-5">
-                                                                                    <div className="w-14 h-14 rounded-2xl bg-white border border-gray-100 p-1 shrink-0 shadow-sm overflow-hidden group-hover/row:scale-110 group-hover/row:rotate-3 transition-all duration-300">
+                                                                            <td className="px-4 py-2">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className="w-10 h-10 rounded-lg bg-white border border-gray-100 p-0.5 shrink-0 shadow-sm overflow-hidden group-hover/row:scale-105 transition-all">
                                                                                         {item.product_image ? (
-                                                                                            <img src={getImageUrl(item.product_image)} className="w-full h-full object-cover rounded-[1rem]" alt="" />
-                                                                                        ) : <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-300"><Package size={20} /></div>}
+                                                                                            <img src={getImageUrl(item.product_image)} className="w-full h-full object-cover rounded-md" alt="" />
+                                                                                        ) : <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-300"><Package size={16} /></div>}
                                                                                     </div>
                                                                                     <div className="min-w-0">
-                                                                                        <div className="font-black text-gray-900 text-base line-clamp-1 tracking-tight" title={item.product_name}>{item.product_name}</div>
-                                                                                        <div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">ID: {item.product_id}</div>
+                                                                                        <div className="font-bold text-gray-900 text-sm line-clamp-1 tracking-tight" title={item.product_name}>{item.product_name}</div>
+                                                                                        <div className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">ID: {item.product_id}</div>
                                                                                     </div>
                                                                                 </div>
                                                                             </td>
-                                                                            <td className="px-6 py-5 text-center">
-                                                                                <span className="text-xs font-black text-gray-300 line-through tracking-tighter">
+                                                                            <td className="px-4 py-2 text-center">
+                                                                                <span className="text-xs font-bold text-gray-300 line-through tracking-tighter">
                                                                                     ฿{parseFloat(item.original_price).toLocaleString()}
                                                                                 </span>
                                                                             </td>
-                                                                            <td className="px-6 py-5">
-                                                                                <div className="relative group/price w-[180px]">
-                                                                                    {/* 🛠️ Improved Price Visibility: pl-10 for icon space, text-right for alignment */}
-                                                                                    <span className="absolute left-10 top-1/2 -translate-y-1/2 text-orange-500 font-black text-sm z-10 pointer-events-none">฿</span>
+                                                                            <td className="px-4 py-2">
+                                                                                <div className="relative group/price w-[140px] mx-auto">
+                                                                                    {/* Compact Price Input */}
+                                                                                    <span className="absolute left-8 top-1/2 -translate-y-1/2 text-orange-500 font-black text-xs z-10 pointer-events-none">฿</span>
                                                                                     
-                                                                                    {/* ➕➖ Stepper Controls */}
                                                                                     <div className="flex items-center">
                                                                                         <button 
                                                                                             type="button" 
-                                                                                            onClick={() => {
+                                                                                            onMouseDown={() => {
                                                                                                 const val = parseFloat(item.sale_price) || 0;
                                                                                                 updateProductRow(idx, 'sale_price', Math.max(0, val - 1));
+                                                                                                // Loop handled by existing logic if reused, but inline simplified for compactness
                                                                                             }}
-                                                                                            className="w-8 h-12 bg-gray-50 border-y-2 border-l-2 border-gray-100 rounded-l-2xl text-gray-400 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-100 flex items-center justify-center transition-all active:scale-95"
+                                                                                            className="w-6 h-8 bg-gray-50 border-y border-l border-gray-100 rounded-l-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-100 flex items-center justify-center transition-all active:scale-95"
                                                                                         >
-                                                                                            <Minus size={12} strokeWidth={4} />
+                                                                                            <Minus size={10} strokeWidth={3} />
                                                                                         </button>
                                                                                         
                                                                                         <input 
                                                                                             type="text" 
-                                                                                            className={`w-full pl-2 pr-2 py-3 bg-gray-50 border-y-2 border-transparent transition-all font-black text-gray-900 outline-none text-xl tracking-tighter shadow-inner text-center h-12
+                                                                                            className={`w-full pl-1 pr-1 py-1 bg-gray-50 border-y border-transparent transition-all font-black text-gray-900 outline-none text-lg tracking-tighter shadow-inner text-center h-8
                                                                                                 ${rowErrors[idx]?.sale_price 
                                                                                                     ? 'bg-red-50 text-red-600 focus:bg-white' 
                                                                                                     : 'focus:bg-white focus:border-orange-500 hover:bg-white'
@@ -2076,84 +2205,87 @@ const FlashSaleManagement = () => {
 
                                                                                         <button 
                                                                                             type="button" 
-                                                                                            onClick={() => {
+                                                                                            onMouseDown={() => {
                                                                                                 const val = parseFloat(item.sale_price) || 0;
                                                                                                 updateProductRow(idx, 'sale_price', Math.min(item.original_price, val + 1));
                                                                                             }}
-                                                                                            className="w-8 h-12 bg-gray-50 border-y-2 border-r-2 border-gray-100 rounded-r-2xl text-gray-400 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-100 flex items-center justify-center transition-all active:scale-95"
+                                                                                            className="w-6 h-8 bg-gray-50 border-y border-r border-gray-100 rounded-r-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-100 flex items-center justify-center transition-all active:scale-95"
                                                                                         >
-                                                                                            <Plus size={12} strokeWidth={4} />
+                                                                                            <Plus size={10} strokeWidth={3} />
                                                                                         </button>
                                                                                     </div>
 
                                                                                     {rowErrors[idx]?.sale_price && (
-                                                                                        <div className="absolute -bottom-5 left-0 w-full text-center">
-                                                                                            <span className="text-[9px] font-black text-white bg-red-500 px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">{rowErrors[idx].sale_price}</span>
+                                                                                        <div className="absolute -bottom-4 left-0 w-full text-center">
+                                                                                            <span className="text-[8px] font-bold text-white bg-red-500 px-1.5 py-0 rounded-full shadow-sm">{rowErrors[idx].sale_price}</span>
                                                                                         </div>
                                                                                     )}
                                                                                 </div>
-                                                                                <div className="flex items-center justify-center gap-2 mt-2">
-                                <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 uppercase tracking-tighter animate-pulse">
-                                                                                        -{item.original_price && item.sale_price ? Math.floor(((item.original_price - item.sale_price)/item.original_price)*100) : 0}%
+                                                                                <div className="flex items-center justify-center gap-2 mt-1">
+                                                                                    <span className="text-[8px] font-bold text-red-500 bg-red-50 px-1.5 py-0 rounded-full border border-red-100 uppercase tracking-tighter">
+                                                                                        -{item.original_price && item.sale_price ? Math.max(0, Math.floor(((item.original_price - item.sale_price)/item.original_price)*100)) : 0}%
                                                                                     </span>
                                                                                 </div>
                                                                             </td>
-                                                                            <td className="px-6 py-5 text-center">
-                                                                                <div className="relative flex items-center">
-                                                                                    <button 
-                                                                                        type="button" 
-                                                                                        onClick={() => {
-                                                                                            const val = parseInt(item.limit) || 0;
-                                                                                            updateProductRow(idx, 'limit', Math.max(0, val - 1));
-                                                                                        }}
-                                                                                        className="w-8 h-12 bg-gray-50 border-y-2 border-l-2 border-gray-100 rounded-l-2xl text-gray-400 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-100 flex items-center justify-center transition-all active:scale-95"
-                                                                                    >
-                                                                                        <Minus size={12} strokeWidth={4} />
-                                                                                    </button>
+                                                                            
+                                                                            <td className="px-4 py-2 text-center">
+                                                                                <div className="relative flex items-center justify-center">
+                                                                                    {/* Quota Stepper */}
+                                                                                    <div className="flex items-center">
+                                                                                        <button 
+                                                                                            type="button" 
+                                                                                            onMouseDown={() => {
+                                                                                                const val = parseInt(item.limit) || 0;
+                                                                                                updateProductRow(idx, 'limit', Math.max(0, val - 1));
+                                                                                                // Loop logic implies handled by generic handlers or can be inline if needed
+                                                                                            }}
+                                                                                            className="w-6 h-8 bg-gray-50 border-y border-l border-gray-100 rounded-l-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-100 flex items-center justify-center transition-all active:scale-95"
+                                                                                        >
+                                                                                            <Minus size={10} strokeWidth={3} />
+                                                                                        </button>
 
-                                                                                    <input 
-                                                                                        type="text" 
-                                                                                        value={item.limit}
-                                                                                        onChange={(e) => updateProductRow(idx, 'limit', e.target.value)}
-                                                                                        onKeyDown={(e) => {
-                                                                                            // 🚫 Block special chars & signs
-                                                                                            if (['-', '+', 'e', 'E', '.', ','].includes(e.key)) {
-                                                                                                e.preventDefault();
-                                                                                            }
-                                                                                        }}
-                                                                                        className={`w-16 px-0 py-3 bg-gray-50 border-y-2 border-transparent transition-all font-black text-gray-900 outline-none text-center text-lg shadow-inner h-12
-                                                                                            ${rowErrors[idx]?.limit 
-                                                                                                ? 'bg-red-50 text-red-600 focus:bg-white' 
-                                                                                                : 'focus:bg-white focus:border-orange-500 hover:bg-white'
-                                                                                            }`}
-                                                                                        placeholder="Quota"
-                                                                                    />
+                                                                                        <input 
+                                                                                            type="text" 
+                                                                                            value={item.limit}
+                                                                                            onChange={(e) => updateProductRow(idx, 'limit', e.target.value)}
+                                                                                            className={`w-12 px-0 py-1 bg-gray-50 border-y border-transparent transition-all font-black text-gray-900 outline-none text-center text-lg shadow-inner h-8
+                                                                                                ${rowErrors[idx]?.limit 
+                                                                                                    ? 'bg-red-50 text-red-600 focus:bg-white' 
+                                                                                                    : 'focus:bg-white focus:border-orange-500 hover:bg-white'
+                                                                                                }`}
+                                                                                            placeholder="Quota"
+                                                                                        />
 
-                                                                                    <button 
-                                                                                        type="button" 
-                                                                                        onClick={() => {
-                                                                                            const val = parseInt(item.limit) || 0;
-                                                                                            updateProductRow(idx, 'limit', Math.min(item.stock, val + 1));
-                                                                                        }}
-                                                                                        className="w-8 h-12 bg-gray-50 border-y-2 border-r-2 border-gray-100 rounded-r-2xl text-gray-400 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-100 flex items-center justify-center transition-all active:scale-95"
-                                                                                    >
-                                                                                        <Plus size={12} strokeWidth={4} />
-                                                                                    </button>
+                                                                                        <button 
+                                                                                            type="button" 
+                                                                                            onMouseDown={() => {
+                                                                                                const val = parseInt(item.limit) || 0;
+                                                                                                updateProductRow(idx, 'limit', Math.min(item.stock, val + 1));
+                                                                                            }}
+                                                                                            className="w-6 h-8 bg-gray-50 border-y border-r border-gray-100 rounded-r-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-100 flex items-center justify-center transition-all active:scale-95"
+                                                                                        >
+                                                                                            <Plus size={10} strokeWidth={3} />
+                                                                                        </button>
+                                                                                    </div>
 
                                                                                     {rowErrors[idx]?.limit && (
-                                                                                        <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 w-32 text-center pointer-events-none z-10">
-                                                                                            <span className="text-[9px] font-black text-white bg-red-500 px-2 py-0.5 rounded-full shadow-md whitespace-nowrap">{rowErrors[idx].limit}</span>
+                                                                                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-32 text-center pointer-events-none z-10">
+                                                                                            <span className="text-[8px] font-bold text-white bg-red-500 px-1.5 py-0 rounded-full shadow-md whitespace-nowrap">{rowErrors[idx].limit}</span>
                                                                                         </div>
                                                                                     )}
                                                                                 </div>
+                                                                                 <div className="flex items-center justify-center gap-1 mt-1 text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                                                                                     Max: {item.stock}
+                                                                                 </div>
                                                                             </td>
-                                                                            <td className="px-6 py-5 text-center">
+
+                                                                            <td className="px-4 py-2 text-center">
                                                                                 <button 
                                                                                     type="button"
                                                                                     onClick={() => removeProductFromSale(idx)}
-                                                                                    className="w-12 h-12 rounded-2xl bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center border border-red-100 shadow-sm active:scale-95 group/del"
+                                                                                    className="w-8 h-8 rounded-lg bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center border border-red-100 shadow-sm active:scale-95 group/del"
                                                                                 >
-                                                                                    <Trash2 size={20} className="group-hover/del:scale-110 transition-transform" />
+                                                                                    <Trash2 size={16} className="group-hover/del:scale-110 transition-transform" />
                                                                                 </button>
                                                                             </td>
                                                                         </tr>

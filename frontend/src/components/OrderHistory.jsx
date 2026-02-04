@@ -241,9 +241,28 @@ function OrderHistory() {
                                                         </button>
                                                     )}
                                                     {order.status === 'Shipped' && (
-                                                        <button className="px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-bold rounded-lg hover:bg-indigo-100 transition-all w-full md:w-auto">
-                                                            ติดตามพัสดุ
-                                                        </button>
+                                                        <div className="flex flex-col gap-2 w-full md:w-auto">
+                                                            <div className="text-right">
+                                                                <p className="text-[10px] font-bold text-gray-500">เลขพัสดุ ({order.courier_name || 'ขนส่ง'})</p>
+                                                                <p className="text-xs font-black text-[#1a4d2e] select-all cursor-text">{order.tracking_number}</p>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(order.tracking_number);
+                                                                    Swal.fire({
+                                                                        icon: 'success',
+                                                                        title: 'คัดลอกเลขพัสดุแล้ว',
+                                                                        showConfirmButton: false,
+                                                                        timer: 1500,
+                                                                        toast: true,
+                                                                        position: 'top-end'
+                                                                    });
+                                                                }}
+                                                                className="px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-bold rounded-lg hover:bg-indigo-100 transition-all w-full flex items-center justify-center gap-1"
+                                                            >
+                                                                <Truck size={12}/> ติดตามพัสดุ
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </td>
