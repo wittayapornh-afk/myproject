@@ -22,10 +22,11 @@ class MegaMenuConfigSerializer(serializers.ModelSerializer):
 
 class CategorySerializer(serializers.ModelSerializer):
     menu_config = MegaMenuConfigSerializer(read_only=True)
+    product_count = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = Category
-        fields = ['id', 'name', 'menu_config']
+        fields = ['id', 'name', 'menu_config', 'product_count']
 
 class TagSerializer(serializers.ModelSerializer):
     """
@@ -37,14 +38,20 @@ class TagSerializer(serializers.ModelSerializer):
     - แสดง Tags ที่เชื่อมกับสินค้า
     """
     product_count = serializers.SerializerMethodField(read_only=True)
+    product_thumbnails = serializers.SerializerMethodField(read_only=True)
     
     class Meta:
         model = Tag
-        fields = ['id', 'name', 'group_name', 'color', 'icon', 'product_count', 'expiration_date', 'automation_rules', 'is_active']
+        fields = ['id', 'name', 'group_name', 'color', 'icon', 'product_count', 'product_thumbnails', 'expiration_date', 'automation_rules', 'is_active']
     
     def get_product_count(self, obj):
         """นับจำนวนสินค้าที่มี Tag นี้"""
         return obj.products.count() 
+
+    def get_product_thumbnails(self, obj):
+        """ดึงรูปของสินค้า 3 อันแรกที่ติด Tag นี้"""
+        products = obj.products.all()[:3]
+        return [p.thumbnail.url if p.thumbnail else None for p in products]
 
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
@@ -86,11 +93,12 @@ class FlashSaleProductSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.title')
     product_image = serializers.SerializerMethodField()
     original_price = serializers.ReadOnlyField(source='product.price')
+    stock = serializers.ReadOnlyField(source='product.stock') # ✅ Expose Stock for Validation
     product_tags = TagSerializer(source='product.tags', many=True, read_only=True)
 
     class Meta:
         model = FlashSaleProduct
-        fields = ['id', 'product', 'product_name', 'product_image', 'sale_price', 'original_price', 'quantity_limit', 'sold_count', 'limit_per_user', 'product_tags']
+        fields = ['id', 'product', 'product_name', 'product_image', 'sale_price', 'original_price', 'stock', 'quantity_limit', 'sold_count', 'limit_per_user', 'product_tags']
 
     def get_product_image(self, obj):
         if obj.product.thumbnail:

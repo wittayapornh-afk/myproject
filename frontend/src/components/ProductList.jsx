@@ -194,6 +194,7 @@ function ProductList() {
   
   // ✅ Layout State
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
   const [openSections, setOpenSections] = useState({ category: true, price: true, brand: true, tags: false });
 
   const toggleSection = (section) => {
@@ -288,9 +289,16 @@ function ProductList() {
       const params = new URLSearchParams(location.search);
       const catParam = params.get('category');
       const pageParam = params.get('page');
+      const searchParam = params.get('search'); // ✅ Capture search param
       
       if (catParam) {
           setSelectedCategory(catParam);
+      }
+      
+      if (searchParam) {
+          setSearchQuery(searchParam); // ✅ Update state
+      } else {
+          setSearchQuery(''); // ✅ Reset if empty
       }
       
       // 🔖 ลองกลับมาจาก sessionStorage ก่อน (ถ้ามี)
@@ -401,7 +409,7 @@ function ProductList() {
 
         setProducts(items);
         // คำนวณหน้า: ถ้า Backend ส่ง total_pages มาก็ใช้เลย ถ้าไม่ส่งให้คำนวณเอง
-        setTotalPages(data.total_pages || Math.ceil((data.count || items.length) / 12) || 1);
+        setTotalPages(data.total_pages || Math.ceil((data.count || items.length) / 18) || 1);
     } catch (err) {
         console.error("Fetch Error:", err);
     } finally {
@@ -458,20 +466,46 @@ function ProductList() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans selection:bg-[#1a4d2e] selection:text-white pb-12">
       
-      {/* 🌟 Header */}
-      <div className="bg-white border-b border-gray-200">
-          <div className="max-w-[1920px] mx-auto px-4 md:px-6 h-16 flex justify-between items-center gap-4">
-               <div className="flex items-center gap-3">
-                   <div className="w-9 h-9 bg-[#1a4d2e] rounded-lg flex items-center justify-center text-white shadow-lg shadow-green-900/20">
-                       <ShoppingBag size={18} />
-                   </div>
-                   <h1 className="text-xl font-black text-[#263A33] tracking-tight uppercase">Shop All</h1>
-               </div>
+      {/* 🌟 Header & Breadcrumb */}
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
+          <div className="max-w-[1920px] mx-auto px-4 md:px-6 py-4">
+               {/* Breadcrumb */}
+               <nav className="flex items-center gap-2 text-xs font-medium text-gray-400 mb-2">
+                    <Link to="/" className="hover:text-[#1a4d2e] transition-colors">หน้าแรก</Link>
+                    <ChevronRight size={12} />
+                    <span className="text-[#1a4d2e] font-bold">สินค้าทั้งหมด</span>
+               </nav>
 
-               {/* Mobile Filter Toggle */}
-               <button onClick={() => setShowMobileFilter(true)} className="lg:hidden p-2.5 bg-white rounded-xl shadow-sm border border-gray-200 text-gray-500 hover:text-[#1a4d2e] active:scale-95 transition-all flex items-center gap-2 font-bold text-xs">
-                   <Filter size={18} /> ตัวกรอง
-               </button>
+               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                   <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 bg-[#1a4d2e] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-green-900/20 rotate-3 transition-transform hover:rotate-6">
+                           <ShoppingBag size={24} />
+                       </div>
+                       <div>
+                            <h1 className="text-3xl font-black text-[#263A33] tracking-tight uppercase flex items-center gap-3">
+                                สินค้าทั้งหมด
+                            </h1>
+                            <p className="text-gray-400 text-xs font-bold mt-1">รวมสินค้าคุณภาพที่เราคัดสรรมาเพื่อคุณ</p>
+                       </div>
+                   </div>
+
+                   {/* Toolbar (Search & Toggle) */}
+                   <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="flex items-center bg-gray-50 rounded-xl p-1 border border-gray-100 w-full md:w-auto">
+                            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-[#1a4d2e] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+                                <LayoutGrid size={18} />
+                            </button>
+                            <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-[#1a4d2e] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+                                <Menu size={18} />
+                            </button>
+                        </div>
+                        
+                        {/* Mobile Filter Toggle */}
+                        <button onClick={() => setShowMobileFilter(true)} className="lg:hidden p-2.5 bg-[#1a4d2e] text-white rounded-xl shadow-lg shadow-green-900/20 active:scale-95 transition-all flex items-center gap-2 font-bold text-xs whitespace-nowrap">
+                            <Filter size={18} /> Filters
+                        </button>
+                   </div>
+               </div>
           </div>
       </div>
 
@@ -503,70 +537,134 @@ function ProductList() {
                             <button 
                                 key={catName}
                                 onClick={() => { setSelectedCategory(catName); updatePage(1); }}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-sm font-bold ${isSelected ? 'bg-[#1a4d2e] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-[#1a4d2e]'}`}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-sm font-bold group ${isSelected ? 'bg-[#1a4d2e] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-[#1a4d2e]'}`}
                             >
                                 <span className="flex items-center gap-2 text-left line-clamp-1">
-                                    {config.icon && <config.icon size={14} className={isSelected ? 'text-white' : 'text-gray-400'} />} 
+                                    {config.icon && <config.icon size={14} className={isSelected ? 'text-white' : 'text-gray-400 group-hover:text-[#1a4d2e]'} />} 
                                     {catName}
                                 </span>
-                                {isSelected && <CheckCircle size={14} />}
+                                <div className="flex items-center gap-2">
+                                     {catObj.product_count > 0 && (
+                                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-[#1a4d2e]/10 group-hover:text-[#1a4d2e]'}`}>
+                                             {catObj.product_count}
+                                         </span>
+                                     )}
+                                     {isSelected && <CheckCircle size={14} />}
+                                </div>
                             </button>
                          );
                      })}
                  </div>
              </FilterSection>
 
-             {/* 2. Price Range */}
+             {/* 2. Price Range (Enhanced Slider) */}
              <FilterSection title="ช่วงราคา" icon={CreditCard} id="price" openSections={openSections} toggleSection={toggleSection}>
-                 <div className="flex items-center gap-2 p-1">
-                     <input 
-                        type="number" 
-                        placeholder="Min" 
-                        value={minPrice} 
-                        onChange={e => setMinPrice(e.target.value)} 
-                        className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium border border-gray-200 focus:border-[#1a4d2e] focus:ring-1 focus:ring-[#1a4d2e] outline-none transition-all placeholder:text-gray-300" 
-                     />
-                     <span className="text-gray-300 font-medium">-</span>
-                     <input 
-                        type="number" 
-                        placeholder="Max" 
-                        value={maxPrice} 
-                        onChange={e => setMaxPrice(e.target.value)} 
-                        className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium border border-gray-200 focus:border-[#1a4d2e] focus:ring-1 focus:ring-[#1a4d2e] outline-none transition-all placeholder:text-gray-300" 
-                     />
+                 <div className="p-3">
+                     {/* Visual Slider */}
+                     <div className="relative h-1 bg-gray-200 rounded-full mb-6 mt-2">
+                         <div 
+                             className="absolute h-full bg-[#1a4d2e] rounded-full" 
+                             style={{ 
+                                 left: `${(minPrice / 50000) * 100}%`, 
+                                 right: `${100 - (maxPrice / 50000) * 100}%` 
+                             }}
+                         ></div>
+                         {/* Min Knob */}
+                         <div 
+                            className="absolute w-4 h-4 bg-white border-2 border-[#1a4d2e] rounded-full top-1/2 -translate-y-1/2 shadow cursor-pointer transform hover:scale-110 transition-transform"
+                            style={{ left: `${(minPrice / 50000) * 100}%` }}
+                         ></div>
+                         {/* Max Knob */}
+                         <div 
+                            className="absolute w-4 h-4 bg-white border-2 border-[#1a4d2e] rounded-full top-1/2 -translate-y-1/2 shadow cursor-pointer transform hover:scale-110 transition-transform"
+                            style={{ left: `${(maxPrice / 50000) * 100}%` }}
+                         ></div>
+                     </div>
+
+                     <div className="flex items-center gap-2 mb-3">
+                         <div className="relative w-full">
+                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">MIN</span>
+                             <input 
+                                type="number" 
+                                value={minPrice} 
+                                onChange={e => {
+                                    const val = Math.min(Number(e.target.value), maxPrice - 100);
+                                    setMinPrice(val);
+                                }} 
+                                className="w-full pl-8 pr-2 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold focus:border-[#1a4d2e] focus:outline-none"
+                             />
+                         </div>
+                         <div className="relative w-full">
+                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">MAX</span>
+                             <input 
+                                type="number" 
+                                value={maxPrice} 
+                                onChange={e => {
+                                    const val = Math.max(Number(e.target.value), minPrice + 100);
+                                    setMaxPrice(val);
+                                }} 
+                                className="w-full pl-8 pr-2 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold focus:border-[#1a4d2e] focus:outline-none"
+                             />
+                         </div>
+                     </div>
+
+                     <button 
+                        onClick={() => updatePage(1)} 
+                        className="w-full py-2 bg-[#E8F5E9] text-[#1a4d2e] font-black text-xs rounded-lg hover:bg-[#1a4d2e] hover:text-white transition-all tracking-wider"
+                     >
+                        APPLY FILTER
+                     </button>
                  </div>
              </FilterSection>
 
              {/* 3. Brands */}
              {brands.length > 0 && (
                  <FilterSection title="แบรนด์" icon={Star} id="brand" openSections={openSections} toggleSection={toggleSection}>
-                     <div className="flex flex-wrap gap-2 p-1">
-                         {brands.slice(0, 15).map(brand => (
-                             <button 
+                     <div className="space-y-2 p-1 max-h-[250px] overflow-y-auto custom-scrollbar">
+                         {brands.slice(0, 20).map(brand => (
+                             <label 
                                  key={brand}
-                                 onClick={() => { setSelectedBrand(selectedBrand === brand ? 'ทั้งหมด' : brand); updatePage(1); }}
-                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedBrand === brand ? 'bg-[#1a4d2e] border-[#1a4d2e] text-white' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-[#1a4d2e]'}`}
+                                 className="flex items-center gap-3 cursor-pointer group hover:bg-gray-50 p-2 rounded-lg transition-all"
                              >
-                                 {brand}
-                             </button>
+                                 <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedBrand === brand ? 'bg-[#1a4d2e] border-[#1a4d2e]' : 'bg-white border-gray-200 group-hover:border-[#1a4d2e]'}`}>
+                                     {selectedBrand === brand && <CheckCircle size={12} className="text-white" />}
+                                 </div>
+                                 <input 
+                                     type="checkbox" 
+                                     className="hidden"
+                                     checked={selectedBrand === brand} 
+                                     onChange={() => { setSelectedBrand(selectedBrand === brand ? 'ทั้งหมด' : brand); updatePage(1); }}
+                                 />
+                                 <span className={`text-sm font-bold ${selectedBrand === brand ? 'text-[#1a4d2e]' : 'text-gray-500 group-hover:text-[#1a4d2e]'}`}>
+                                     {brand}
+                                 </span>
+                             </label>
                          ))}
                      </div>
                  </FilterSection>
              )}
 
              {/* 4. Tags (NEW) */}
+             {/* 4. Tags (Grouped) */}
              {allTags.length > 0 && (
                 <FilterSection title="แท็กสินค้า" icon={Tag} id="tags" openSections={openSections} toggleSection={toggleSection}>
-                    <div className="flex flex-wrap gap-2 p-1">
-                        {allTags.slice(0, 20).map(tag => (
-                            <button
-                                key={tag.id}
-                                onClick={() => toggleTag(tag.id)}
-                                className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all flex items-center gap-1 ${selectedTagIds.includes(tag.id) ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-500 border-gray-100 hover:bg-gray-100'}`}
-                            >
-                                {tag.icon && <span>{tag.icon}</span>}
-                                {tag.name}
-                            </button>
+                    <div className="p-1 space-y-4">
+                        {Object.entries(tagGroups).map(([groupName, tags]) => (
+                            <div key={groupName}>
+                                <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-2">{groupName}</h5>
+                                <div className="flex flex-wrap gap-2">
+                                    {tags.map(tag => (
+                                        <button
+                                            key={tag.id}
+                                            onClick={() => toggleTag(tag.id)}
+                                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all flex items-center gap-1 ${selectedTagIds.includes(tag.id) ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-500 border-gray-100 hover:bg-gray-100'}`}
+                                        >
+                                            {tag.icon && <span>{tag.icon}</span>}
+                                            {tag.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </FilterSection>
@@ -619,6 +717,39 @@ function ProductList() {
         )}
 
       <main className="flex-1 w-full min-w-0">
+         
+         {/* 🌟 Sticky Horizontal Category Bar (Mobile & Desktop) */}
+         <div className="sticky top-[72px] lg:top-24 z-30 bg-[#F8F9FA]/95 backdrop-blur-md py-2 -mx-4 px-4 md:mx-0 md:px-0 mb-6 border-b border-gray-200/50 transition-all">
+            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
+                <button 
+                    onClick={() => { setSelectedCategory('ทั้งหมด'); updatePage(1); }}
+                    className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold border transition-all shadow-sm ${selectedCategory === 'ทั้งหมด' ? 'bg-[#1a4d2e] text-white border-[#1a4d2e] ring-2 ring-green-900/10' : 'bg-white text-gray-600 border-gray-200 hover:border-[#1a4d2e] hover:text-[#1a4d2e]'}`}
+                >
+                    ทั้งหมด
+                </button>
+                {categories.map(catObj => {
+                    const catName = typeof catObj === 'string' ? catObj : catObj.name;
+                    const config = getCategoryConfig(catName);
+                    const isSelected = selectedCategory === catName;
+                    
+                    return (
+                        <button 
+                            key={catName}
+                            onClick={() => { setSelectedCategory(catName); updatePage(1); }}
+                            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold border transition-all shadow-sm flex items-center gap-2 group ${isSelected ? 'bg-[#1a4d2e] text-white border-[#1a4d2e] ring-2 ring-green-900/10' : 'bg-white text-gray-600 border-gray-200 hover:border-[#1a4d2e] hover:text-[#1a4d2e]'}`}
+                        >
+                            {config.icon && <config.icon size={14} className={isSelected ? 'text-white' : 'text-gray-400 group-hover:text-[#1a4d2e]'} />}
+                            {catName}
+                            {catObj.product_count > 0 && (
+                                <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-[#1a4d2e]/10 group-hover:text-[#1a4d2e]'}`}>
+                                    {catObj.product_count}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+         </div>
          {/* Sort & Status Bar */}
          <div className="flex justify-between items-center mb-6">
              <p className="text-gray-500 font-medium">พบสินค้า <span className="text-[#1a4d2e] font-bold">{loading ? '...' : (products.length || 0)}</span> รายการ</p>
@@ -643,18 +774,18 @@ function ProductList() {
 
 
 
-            {loading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {[...Array(10)].map((_, i) => <ProductSkeleton key={i} />)}
-              </div>
-            ) : products.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-20">
-                {products.map((product) => {
-                  const flashSaleItem = activeFlashSales[product.id];
-                  const flashSale = flashSaleItem || product.flash_sale;
+             {loading ? (
+               <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-1'}`}>
+                 {[...Array(8)].map((_, i) => <ProductSkeleton key={i} />)}
+               </div>
+             ) : products.length > 0 ? (
+               <div className={`grid gap-6 mb-20 ${viewMode === 'grid' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-1'}`}>
+                 {products.map((product) => {
+                   const flashSaleItem = activeFlashSales[product.id];
+                   const flashSale = flashSaleItem || product.flash_sale;
 
-                  return (
-                  <div key={product.id} className={`group bg-white rounded-3xl p-3 shadow-sm hover:shadow-2xl hover:shadow-green-900/10 transition-all duration-500 relative border border-gray-100 hover:border-transparent flex flex-col hover:-translate-y-2 ${flashSale ? 'ring-2 ring-red-50' : ''}`}>
+                   return (
+                   <div key={product.id} className={`group bg-white rounded-3xl p-3 shadow-sm hover:shadow-2xl hover:shadow-green-900/10 transition-all duration-500 relative border border-gray-100 hover:border-transparent flex ${viewMode === 'list' ? 'flex-row gap-6 items-center' : 'flex-col hover:-translate-y-2'} ${flashSale ? 'ring-2 ring-red-50' : ''}`}>
                     
                     {/* Flash Sale Badge */}
                     {flashSale && (
@@ -671,40 +802,59 @@ function ProductList() {
                              -{Math.round((1 - (flashSale.sale_price || flashSale.price) / product.price) * 100)}%
                         </div>
                     )}
+                    
+                    {/* New Arrival Badge (Mock logic) */}
+                    {(new Date() - new Date(product.created_at)) / (1000 * 3600 * 24) < 14 && !flashSale && ( // New if < 14 days
+                        <div className="absolute top-4 left-4 z-30 bg-[#1a4d2e] text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-lg shadow-green-900/30">
+                            NEW
+                        </div>
+                    )}
 
                     {/* Image Area */}
                     <Link 
                         to={`/product/${product.id}`} 
                         onClick={() => sessionStorage.setItem('shopCurrentPage', currentPage)}
-                        className="block relative aspect-[4/5] mb-4 bg-[#F8F9FA] rounded-2xl overflow-hidden p-6 group-hover:bg-white transition-colors"
+                        className={`block relative bg-[#F8F9FA] rounded-2xl overflow-hidden p-6 group-hover:bg-white transition-colors ${viewMode === 'list' ? 'w-48 aspect-square flex-shrink-0' : 'aspect-[4/5] mb-4'}`}
                     >
                        <img src={getImageUrl(product.thumbnail || product.image)} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700 mix-blend-multiply group-hover:mix-blend-normal" alt={product.title} />
                        
-                       {/* Hover Actions */}
-                       <div className="absolute inset-x-4 bottom-4 flex gap-2 translate-y-20 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 z-20">
-                            {!isRestricted && product.stock > 0 && (
-                                <button onClick={(e) => { e.preventDefault(); handleAddToCart(product); }} className="flex-1 h-10 bg-[#1a4d2e] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-green-900/30 hover:bg-[#143d24]">
-                                    <ShoppingBag size={14} /> Add
-                                </button>
-                            )}
-                       </div>
+                       {/* Hover Actions (Grid Only) */}
+                       {viewMode === 'grid' && (
+                           <div className="absolute inset-x-4 bottom-4 flex gap-2 translate-y-20 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 z-20">
+                                {!isRestricted && product.stock > 0 && (
+                                    <button onClick={(e) => { e.preventDefault(); handleAddToCart(product); }} className="flex-1 h-10 bg-[#1a4d2e] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-green-900/30 hover:bg-[#143d24]">
+                                        <ShoppingBag size={14} /> Add
+                                    </button>
+                                )}
+                           </div>
+                       )}
                        
                        {product.stock <= 0 && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center"><span className="bg-black/80 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl">Out of Stock</span></div>}
                     </Link>
                     
                     {/* Info Area */}
                     <div className="space-y-2 flex-grow flex flex-col px-1">
-                        <div className="flex items-center gap-2 overflow-hidden">
+                        {/* Category Label */}
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{product.category || 'General'}</p>
+
+                        <div className="flex items-center gap-2 overflow-hidden mb-1">
                              {product.tags && product.tags.slice(0,2).map(tag => (
                                  <span key={tag.id} className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-bold rounded-md whitespace-nowrap">{tag.name}</span>
                              ))}
                         </div>
 
-                        <Link to={`/product/${product.id}`} className="font-bold text-[#263A33] text-sm leading-snug line-clamp-2 hover:text-[#1a4d2e] transition-colors">{product.title}</Link>
+                        <Link to={`/product/${product.id}`} className={`font-bold text-[#263A33] leading-snug hover:text-[#1a4d2e] transition-colors ${viewMode === 'grid' ? 'text-sm line-clamp-2' : 'text-lg'}`}>{product.title}</Link>
                         
+                        {/* Rating */}
+                        <div className="flex items-center gap-1">
+                            <Star size={12} className="text-yellow-400 fill-yellow-400" />
+                            <span className="text-xs font-bold text-gray-500">{product.rating || '0.0'}</span>
+                        </div>
+
                         <div className="mt-auto pt-2 flex items-baseline gap-2">
                              {flashSale ? (
                                 <>
+                                    <button className={`${viewMode === 'list' ? 'order-last ml-auto' : 'hidden'}`}></button> {/* Spacer */}
                                     <span className="font-black text-lg text-red-500">{formatPrice(flashSale.sale_price)}</span>
                                     <span className="text-xs text-gray-300 line-through font-bold">{formatPrice(product.price)}</span>
                                 </>
@@ -712,6 +862,15 @@ function ProductList() {
                                 <span className="font-black text-lg text-[#1a4d2e]">{formatPrice(product.price)}</span>
                              )}
                         </div>
+
+                        {/* List View Actions */}
+                         {viewMode === 'list' && !isRestricted && product.stock > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-50 flex gap-3">
+                                <button onClick={(e) => { e.preventDefault(); handleAddToCart(product); }} className="px-6 h-11 bg-[#1a4d2e] text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-green-900/30 hover:bg-[#143d24]">
+                                    <ShoppingBag size={16} /> Add to Cart
+                                </button>
+                            </div>
+                         )}
                    </div>
                   </div>
                   );

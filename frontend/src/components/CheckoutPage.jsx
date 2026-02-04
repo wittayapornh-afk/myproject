@@ -250,7 +250,7 @@ function CheckoutPage() {
                 first_name: user.first_name || '',
                 last_name: user.last_name || '',
                 email: user.email || '',
-                phone: user.phone_number || '',
+                phone: user.phone || user.phone_number || '',
                 address: user.address || '',
                 zip_code: ''
             });
@@ -715,13 +715,21 @@ function CheckoutPage() {
     };
 
     const BANKS = [
-        { id: 'kbank', name: 'กสิกรไทย (KBANK)', color: '#138f2d', initials: 'KBANK', iconUrl: 'https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/kbank.svg' },
-        { id: 'scb', name: 'ไทยพาณิชย์ (SCB)', color: '#4e2a84', initials: 'SCB', iconUrl: 'https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/scb.svg' },
-        { id: 'bbl', name: 'กรุงเทพ (BBL)', color: '#1e3a8a', initials: 'BBL', iconUrl: 'https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/bbl.svg' },
-        { id: 'ktb', name: 'กรุงไทย (KTB)', color: '#0ea5e9', initials: 'KTB', iconUrl: 'https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/ktb.svg' },
-        { id: 'bay', name: 'กรุงศรี (BAY)', color: '#f5ce00', initials: 'BAY', textColor: '#4e3801', iconUrl: 'https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/bay.svg' },
-        { id: 'ttb', name: 'ทหารไทยธนชาต (ttb)', color: '#0056b3', initials: 'TTB', iconUrl: 'https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/ttb.svg' },
-        { id: 'gsb', name: 'ออมสิน (GSB)', color: '#eb198d', initials: 'GSB', iconUrl: 'https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/gsb.svg' },
+        { id: 'kbank', name: 'กสิกรไทย (KBANK)', color: '#138f2d', initials: 'KBANK', iconUrl: '/bank-icons/kbank.svg' },
+        { id: 'scb', name: 'ไทยพาณิชย์ (SCB)', color: '#4e2a84', initials: 'SCB', iconUrl: '/bank-icons/scb.svg' },
+        { id: 'bbl', name: 'กรุงเทพ (BBL)', color: '#1e3a8a', initials: 'BBL', iconUrl: '/bank-icons/bbl.svg' },
+        { id: 'ktb', name: 'กรุงไทย (KTB)', color: '#0ea5e9', initials: 'KTB', iconUrl: '/bank-icons/ktb.svg' },
+        { id: 'bay', name: 'กรุงศรี (BAY)', color: '#f5ce00', initials: 'BAY', textColor: '#4e3801', iconUrl: '/bank-icons/bay.svg' },
+        { id: 'ttb', name: 'ทหารไทยธนชาต (ttb)', color: '#0056b3', initials: 'TTB', iconUrl: '/bank-icons/ttb.svg', isColored: true },
+        { id: 'gsb', name: 'ออมสิน (GSB)', color: '#eb198d', initials: 'GSB', iconUrl: '/bank-icons/gsb.svg' },
+        // { id: 'tisco', name: 'ทิสโก้ (TISCO)', color: '#1a4d2e', initials: 'TISCO', iconUrl: '/bank-icons/tisco.svg' },
+        // { id: 'kkp', name: 'เกียรตินาคิน (KKP)', color: '#199cc5', initials: 'KKP', iconUrl: '/bank-icons/kkp.svg' },
+        // { id: 'cimb', name: 'ซีไอเอ็มบี (CIMB)', color: '#7e2f36', initials: 'CIMB', iconUrl: '/bank-icons/cimb.svg' },
+        // { id: 'uob', name: 'ยูโอบี (UOB)', color: '#0b3979', initials: 'UOB', iconUrl: '/bank-icons/uob.svg' },
+        // { id: 'lh', name: 'แลนด์ แอนด์ เฮ้าส์ (LH)', color: '#6d6e71', initials: 'LH', iconUrl: '/bank-icons/lhb.svg' },
+        // { id: 'baac', name: 'ธ.ก.ส. (BAAC)', color: '#4b9b1d', initials: 'BAAC', iconUrl: '/bank-icons/baac.svg' },
+        // { id: 'ghb', name: 'อาคารสงเคราะห์ (GHB)', color: '#ff6700', initials: 'GHB', iconUrl: '/bank-icons/ghb.svg' },
+        // { id: 'icbc', name: 'ไอซีบีซี (ICBC)', color: '#c50f1f', initials: 'ICBC', iconUrl: '/bank-icons/icbc.svg' },
     ];
     const [selectedBank, setSelectedBank] = useState(BANKS[0]);
 
@@ -833,7 +841,7 @@ function CheckoutPage() {
                                         <ErrorMessage message={errors.zip_code} />
                                     </div>
 
-                                    <div className="space-y-1">
+                                            <div className="space-y-1">
                                         <label className="text-xs font-bold text-gray-400 ml-1">เบอร์โทรศัพท์ (10 หลัก)</label>
                                         <input
                                             required
@@ -847,6 +855,7 @@ function CheckoutPage() {
                                                     validateField('phone', val);
                                                 }
                                             }}
+                                            placeholder="0XXXXXXXXX"
                                             className={`w-full bg-gray-50 border rounded-xl px-4 py-3 font-bold text-[#263A33] outline-none transition-all ${errors.phone ? 'border-red-500 focus:ring-red-500/10' : 'border-gray-200 focus:border-[#1a4d2e] focus:ring-green-500/10'}`}
                                         />
                                         <ErrorMessage message={errors.phone} />
@@ -895,11 +904,11 @@ function CheckoutPage() {
                                         <div className="mb-6">
                                             <h4 className="font-black text-sm text-gray-600 uppercase tracking-wide mb-3">โอนเงินเข้าบัญชี (ร้านค้า)</h4>
                                             <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-center gap-4 shadow-sm">
-                                                <div className="w-12 h-12 rounded-full bg-[#0ea5e9] flex items-center justify-center text-white font-black text-xl shadow-sm overflow-hidden p-2">
-                                                    <img
-                                                        src="https://raw.githubusercontent.com/guidea/thai-bank-icons/master/official/ktb.svg"
+                                                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-xl shadow-sm overflow-hidden p-2" style={{ backgroundColor: '#0ea5e9' }}>
+                                                     <img
+                                                        src="/bank-icons/ktb.svg"
                                                         className="w-full h-full object-contain"
-                                                        onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = 'KTB' }}
+                                                        alt="KTB"
                                                     />
                                                 </div>
                                                 <div>
@@ -947,38 +956,48 @@ function CheckoutPage() {
                                                 </div>
 
                                                 <div className="col-span-2">
-                                                    <label className="text-xs font-bold text-gray-400 block mb-1">จำนวนเงิน</label>
-                                                    <input type="number" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none text-[#263A33]" />
+                                                    <label className="text-xs font-bold text-gray-400 block mb-1">จำนวนเงิน (บาท)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        value={transferAmount} 
+                                                        readOnly
+                                                        disabled
+                                                        className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none text-gray-500 cursor-not-allowed" 
+                                                    />
                                                 </div>
 
                                                 {paymentMethod === 'Bank' && (
                                                     <div className="col-span-2 space-y-3 pt-2 border-t border-dashed border-gray-200 mt-2 animate-in fade-in">
                                                         <label className="text-xs font-bold text-gray-400 block mb-1">ธนาคารของคุณ (ที่ใช้โอน)</label>
-                                                        <div className="flex flex-wrap gap-3">
+                                                        <div className="flex flex-wrap gap-2">
                                                             {BANKS.map((bank, idx) => (
                                                                 <div
                                                                     key={`${bank.id}-${idx}`}
                                                                     onClick={() => { setBankName(bank.name); setSelectedBank(bank); }}
-                                                                    style={{ borderColor: selectedBank.id === bank.id ? bank.color : '' }}
-                                                                    className={`w-14 h-14 rounded-2xl cursor-pointer flex items-center justify-center transition-all relative overflow-hidden shadow-sm p-1 bg-white ${selectedBank.id === bank.id ? 'ring-4 ring-offset-1 scale-110 z-10 border-2' : 'hover:scale-105 opacity-80 hover:opacity-100 border border-gray-100'}`}
+                                                                    className={`w-14 h-14 rounded-2xl cursor-pointer flex items-center justify-center transition-all relative overflow-hidden shadow-sm p-1
+                                                                        ${selectedBank.id === bank.id 
+                                                                            ? 'ring-2 ring-offset-2 ring-blue-400 scale-105 z-10' 
+                                                                            : 'opacity-90 hover:opacity-100 hover:scale-105 border border-gray-100'
+                                                                        }
+                                                                        `}
+                                                                    style={{ backgroundColor: bank.isColored ? '#ffffff' : bank.color }}
                                                                 >
-                                                                    <div className="w-full h-full rounded-xl flex items-center justify-center text-[10px] font-black text-white" style={{ backgroundColor: bank.color }}>
-                                                                        <img
+                                                                    {/* 🏦 Actual Bank Logo Image */}
+                                                                    <div 
+                                                                        className="w-full h-full rounded-xl flex items-center justify-center overflow-hidden" 
+                                                                    >
+                                                                         <img
                                                                             src={bank.iconUrl}
+                                                                            alt={bank.initials}
                                                                             className="w-full h-full object-contain"
-                                                                            onError={(e) => {
-                                                                                e.target.style.display = 'none';
-                                                                                e.target.parentElement.innerHTML = bank.initials;
-                                                                            }}
                                                                         />
                                                                     </div>
-                                                                    {selectedBank.id === bank.id && <div className="absolute inset-0 bg-white/20"></div>}
                                                                 </div>
                                                             ))}
                                                         </div>
                                                         <div className="bg-white/50 p-3 rounded-xl border border-gray-100 flex items-center gap-2">
                                                             <span className="text-xs font-bold text-gray-500">เลือก:</span>
-                                                            <span className="text-sm font-bold px-2 py-0.5 rounded text-white shadow-sm" style={{ backgroundColor: selectedBank.color }}>{selectedBank.name}</span>
+                                                            <span className="text-xs font-bold px-2 py-0.5 rounded text-white shadow-sm" style={{ backgroundColor: selectedBank.color }}>{selectedBank.name}</span>
                                                         </div>
 
 
@@ -1012,7 +1031,7 @@ function CheckoutPage() {
                     )}
 
                     <div className="lg:col-span-4 transition-all duration-500">
-                        <div className="bg-gray-900 p-8 rounded-[3rem] text-white shadow-xl sticky top-28">
+                        <div className="bg-gradient-to-br from-[#1a4d2e] to-[#143d24] p-8 rounded-[3rem] text-white shadow-xl shadow-green-900/30 sticky top-28">
                             <h2 className="text-xl font-black mb-6 border-b border-white/10 pb-4">สรุปคำสั่งซื้อ</h2>
                             <div className="space-y-4 mb-8 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
                                 {checkoutItems.map((item, idx) => {
@@ -1053,7 +1072,7 @@ function CheckoutPage() {
                             <div className="mb-6">
                                 <label className="text-[10px] font-bold text-white/60 mb-2 block uppercase tracking-widest flex justify-between">
                                     โค้ดส่วนลด
-                                    <button type="button" onClick={() => setShowCouponModal(true)} className="text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"><Tag size={10} /> เลือกคูปอง ({availableCoupons.length})</button>
+                                    <button type="button" onClick={() => setShowCouponModal(true)} className="text-white/80 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"><Tag size={10} /> เลือกคูปอง ({availableCoupons.length})</button>
                                 </label>
                                 <div className="flex bg-white/10 rounded-xl p-1 border border-white/10 focus-within:border-white/50 transition-colors">
                                     <div className="pl-3 flex items-center text-white/50"><Tag size={16} /></div>
@@ -1067,7 +1086,7 @@ function CheckoutPage() {
                                     {couponData ? (
                                         <button type="button" onClick={removeCoupon} className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">ลบ</button>
                                     ) : (
-                                        <button type="button" onClick={() => handleApplyCoupon(couponCode)} className="bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-600 transition disabled:bg-gray-400 disabled:text-gray-200">ใช้</button>
+                                        <button type="button" onClick={() => handleApplyCoupon(couponCode)} className="bg-white text-[#1a4d2e] px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-green-50 transition disabled:bg-gray-400 disabled:text-gray-200">ใช้</button>
                                     )}
                                 </div>
                                 {couponData && <p className="text-[10px] text-indigo-300 mt-2 flex items-center gap-1"><Check size={10} /> ลด {formatPrice(discount)}</p>}
@@ -1115,7 +1134,7 @@ function CheckoutPage() {
             {showCouponModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-                        <div className="p-4 bg-indigo-600 text-white flex justify-between items-center">
+                        <div className="p-4 bg-[#1a4d2e] text-white flex justify-between items-center">
                             <h3 className="font-bold text-lg flex items-center gap-2"><Tag size={20} /> เลือกคูปองส่วนลด</h3>
                             <button onClick={() => setShowCouponModal(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
                         </div>

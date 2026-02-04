@@ -35,7 +35,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         NEW_USER = 'new_user', 'New User'
         CUSTOMER = 'customer', 'Customer'
-        ADMIN = 'admin', 'Super Admin'
+        ADMIN = 'admin', 'Admin'
+        SUPER_ADMIN = 'super_admin', 'Super Admin'
 
     username = models.CharField(max_length=150, unique=True)
     first_name = models.CharField(max_length=150, blank=True)
@@ -67,11 +68,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Properties to map role to Django permissions
     @property
     def is_staff(self):
-        return self.role == 'admin'
+        return self.role in ['admin', 'super_admin']
 
     @property
     def is_superuser(self):
-        return self.role == 'admin'
+        return self.role == 'super_admin'
 
 # ==========================================
 # 🛒 Product System
@@ -701,6 +702,11 @@ class Order(models.Model):
     transfer_date = models.DateTimeField(null=True, blank=True)
     bank_name = models.CharField(max_length=100, null=True, blank=True)
     transfer_account_number = models.CharField(max_length=50, null=True, blank=True)
+
+    # 🚚 Tracking Info (Phase 8)
+    tracking_number = models.CharField(max_length=100, null=True, blank=True)
+    courier_name = models.CharField(max_length=100, null=True, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
     
     # Legacy Coupon Link (Keep for backward compat, but rely on applied_coupon for V2)
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='legacy_orders')

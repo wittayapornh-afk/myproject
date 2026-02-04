@@ -154,53 +154,102 @@ const CustomDateInput = forwardRef(({ value, onClick, label, icon: Icon, onQuick
     </div>
 ));
 
-// ✅ Thai Time Picker with Input & Validation
+// ✅ Thai Time Picker with Input & Validation (Enhanced with Long Press & Smart Lock)
 const ThaiTimePicker = ({ value, onDateChange, minDate }) => {
     const dateValue = value instanceof Date ? value : new Date();
     
-    // Adjust Time (Arrows)
-    const adjustDate = (type, direction) => {
-        const newDate = new Date(dateValue);
+    // ⌨️ Local State for Typing Handling
+    const [hInput, setHInput] = useState(dateValue.getHours().toString().padStart(2, '0'));
+    const [mInput, setMInput] = useState(dateValue.getMinutes().toString().padStart(2, '0'));
+
+    // ✅ Ref for Long Press to access latest state
+    const dateValueRef = useRef(dateValue);
+    useEffect(() => {
+        dateValueRef.current = dateValue;
+        setHInput(dateValue.getHours().toString().padStart(2, '0'));
+        setMInput(dateValue.getMinutes().toString().padStart(2, '0'));
+    }, [dateValue]);
+
+    // 🕒 Internal Adjust Logic (Pure)
+    const calculateNewDate = (baseDate, type, direction) => {
+        const newDate = new Date(baseDate);
         if (type === 'mm') {
             newDate.setMinutes(newDate.getMinutes() + direction);
         } else {
             newDate.setHours(newDate.getHours() + direction);
         }
-        
-        // ✅ V3 Validation: Allow Future Adjustments, Block Past (Minute Precision)
-        const now = new Date();
-        const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
-        const targetMinute = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), newDate.getHours(), newDate.getMinutes());
-
-        if (targetMinute < currentMinute) return; // Block strictly past minutes
-        
-        onDateChange(newDate);
+        return newDate;
     };
 
-    // Manual Input
-    const handleInputChange = (type, val) => {
-        let num = parseInt(val, 10);
-        if (isNaN(num)) return; // Don't update if not number
+    // ⚡ Long Press Handler
+    const handleLongPress = (type, direction) => {
+        const validateAndClamp = (targetDate) => {
+            const now = new Date();
+            const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
+            const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), targetDate.getHours(), targetDate.getMinutes());
+            
+            // If target is in the past, return Current Time (Clamp)
+            // This allows moving from Past -> Present, and prevents Future -> Past
+            if (target < currentMinute) {
+                return currentMinute; 
+            }
+            return targetDate;
+        };
 
+        // 1. Immediate Trigger
+        const initialDate = dateValueRef.current;
+        const newDate = calculateNewDate(initialDate, type, direction);
+        onDateChange(validateAndClamp(newDate));
+
+        // 2. Interval Trigger
+        const interval = setInterval(() => {
+            const currentBase = dateValueRef.current;
+            const nextDate = calculateNewDate(currentBase, type, direction);
+            onDateChange(validateAndClamp(nextDate));
+        }, 100);
+
+        const cleanup = () => {
+            clearInterval(interval);
+            document.removeEventListener('mouseup', cleanup);
+            document.removeEventListener('mouseleave', cleanup);
+        };
+        document.addEventListener('mouseup', cleanup);
+        document.addEventListener('mouseleave', cleanup);
+    };
+
+    // Manual Input Commit
+    const handleInputCommit = (type) => {
         const newDate = new Date(dateValue);
-        
+        let val = 0;
         if (type === 'hh') {
-            num = Math.max(0, Math.min(23, num)); 
-            newDate.setHours(num);
+            val = parseInt(hInput.replace(/[^0-9]/g, '') || '0');
+            val = Math.min(Math.max(val, 0), 23);
+            newDate.setHours(val);
         } else {
-            num = Math.max(0, Math.min(59, num)); 
-            newDate.setMinutes(num);
+            val = parseInt(mInput.replace(/[^0-9]/g, '') || '0');
+            val = Math.min(Math.max(val, 0), 59);
+            newDate.setMinutes(val);
         }
-
-        // ✅ V3 Validation: Allow Future Adjustments, Block Past (Minute Precision)
+        
+        // Smart Lock Validation
         const now = new Date();
         const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
         const targetMinute = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), newDate.getHours(), newDate.getMinutes());
 
         if (targetMinute < currentMinute) {
-             onDateChange(new Date(now)); // Snap to now if invalid
-        } else {
-             onDateChange(newDate);
+             // Rollback if invalid past time
+             setHInput(dateValue.getHours().toString().padStart(2, '0'));
+             setMInput(dateValue.getMinutes().toString().padStart(2, '0'));
+             return;
+        }
+
+        onDateChange(newDate);
+    };
+
+    const handleKeyDown = (e, type) => {
+        if (e.key === 'Enter') {
+            e.currentTarget.blur();
+            handleInputCommit(type);
         }
     };
 
@@ -213,26 +262,32 @@ const ThaiTimePicker = ({ value, onDateChange, minDate }) => {
             <div className="flex items-center gap-3">
                 {/* Hour */}
                 <div className="flex flex-col items-center">
-                    <button type="button" onClick={() => adjustDate('hh', 1)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"><ChevronUp size={14}/></button>
+                    <button type="button" onMouseDown={() => handleLongPress('hh', 1)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all outline-none md:active:scale-90"><ChevronUp size={14}/></button>
                     <input 
-                        type="number" 
-                        value={dateValue.getHours().toString().padStart(2,'0')}
-                        onChange={(e) => handleInputChange('hh', e.target.value)}
-                        className="text-xl font-black text-indigo-900 w-12 text-center bg-transparent border-none focus:ring-0 p-0 appearance-none"
+                        type="text" 
+                        value={hInput}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setHInput(e.target.value)}
+                        onBlur={() => handleInputCommit('hh')}
+                        onKeyDown={(e) => handleKeyDown(e, 'hh')}
+                        className="text-xl font-black text-indigo-900 w-12 text-center bg-transparent border-none focus:ring-0 p-0 appearance-none outline-none"
                     />
-                    <button type="button" onClick={() => adjustDate('hh', -1)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"><ChevronDown size={14}/></button>
+                    <button type="button" onMouseDown={() => handleLongPress('hh', -1)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all outline-none md:active:scale-90"><ChevronDown size={14}/></button>
                 </div>
                 <span className="text-gray-300 font-bold">:</span>
                 {/* Minute */}
                 <div className="flex flex-col items-center">
-                    <button type="button" onClick={() => adjustDate('mm', 1)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"><ChevronUp size={14}/></button>
+                    <button type="button" onMouseDown={() => handleLongPress('mm', 1)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all outline-none md:active:scale-90"><ChevronUp size={14}/></button>
                     <input 
-                        type="number" 
-                        value={dateValue.getMinutes().toString().padStart(2,'0')}
-                        onChange={(e) => handleInputChange('mm', e.target.value)}
-                        className="text-xl font-black text-indigo-900 w-12 text-center bg-transparent border-none focus:ring-0 p-0 appearance-none"
+                        type="text" 
+                        value={mInput}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setMInput(e.target.value)}
+                        onBlur={() => handleInputCommit('mm')}
+                        onKeyDown={(e) => handleKeyDown(e, 'mm')}
+                        className="text-xl font-black text-indigo-900 w-12 text-center bg-transparent border-none focus:ring-0 p-0 appearance-none outline-none"
                     />
-                    <button type="button" onClick={() => adjustDate('mm', -1)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"><ChevronDown size={14}/></button>
+                    <button type="button" onMouseDown={() => handleLongPress('mm', -1)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all outline-none md:active:scale-90"><ChevronDown size={14}/></button>
                 </div>
             </div>
         </div>
