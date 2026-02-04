@@ -357,8 +357,26 @@ def products_api(request):
         if in_stock == 'true':
             products = products.filter(stock__gt=0)
 
+        # ✅ Smart Search (Multi-field & Multi-word)
         if search:
-            products = products.filter(title__icontains=search)
+            # 1. Split search query into individual keywords (e.g., "iphone case" -> ["iphone", "case"])
+            keywords = search.strip().split()
+            
+            # 2. Build a complex query: Each keyword must match AT LEAST ONE field
+            # (AND logic for keywords, OR logic for fields)
+            # This ensures "iphone case" matches a product with "iPhone" in title and "Case" in category.
+            final_query = Q()
+            for word in keywords:
+                word_query = (
+                    Q(title__icontains=word) | 
+                    Q(description__icontains=word) | 
+                    Q(category__name__icontains=word) | 
+                    Q(brand__icontains=word) | 
+                    Q(tags__name__icontains=word)
+                )
+                final_query &= word_query
+            
+            products = products.filter(final_query).distinct()
 
         paginator = PageNumberPagination()
         paginator.page_size = 50
@@ -1748,9 +1766,24 @@ def tag_api(request, tag_id=None):
         try:
             from .models import Tag
             from .serializers import TagSerializer
+            from django.utils import timezone
+            from django.db.models import Count, Q
             
-            # ดึง Tags ทั้งหมด เรียงตามกลุ่ม และชื่อ
-            tags = Tag.objects.all().order_by('group_name', 'name')
+            # ดึง Tags โดยกรอง:
+            # 1. ยังไม่หมดอายุ (expiration_date IS NULL หรือ >= วันนี้)
+            # 2. มีสินค้าที่ active อย่างน้อย 1 ชิ้น (และ stock > 0 ถ้าเป็นการใช้งานจริง)
+            today = timezone.now().date()
+            
+            tags = Tag.objects.annotate(
+                active_product_count=Count(
+                    'products',  # ✅ Fixed: Use 'products' (plural) to match related_name
+                    filter=Q(products__is_active=True, products__stock__gt=0)
+                )
+            ).filter(
+                Q(expiration_date__isnull=True) | Q(expiration_date__gte=today),
+                active_product_count__gt=0  # มีสินค้า Active อย่างน้อย 1 ชิ้น
+            ).order_by('group_name', 'name')
+            
             serializer = TagSerializer(tags, many=True)
             
             return Response(serializer.data)
@@ -2101,7 +2134,12 @@ def get_products_by_tags_api(request):
     try:
         from .models import Product
         # Filter products that match ANY of the tags
-        products = Product.objects.filter(tags__id__in=tag_ids, is_active=True).distinct()
+        # ✅ New: Only include products with stock > 0 and is_active=True
+        products = Product.objects.filter(
+            tags__id__in=tag_ids, 
+            is_active=True,
+            stock__gt=0  # ✅ กรองสินค้าที่หมดสต็อก
+        ).distinct()
         
         # Serialize only needed fields
         data = []
@@ -2223,14 +2261,22 @@ def get_public_coupons(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_active_flash_sales_api(request):
-    now = timezone.now()
-    active_flash_sales = FlashSale.objects.filter(
-        # start_time__lte=now, # ✅ Allow showing upcoming/recent Flash Sales
-        end_time__gte=now,
-        is_active=True
-    ).order_by('-id') # ✅ Show NEWEST created Flash Sale first (instead of soonest ending)
-    serializer = FlashSaleSerializer(active_flash_sales, many=True)
-    return Response(serializer.data)
+    try:
+        now = timezone.now()
+        active_flash_sales = FlashSale.objects.filter(
+            # start_time__lte=now, # ✅ Allow showing upcoming/recent Flash Sales
+            end_time__gte=now,
+            is_active=True
+        ).order_by('-id') # ✅ Show NEWEST created Flash Sale first (instead of soonest ending)
+        
+        # Log count
+        logger.info(f"Active Flash Sales Count: {active_flash_sales.count()}")
+        
+        serializer = FlashSaleSerializer(active_flash_sales, many=True)
+        return Response(serializer.data)
+    except Exception as e:
+        logger.error(f"Error fetching active flash sales: {str(e)}\n{traceback.format_exc()}")
+        return Response({"error": str(e)}, status=500)
 
 # --- Admin Coupon Management ---
 @api_view(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
@@ -3402,3 +3448,67 @@ def get_my_coupons_api(request):
     except Exception as e:
         logger.error(f"Get My Coupons Error: {str(e)}")
         return Response({'message': 'เกิดข้อผิดพลาดในการดึงข้อมูลคูปอง'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ==========================================
+# 🏷️ Tag Slug API (For Landing Pages)
+# ==========================================
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def tag_by_slug_api(request, slug):
+    try:
+        from .models import Tag
+        from .serializers import TagSerializer
+        
+        tag = Tag.objects.get(slug=slug)
+        serializer = TagSerializer(tag)
+        return Response(serializer.data)
+    except Tag.DoesNotExist:
+        return Response({"error": "Tag not found"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+# ==========================================
+# 🗺️ Dynamic Sitemap (SEO)
+# ==========================================
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def sitemap_xml(request):
+    """
+    Generate dynamic sitemap.xml for SEO
+    Includes: Static Pages, Tag Pages
+    """
+    from .models import Tag
+    
+    # 1. Base URL
+    base_url = "https://myshop.com" # Change to actual domain in prod
+    
+    # 2. Static Pages
+    urls = [
+        f"{base_url}/",
+        f"{base_url}/shop",
+        f"{base_url}/flash-sale",
+        f"{base_url}/coupons",
+    ]
+    
+    # 3. Dynamic Tag Pages
+    tags = Tag.objects.filter(is_active=True)
+    for tag in tags:
+        if tag.slug:
+            urls.append(f"{base_url}/tag/{tag.slug}")
+            
+    # 4. Generate XML
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    
+    for url in urls:
+        xml_content += '  <url>\n'
+        xml_content += f'    <loc>{url}</loc>\n'
+        xml_content += '    <changefreq>daily</changefreq>\n'
+        xml_content += '    <priority>0.8</priority>\n'
+        xml_content += '  </url>\n'
+        
+    xml_content += '</urlset>'
+    
+    return HttpResponse(xml_content, content_type="application/xml")
+
+# ✅ Trigger Reload

@@ -34,6 +34,7 @@ urlpatterns = [
     path('api/products/<int:product_id>/tags/', views.product_tags_api, name='product_tags'),  # POST: กำหนด Tags ให้สินค้า
     path('api/tags/automation/run/', views.run_tag_automation_api), # ✅ Add Automation API
     path('api/products/bulk-update-tags/', views.bulk_update_tags_api), # ✅ Add Bulk Update API
+    path('api/tags/<str:slug>/', views.tag_by_slug_api, name='tag_by_slug'), # ✅ Tag by Slug
     
     # ✅ แก้เป็น products (เติม s) ให้ตรงกับ Frontend
     path('api/products/<int:product_id>/', views.product_detail_api),
@@ -64,7 +65,6 @@ urlpatterns = [
     path('api/admin/campaigns/<int:campaign_id>/', views.admin_campaign_api),
     path('api/admin/campaigns/<int:campaign_id>/flash-sales/', views.get_campaign_flash_sales),
     path('api/orders/<int:order_id>/confirm-received/', views.confirm_received_api), # ✅ Confirm Received
-    path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
     path('api/upload_slip/<int:order_id>/', views.upload_slip), # ✅ Upload Slip
     path('api/payment/promptpay_payload/', views.generate_promptpay_qr_api), # ✅ Helper for Checkout UI
     
@@ -111,5 +111,10 @@ urlpatterns = [
     # 5. Activity Logs (Admin)
     path('api/admin/logs/', views.get_admin_logs),
     path('api/admin/stock-history/', views.get_all_stock_history), # ✅ Global Stock History
+    
+    # ==============================
+    # 🌍 SEO Utilities
+    # ==============================
+    path('sitemap.xml', views.sitemap_xml), # ✅ Dynamic Sitemap
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -6,7 +6,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
-  font-family: 'Sarabun', sans-serif;
+  font-family: "Sarabun", sans-serif;
 }
 
 /* Header Section */
@@ -42,11 +42,11 @@
 
 /* Create Tag Section */
 .create-tag-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #581c87 0%, #7c3aed 100%);
   padding: 2rem;
   border-radius: 12px;
   margin-bottom: 2rem;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(88, 28, 135, 0.3);
 }
 
 .create-tag-section h2 {
@@ -69,7 +69,7 @@
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.95);
   transition: all 0.3s ease;
-  font-family: 'Sarabun', sans-serif;
+  font-family: "Sarabun", sans-serif;
 }
 
 .tag-input:focus {
@@ -89,12 +89,12 @@
   font-size: 1rem;
   font-weight: 600;
   background: white;
-  color: #667eea;
+  color: #581c87;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-family: 'Sarabun', sans-serif;
+  font-family: "Sarabun", sans-serif;
   white-space: nowrap;
 }
 
@@ -161,8 +161,8 @@
 }
 
 .tag-card:hover {
-  border-color: #667eea;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  border-color: #581c87;
+  box-shadow: 0 4px 12px rgba(88, 28, 135, 0.15);
   transform: translateY(-2px);
 }
 
@@ -175,8 +175,8 @@
 .tag-badge {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #667eea;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #581c87;
+  background: linear-gradient(135deg, #581c87 0%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -213,7 +213,7 @@
   background: #f8f9fa;
   padding: 1.5rem;
   border-radius: 10px;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid #581c87;
 }
 
 .usage-guide h3 {
@@ -236,7 +236,7 @@
 }
 
 .usage-guide strong {
-  color: #667eea;
+  color: #581c87;
   font-weight: 600;
 }
 

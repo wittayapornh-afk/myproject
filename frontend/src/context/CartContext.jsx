@@ -17,26 +17,58 @@ export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [isInitialized, setIsInitialized] = useState(false); // ✅ ป้องกัน Save ทับข้อมูลตอนโหลด
 
-  // 1. โหลดข้อมูลเมื่อ User เปลี่ยน (Login/Logout)
+  // 1. โหลดข้อมูลเมื่อ User เปลี่ยน (Login/Logout) และ Merge Guest Cart
   useEffect(() => {
     setIsInitialized(false); // Reset ก่อนโหลดใหม่
     const key = getCartKey();
     const savedCart = localStorage.getItem(key);
     console.log(`🛍️ [CartContext] Loading cart for key: ${key}`);
     
+    let loadedItems = [];
+
     if (savedCart) {
       try {
-          const parsed = JSON.parse(savedCart);
-          console.log(`✅ [CartContext] Restored ${parsed.length} items from localStorage`);
-          setCartItems(parsed);
+          loadedItems = JSON.parse(savedCart);
+          console.log(`✅ [CartContext] Restored ${loadedItems.length} items from localStorage`);
       } catch (e) {
           console.error("❌ Link Cart Parse Error", e);
-          setCartItems([]);
       }
     } else {
       console.warn(`⚠️ [CartContext] No saved cart found for key: ${key}`);
-      setCartItems([]);
     }
+
+    // ✅ Merge Guest Cart Logic (ย้ายของจากตะกร้า Guest เข้า User)
+    if (user) {
+        const guestCartJSON = localStorage.getItem('cart_guest');
+        if (guestCartJSON) {
+            try {
+                const guestItems = JSON.parse(guestCartJSON);
+                if (guestItems.length > 0) {
+                    console.log(`🔀 [CartContext] Merging ${guestItems.length} guest items into user cart...`);
+                    
+                    // Merge Strategy: Accumulate quantities
+                    guestItems.forEach(gItem => {
+                        const existingIndex = loadedItems.findIndex(i => i.id === gItem.id);
+                        if (existingIndex > -1) {
+                            loadedItems[existingIndex].quantity += gItem.quantity;
+                        } else {
+                            loadedItems.push(gItem);
+                        }
+                    });
+
+                    // 🗑️ Clear guest cart after merge
+                    localStorage.removeItem('cart_guest');
+                    
+                    // 💾 Save immediately so we don't lose the merge if refresh happens fast
+                    localStorage.setItem(key, JSON.stringify(loadedItems));
+                }
+            } catch (e) {
+                console.error("❌ Guest Cart Merge Error", e);
+            }
+        }
+    }
+
+    setCartItems(loadedItems);
     setIsInitialized(true); // ✅ โหลดเสร็จแล้ว อนุญาตให้บันทึกได้
   }, [user]); // ทำงานเมื่อ user เปลี่ยน
 

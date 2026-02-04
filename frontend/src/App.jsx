@@ -35,7 +35,9 @@ import MarketingPopup from './components/MarketingPopup'; // ✅ Global Popup
 import FlashSaleManagement from './components/FlashSaleManagement'; // ✅ Flash Sale Management
 import FlashSalePage from './components/FlashSalePage'; // ✅ Flash Sale Page
 import MyCoupons from './components/MyCoupons'; // ✅ My Coupons Page
+
 import TagManagement from './components/TagManagement'; // 🏷️ Tag Management
+import TagPage from './components/TagPage'; // 🏷️ Tag Landing Page
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -94,6 +96,7 @@ const AppContent = () => {
 
               {/* ✅ จุดสำคัญ: เส้นทางต้องตรงกับ Link ใน ProductList */}
               <Route path="/product/:id" element={<ProductDetail />} />
+              <Route path="/tag/:slug" element={<TagPage />} />
 
               <Route path="/cart" element={<CartPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />

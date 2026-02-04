@@ -262,6 +262,24 @@ function ProductDetail() {
 
   const handleBuyNow = () => {
       if (product) {
+          // 🔒 Login Gate Check
+          if (!user) {
+              Swal.fire({
+                  title: 'กรุณาเข้าสู่ระบบ',
+                  text: 'คุณต้องเข้าสู่ระบบสมาชิกก่อนซื้อสินค้า',
+                  icon: 'info',
+                  showCancelButton: true,
+                  confirmButtonText: 'เข้าสู่ระบบ',
+                  cancelButtonText: 'ยกเลิก',
+                  confirmButtonColor: '#1a4d2e',
+              }).then((result) => {
+                  if (result.isConfirmed) {
+                      navigate('/login');
+                  }
+              });
+              return;
+          }
+
           // Send specific item to checkout directly (bypass cart context temporarily)
           navigate('/checkout', { state: { directBuyItem: product, quantity: quantity } });
       }
@@ -275,36 +293,61 @@ function ProductDetail() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans selection:bg-indigo-600 selection:text-white pb-20 text-gray-900">
       
-      {/* 🌟 Sticky Header for Navigation */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 h-20 flex justify-between items-center">
-             <button onClick={() => navigate('/shop')} className="group flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-bold transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-gray-50/50 flex items-center justify-center border border-transparent group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-all">
-                    <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform"/>
-                </div>
-                <span className="hidden md:inline">Back to Shop</span>
-             </button>
+      {/* 🌟 New Sticky Header & Breadcrumb */}
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm transition-all duration-300">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
+               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                   <div className="flex-1">
+                       {/* Breadcrumb */}
+                       <nav className="flex items-center gap-2 text-xs font-medium text-gray-400 mb-2">
+                            <Link to="/" className="hover:text-[#1a4d2e] transition-colors">หน้าแรก</Link>
+                            <ChevronRight size={12} />
+                            <Link to="/shop" className="hover:text-[#1a4d2e] transition-colors">สินค้าทั้งหมด</Link>
+                            <ChevronRight size={12} />
+                            <span className="text-[#1a4d2e] font-bold line-clamp-1">{product.title}</span>
+                       </nav>
 
-             <div className="flex items-center gap-3">
-                 {product.prev_id && (
-                     <button onClick={() => navigate(`/product/${product.prev_id}`)} className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 hover:border-indigo-600 transition-all text-gray-400 hover:text-indigo-600">
-                         <ChevronLeft size={20} />
-                     </button>
-                 )}
-                 {/* ✅ Safe Navigation Logic */}
-                 {(product.next_id || (relatedProducts.length > 0 && relatedProducts[0]?.id)) && (
-                     <button 
-                        onClick={() => {
-                            const nextId = product.next_id || (relatedProducts.length > 0 ? relatedProducts[0].id : null);
-                            if (nextId) navigate(`/product/${nextId}`);
-                        }} 
-                        className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 shadow-lg hover:shadow-indigo-900/20 transition-all hover:translate-x-0.5"
-                     >
-                         <ChevronRight size={20} />
-                     </button>
-                 )}
-             </div>
-        </div>
+                       <div className="flex items-center gap-4">
+                           <div className="w-12 h-12 bg-[#1a4d2e] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-green-900/20 rotate-3 transition-transform hover:rotate-6">
+                               <Package size={24} />
+                           </div>
+                           <div>
+                                <h1 className="text-2xl font-black text-[#263A33] tracking-tight uppercase flex items-center gap-3">
+                                    รายละเอียดสินค้า
+                                </h1>
+                                <p className="text-gray-400 text-xs font-bold mt-1">ข้อมูลและรายละเอียดครบถ้วน</p>
+                           </div>
+                       </div>
+                   </div>
+
+                   {/* Controls (Back & Nav) */}
+                   <div className="flex items-center gap-3">
+                         <button onClick={() => navigate('/shop')} className="group flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-bold transition-colors pr-4 border-r border-gray-200">
+                            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-indigo-50 transition-all">
+                                <ArrowLeft size={18} />
+                            </div>
+                            <span className="hidden lg:inline text-xs">กลับหน้ารวม</span>
+                         </button>
+
+                         {product.prev_id && (
+                             <button onClick={() => navigate(`/product/${product.prev_id}`)} className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 hover:border-indigo-600 transition-all text-gray-400 hover:text-indigo-600">
+                                 <ChevronLeft size={20} />
+                             </button>
+                         )}
+                         {(product.next_id || (relatedProducts.length > 0 && relatedProducts[0]?.id)) && (
+                             <button 
+                                onClick={() => {
+                                    const nextId = product.next_id || (relatedProducts.length > 0 ? relatedProducts[0].id : null);
+                                    if (nextId) navigate(`/product/${nextId}`);
+                                }} 
+                                className="w-10 h-10 rounded-xl bg-[#1a4d2e] text-white flex items-center justify-center hover:bg-[#143d24] shadow-lg shadow-green-900/20 transition-all"
+                             >
+                                 <ChevronRight size={20} />
+                             </button>
+                         )}
+                   </div>
+               </div>
+          </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 mt-8">
@@ -483,9 +526,45 @@ function ProductDetail() {
 
                       {!isRestricted && !isOutOfStock && (
                          <div className="flex items-center bg-gray-100/80 rounded-[1.2rem] p-1.5 border border-white shadow-inner">
-                             <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors"><Minus size={18}/></button>
+                             <button 
+                                 type="button"
+                                 onMouseDown={() => {
+                                     setQuantity(prev => Math.max(1, prev - 1));
+                                     const interval = setInterval(() => {
+                                         setQuantity(prev => Math.max(1, prev - 1));
+                                     }, 100);
+                                     const cleanup = () => {
+                                         clearInterval(interval);
+                                         document.removeEventListener('mouseup', cleanup);
+                                         document.removeEventListener('mouseleave', cleanup);
+                                     };
+                                     document.addEventListener('mouseup', cleanup);
+                                     document.addEventListener('mouseleave', cleanup);
+                                 }}
+                                 className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors active:scale-95 touch-manipulation"
+                             >
+                                 <Minus size={18}/>
+                             </button>
                              <span className="font-black text-xl w-12 text-center text-gray-900">{quantity}</span>
-                             <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-600 hover:text-indigo-600 transition-colors"><Plus size={18}/></button>
+                             <button 
+                                 type="button"
+                                 onMouseDown={() => {
+                                     setQuantity(prev => Math.min(product.stock, prev + 1));
+                                     const interval = setInterval(() => {
+                                         setQuantity(prev => Math.min(product.stock, prev + 1));
+                                     }, 100);
+                                     const cleanup = () => {
+                                         clearInterval(interval);
+                                         document.removeEventListener('mouseup', cleanup);
+                                         document.removeEventListener('mouseleave', cleanup);
+                                     };
+                                     document.addEventListener('mouseup', cleanup);
+                                     document.addEventListener('mouseleave', cleanup);
+                                 }}
+                                 className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-600 hover:text-indigo-600 transition-colors active:scale-95 touch-manipulation"
+                             >
+                                 <Plus size={18}/>
+                             </button>
                          </div>
                       )}
 

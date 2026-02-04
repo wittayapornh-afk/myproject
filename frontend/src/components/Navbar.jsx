@@ -312,6 +312,13 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                     placeholder="ค้นหาสินค้า แบรนด์ หรือโปรโมชั่น..." 
                     className="w-full pl-12 pr-4 py-3 bg-[#F4F4F5] border-2 border-transparent focus:border-[#1a4d2e] rounded-2xl text-sm font-medium transition-all duration-300 outline-none shadow-sm focus:bg-white focus:shadow-lg placeholder-gray-400 text-gray-700"
                     onChange={(e) => handleSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && searchQuery.trim()) {
+                            navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+                            setShowNotifications(false); // Close other dropdowns
+                            setSearchResults([]); // Close suggestions
+                        }
+                    }}
                     onFocus={() => {
                         if (!searchQuery) {
                              axios.get(`${API_BASE_URL}/api/products/`).then(res => {

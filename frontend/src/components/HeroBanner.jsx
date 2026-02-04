@@ -89,6 +89,8 @@ const HeroBanner = () => {
                         };
                         flashItems.push(eventSlide);
 
+                        /* 
+                        // ❌ DISABLED: Don't show individual flash sale products in Hero (User Request)
                         if (activeFS.products && activeFS.products.length > 0) {
                             const fsProducts = activeFS.products.map(p => ({
                                 id: p.product || p.id,
@@ -102,6 +104,7 @@ const HeroBanner = () => {
                             }));
                             flashItems = [...flashItems, ...fsProducts];
                         }
+                        */
                     }
                 } catch (e) { 
                     console.warn("⚠️ No active flash sale:", e); 
@@ -471,18 +474,19 @@ const HeroBanner = () => {
             </AnimatePresence>
 
             {/* Navigation Controls */}
+            {/* Navigation Controls - ✅ Enhanced Visibility */}
             <button 
                 onClick={prevSlide}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all shadow-lg hover:scale-110 group"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-black/40 backdrop-blur-md border border-white/30 text-white flex items-center justify-center hover:bg-black/60 hover:border-white/50 transition-all shadow-xl hover:scale-110 group active:scale-95"
             >
-                <ChevronLeft size={24} className="group-hover:-translate-x-0.5 transition-transform" />
+                <ChevronLeft size={32} className="group-hover:-translate-x-1 transition-transform drop-shadow-md" />
             </button>
 
             <button 
                 onClick={nextSlide}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all shadow-lg hover:scale-110 group"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-black/40 backdrop-blur-md border border-white/30 text-white flex items-center justify-center hover:bg-black/60 hover:border-white/50 transition-all shadow-xl hover:scale-110 group active:scale-95"
             >
-                <ChevronRight size={24} className="group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight size={32} className="group-hover:translate-x-1 transition-transform drop-shadow-md" />
             </button>
 
             {/* Pagination Dots */}

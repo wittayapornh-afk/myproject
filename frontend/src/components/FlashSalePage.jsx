@@ -244,16 +244,37 @@ const FlashSalePage = () => {
                                                             </div>
 
                                                             {/* 📊 Progress Bar: แสดงจำนวนที่ขายไป */}
-                                                            <div className="bg-orange-100 rounded-full h-3 w-full relative overflow-hidden mb-4">
-                                                                {/* แถบเติม (สีส้ม-แดง) */}
+                                                            <div className="bg-gray-100 rounded-full h-3 w-full relative overflow-hidden mb-4 border border-gray-200">
+                                                                {/* แถบเติม (Dynamic Color) */}
                                                                 <div 
-                                                                    className={`absolute top-0 left-0 h-full ${isUpcoming ? 'bg-gray-300' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}
+                                                                    className={`absolute top-0 left-0 h-full transition-all duration-500 ${
+                                                                        isUpcoming 
+                                                                            ? 'bg-gray-300' 
+                                                                            : soldPercent >= 80 
+                                                                                ? 'bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 animate-gradient-x' // 🔥 Hot
+                                                                                : soldPercent >= 50 
+                                                                                    ? 'bg-gradient-to-r from-orange-400 to-orange-600' // 🟠 Warm
+                                                                                    : 'bg-green-500' // 🟢 Normal
+                                                                    }`}
                                                                     style={{ width: `${Math.min(soldPercent, 100)}%` }}
                                                                 ></div>
+                                                                
                                                                 {/* ข้อความจำนวนที่ขาย */}
-                                                                <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-orange-900 uppercase">
-                                                                    {isUpcoming ? 'Not Started' : (item.sold_count >= item.quantity_limit ? 'Sold Out' : `Sold ${item.sold_count}`)}
-                                                                </span>
+                                                                <div className="absolute inset-0 flex items-center justify-center text-[9px] font-black uppercase tracking-widest z-10 px-2 drop-shadow-sm">
+                                                                    {isUpcoming ? (
+                                                                        <span className="text-gray-400">เตรียมตัวให้พร้อม</span>
+                                                                    ) : item.sold_count >= item.quantity_limit ? (
+                                                                        <span className="text-gray-500">SOLD OUT</span>
+                                                                    ) : (
+                                                                        <div className="flex justify-between w-full text-gray-600">
+                                                                             {/* 🔥 Fire Icon if Hot */}
+                                                                             {soldPercent >= 80 && !isUpcoming && <Flame size={10} className="text-red-500 animate-bounce" fill="currentColor" />}
+                                                                             <span className={soldPercent >= 80 ? "text-red-600 animate-pulse" : ""}>
+                                                                                 {soldPercent >= 90 ? `เหลือ ${item.quantity_limit - item.sold_count} ชิ้น!` : `ขายแล้ว ${item.sold_count}`}
+                                                                             </span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
 
                                                             {/* 🛒 ปุ่ม Action */}
@@ -301,8 +322,8 @@ const FlashSalePage = () => {
 // แสดงนับถอยหลังเวลา Flash Sale
 // ========================================
 const CountdownTimer = ({ targetTime, label = "Ending in" }) => {
-    // 📊 State: เก็บเวลาที่เหลือ (ชั่วโมง, นาที, วินาที)
-    const [timeLeft, setTimeLeft] = useState({ h: 0, m: 0, s: 0 });
+    // 📊 State: เก็บเวลาที่เหลือ (ชั่วโมง, นาที, วินาที, มิลลิวินาที)
+    const [timeLeft, setTimeLeft] = useState({ h: 0, m: 0, s: 0, ms: 0 });
 
     useEffect(() => {
         // 🧮 Function คำนวณเวลาที่เหลือ
@@ -313,27 +334,50 @@ const CountdownTimer = ({ targetTime, label = "Ending in" }) => {
                     h: Math.floor((diff / (1000 * 60 * 60))),     // ชั่วโมง
                     m: Math.floor((diff / 1000 / 60) % 60),       // นาที
                     s: Math.floor((diff / 1000) % 60),            // วินาที
+                    ms: Math.floor((diff % 1000) / 10),           // มิลลิวินาที (2 หลัก)
                 });
             } else {
-                setTimeLeft({ h: 0, m: 0, s: 0 }); // หมดเวลา/ถึงเวลา
+                setTimeLeft({ h: 0, m: 0, s: 0, ms: 0 }); // หมดเวลา/ถึงเวลา
             }
         };
         
         calculate(); // คำนวณครั้งแรก
-        const timer = setInterval(calculate, 1000); // อัพเดตทุก 1 วินาที
+        const timer = setInterval(calculate, 77); // อัพเดตถี่ขึ้นเพื่อเลขวิ่ง (77ms เพื่อให้ดูเป็นธรรมชาติ)
         return () => clearInterval(timer); // ล้าง Timer เมื่อ Component ถูกลบ
     }, [targetTime]);
 
     return (
-        <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{label}</span>
+        <div className="flex items-center gap-3 bg-black/80 backdrop-blur-sm p-3 rounded-2xl border border-white/10 shadow-xl">
+            <div className="flex flex-col items-end">
+                <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">{label}</span>
+                <div className="flex items-center gap-1 text-white">
+                     <Clock size={12} className="text-orange-500 animate-pulse" />
+                </div>
+            </div>
+            
             {/* แสดงนาฬิกานับถอยหลัง */}
-            <div className="flex gap-1 text-white font-black text-lg">
-                <div className="bg-gray-800 px-2 py-1 rounded">{String(timeLeft.h).padStart(2, '0')}</div>
-                <span className="text-gray-800 self-center">:</span>
-                <div className="bg-gray-800 px-2 py-1 rounded">{String(timeLeft.m).padStart(2, '0')}</div>
-                <span className="text-gray-800 self-center">:</span>
-                <div className="bg-gray-800 px-2 py-1 rounded">{String(timeLeft.s).padStart(2, '0')}</div>
+            <div className="flex gap-1 items-end font-mono">
+                {/* Hours */}
+                <div className="bg-gray-800 text-white font-black text-xl w-10 h-10 flex items-center justify-center rounded-lg shadow-inner">
+                    {String(timeLeft.h).padStart(2, '0')}
+                </div>
+                <span className="text-gray-400 font-bold mb-2">:</span>
+                
+                {/* Minutes */}
+                <div className="bg-gray-800 text-white font-black text-xl w-10 h-10 flex items-center justify-center rounded-lg shadow-inner">
+                    {String(timeLeft.m).padStart(2, '0')}
+                </div>
+                <span className="text-gray-400 font-bold mb-2">:</span>
+                
+                {/* Seconds */}
+                <div className="bg-orange-600 text-white font-black text-xl w-10 h-10 flex items-center justify-center rounded-lg shadow-lg shadow-orange-900/50">
+                    {String(timeLeft.s).padStart(2, '0')}
+                </div>
+                
+                {/* Milliseconds (เล็กๆ) */}
+                <div className="bg-gray-900 text-orange-400 font-bold text-xs w-6 h-6 flex items-center justify-center rounded mb-1 border border-orange-500/30">
+                     {String(timeLeft.ms).padStart(2, '0')}
+                </div>
             </div>
         </div>
     );
