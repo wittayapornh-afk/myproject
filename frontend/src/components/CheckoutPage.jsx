@@ -2,15 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { MapPin, Truck, CreditCard, ChevronLeft, ArrowRight, ShieldCheck, Mail, Phone, User, Upload, Check, X, Image as ImageIcon, Tag, Zap, ArrowLeft, QrCode, Landmark, Package, Home, Briefcase } from 'lucide-react';
+import AddressModal from './AddressModal';
 import Swal from 'sweetalert2';
 import axios from 'axios';
-import { MapPin, Truck, CreditCard, ChevronLeft, ArrowRight, ShieldCheck, Mail, Phone, User, Upload, Check, X, Image as ImageIcon, Tag, Zap, ArrowLeft, QrCode, Landmark, Package } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+const RecenterAutomatically = ({ lat, lng }) => {
+    const map = useMap();
+    useEffect(() => {
+        if (lat && lng) {
+            map.setView([lat, lng], map.getZoom());
+        }
+    }, [lat, lng]);
+    return null;
+};
 
 // Fix Leaflet Marker
 delete L.Icon.Default.prototype._getIconUrl;
@@ -240,33 +251,97 @@ function CheckoutPage() {
 
 
     useEffect(() => {
-        // Only autofill from USER if LocalStorage is empty OR has effectively empty data
-        const saved = localStorage.getItem('checkout_form_data');
-        let shouldAutofill = true;
+        // 🔄 Sync Logged-in User Profile to Form
+        if (user) {
+            // Only update if current data is effectively empty OR user just logged in/profile changed
+            setFormData(prev => ({
+                first_name: user.first_name || prev.first_name || '',
+                last_name: user.last_name || prev.last_name || '',
+                email: user.email || prev.email || '',
+                phone: user.phone || user.phone_number || prev.phone || '',
+                address: user.address || prev.address || '',
+                zip_code: user.zipcode || prev.zip_code || '' 
+            }));
 
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                // If user has typed anything significant, don't overwrite
-                if (parsed.first_name || parsed.phone || parsed.address) {
-                    shouldAutofill = false;
+            // Sync Province (Handle potential English->Thai mapping if backend is English)
+            if (user.province) {
+                const prov = PROVINCE_MAPPING[user.province] || user.province;
+                if (THAI_PROVINCES.includes(prov)) {
+                    setProvince(prov);
                 }
-            } catch (e) {
-                console.error("Error parsing saved form", e);
+            }
+
+            if (user.latitude && user.longitude) {
+                const lat = parseFloat(user.latitude);
+                const lng = parseFloat(user.longitude);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    setMapPosition({ lat, lng });
+                }
             }
         }
-
-        if (user && shouldAutofill) {
-            setFormData({
-                first_name: user.first_name || '',
-                last_name: user.last_name || '',
-                email: user.email || '',
-                phone: user.phone || user.phone_number || '',
-                address: user.address || '',
-                zip_code: ''
-            });
-        }
     }, [user]);
+
+    // 🆕 Address System Components
+    const [addresses, setAddresses] = useState([]);
+    const [selectedAddressId, setSelectedAddressId] = useState(null);
+    const [showAddressModal, setShowAddressModal] = useState(false);
+    const [addressToEdit, setAddressToEdit] = useState(null);
+
+    // Fetch Addresses
+    const fetchAddresses = async () => {
+         if (!token) return;
+         try {
+             const res = await axios.get('http://localhost:8000/api/addresses/', {
+                 headers: { Authorization: `Token ${token}` }
+             });
+             setAddresses(res.data);
+             
+             // Auto-select default
+             const defaultAddr = res.data.find(a => a.is_default);
+             if (defaultAddr && !selectedAddressId) {
+                 handleSelectAddress(defaultAddr);
+             }
+         } catch (err) {
+             console.error("Error fetching addresses:", err);
+         }
+    };
+
+    useEffect(() => {
+        if (token) fetchAddresses();
+    }, [token]);
+
+    const handleSelectAddress = (addr) => {
+        setSelectedAddressId(addr.id);
+        setFormData(prev => ({
+            ...prev,
+            first_name: addr.receiver_name.split(' ')[0] || '',
+            last_name: addr.receiver_name.split(' ').slice(1).join(' ') || '',
+            phone: addr.phone,
+            address: addr.address_detail + ' ' + (addr.sub_district || '') + ' ' + (addr.district || ''),
+            zip_code: addr.zipcode
+        }));
+        setProvince(addr.province);
+        
+        if (addr.latitude && addr.longitude) {
+            setMapPosition({ lat: parseFloat(addr.latitude), lng: parseFloat(addr.longitude) });
+        }
+    };
+
+    const handleEditAddress = (addr, e) => {
+        e.stopPropagation();
+        setAddressToEdit(addr);
+        setShowAddressModal(true);
+    };
+
+    const handleAddNewAddress = () => {
+        setAddressToEdit(null);
+        setShowAddressModal(true);
+    };
+
+    const handleAddressSaved = (newAddr) => {
+        fetchAddresses();
+        handleSelectAddress(newAddr); // Auto select the new/updated one
+    };
 
     const THAI_PROVINCES = [
         "กรุงเทพมหานคร", "กระบี่", "กาญจนบุรี", "กาฬสินธุ์", "กำแพงเพชร", "ขอนแก่น", "จันทบุรี", "ฉะเชิงเทรา", "ชลบุรี", "ชัยนาท", "ชัยภูมิ", "ชุมพร", "เชียงราย", "เชียงใหม่", "ตรัง", "ตราด", "ตาก", "นครนายก", "นครปฐม", "นครพนม", "นครราชสีมา", "นครศรีธรรมราช", "นครสวรรค์", "นนทบุรี", "นราธิวาส", "น่าน", "บึงกาฬ", "บุรีรัมย์", "ปทุมธานี", "ประจวบคีรีขันธ์", "ปราจีนบุรี", "ปัตตานี", "พระนครศรีอยุธยา", "พะเยา", "พังงา", "พัทลุง", "พิจิตร", "พิษณุโลก", "เพชรบุรี", "เพชรบูรณ์", "แพร่", "ภูเก็ต", "มหาสารคาม", "มุกดาหาร", "แม่ฮ่องสอน", "ยโสธร", "ยะลา", "ร้อยเอ็ด", "ระนอง", "ระยอง", "ราชบุรี", "ลพบุรี", "ลำปาง", "ลำพูน", "เลย", "ศรีสะเกษ", "สกลนคร", "สงขลา", "สตูล", "สมุทรปราการ", "สมุทรสงคราม", "สมุทรสาคร", "สระแก้ว", "สระบุรี", "สิงห์บุรี", "สุโขทัย", "สุพรรณบุรี", "สุราษฎร์ธานี", "สุรินทร์", "หนองคาย", "หนองบัวลำภู", "อ่างทอง", "อำนาจเจริญ", "อุดรธานี", "อุตรดิตถ์", "อุทัยธานี", "อุบลราชธานี"
@@ -626,7 +701,10 @@ function CheckoutPage() {
                     ...formData,
                     name: `${formData.first_name} ${formData.last_name}`.trim(),
                     address: `${formData.address} ${formData.zip_code}`.trim(),
-                    province: province
+                    province: province,
+                    zip_code: formData.zip_code, // ✅ Send Zip Explicitly
+                    latitude: mapPosition?.lat || null, // ✅ Send Coordinates
+                    longitude: mapPosition?.lng || null 
                 },
                 paymentMethod: ['QR', 'Bank'].includes(paymentMethod) ? 'Transfer' : paymentMethod,
                 couponCode: couponData ? couponData.code : null
@@ -669,6 +747,7 @@ function CheckoutPage() {
             // ✅ Clear Saved Form Data
             localStorage.removeItem('checkout_form_data');
             localStorage.removeItem('checkout_province');
+            localStorage.removeItem('checkout_map_position'); // ✅ Clear Map
             localStorage.removeItem('checkout_items_persist'); // ✅ Clear Items
 
             navigate('/tracking');
@@ -806,6 +885,82 @@ function CheckoutPage() {
                                     <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-[#1a4d2e]"><User size={20} /></div>
                                     ข้อมูลจัดส่ง
                                 </h2>
+
+                                {/* 🆕 Address Selection UI (Correct Placement) */}
+                                {user && (
+                                    <div className="mb-8">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">เลือกที่อยู่จัดส่ง</h3>
+                                            <button 
+                                                type="button"
+                                                onClick={handleAddNewAddress}
+                                                className="text-xs font-bold text-[#1a4d2e] bg-green-50 px-3 py-1.5 rounded-lg hover:bg-green-100 transition flex items-center gap-1 border border-green-100"
+                                            >
+                                                <Check size={12} /> เพิ่มที่อยู่ใหม่
+                                            </button>
+                                        </div>
+                                        
+                                        {addresses.length === 0 ? (
+                                            <div className="p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-center hover:bg-gray-100 transition cursor-pointer group" onClick={handleAddNewAddress}>
+                                                <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-gray-400 mx-auto mb-3 shadow-sm group-hover:scale-110 transition">
+                                                    <MapPin size={24} />
+                                                </div>
+                                                <p className="text-gray-500 font-bold text-sm">คุณยังไม่มีที่อยู่ที่บันทึกไว้</p>
+                                                <p className="text-gray-400 text-xs mt-1">คลิกเพื่อเพิ่มที่อยู่จัดส่ง</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid gap-3">
+                                                {addresses.map(addr => (
+                                                    <div 
+                                                        key={addr.id}
+                                                        onClick={() => handleSelectAddress(addr)}
+                                                        className={`relative p-4 rounded-2xl border-2 transition cursor-pointer group hover:shadow-md ${
+                                                            selectedAddressId === addr.id 
+                                                            ? 'border-[#1a4d2e] bg-[#f0fdf4]' 
+                                                            : 'border-transparent bg-gray-50 hover:bg-white hover:border-gray-200'
+                                                        }`}
+                                                    >
+                                                        {/* Selection Indicator */}
+                                                        <div className={`absolute top-4 right-4 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${selectedAddressId === addr.id ? 'border-[#1a4d2e] bg-[#1a4d2e] scale-110' : 'border-gray-300 bg-white'}`}>
+                                                            {selectedAddressId === addr.id && <Check size={14} className="text-white" />}
+                                                        </div>
+
+                                                        <div className="flex items-start gap-4">
+                                                            {/* Icon based on Label */}
+                                                            <div className={`p-3 rounded-2xl ${selectedAddressId === addr.id ? 'bg-[#1a4d2e] text-white' : 'bg-gray-200 text-gray-500'}`}>
+                                                                {addr.label === 'Home' && <Home size={20} />}
+                                                                {addr.label === 'Work' && <Briefcase size={20} />}
+                                                                {addr.label === 'Other' && <MapPin size={20} />}
+                                                            </div>
+                                                            
+                                                            <div className="flex-1 pr-8">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <span className="font-bold text-gray-800 text-lg">{addr.label === 'Home' ? 'บ้าน' : addr.label === 'Work' ? 'ที่ทำงาน' : 'อี่นๆ'}</span>
+                                                                    {addr.is_default && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">⭐ ค่าเริ่มต้น</span>}
+                                                                </div>
+                                                                <p className="text-sm font-bold text-gray-700 mb-1">{addr.receiver_name} <span className="text-gray-400 font-normal">|</span> {addr.phone}</p>
+                                                                <p className="text-sm text-gray-500 leading-relaxed max-w-md">
+                                                                    {addr.address_detail} {addr.sub_district} {addr.district} <br/>
+                                                                    จ. {addr.province} {addr.zipcode}
+                                                                </p>
+                                                                
+                                                                <div className="mt-3 flex gap-4 opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0">
+                                                                    <button type="button" onClick={(e) => handleEditAddress(addr, e)} className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1">
+                                                                        แก้ไขที่อยู่
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                {/* Divider if user logged in */}
+                                {user && <div className="h-px bg-gray-100 my-6"></div>}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <label className="text-xs font-bold text-gray-400 ml-1">ชื่อ</label>
@@ -1190,6 +1345,15 @@ function CheckoutPage() {
                 </div>
             )}
 
+            {/* Address Modal */}
+            <AddressModal 
+                isOpen={showAddressModal}
+                onClose={() => setShowAddressModal(false)}
+                onSave={handleAddressSaved}
+                token={token}
+                addressToEdit={addressToEdit}
+            />
+
             {showMap && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
@@ -1201,6 +1365,7 @@ function CheckoutPage() {
                             <MapContainer center={mapPosition || { lat: 13.7563, lng: 100.5018 }} zoom={13} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
                                 <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                                 <LocationMarker />
+                                {mapPosition && <RecenterAutomatically lat={mapPosition.lat} lng={mapPosition.lng} />}
                             </MapContainer>
                         </div>
                         <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">

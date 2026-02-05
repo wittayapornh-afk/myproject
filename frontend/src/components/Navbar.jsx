@@ -5,6 +5,7 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../contexts/WishlistContext'; // ❤️ Wishlist
 import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
 
 // ✅ Reusable Tooltip Component
@@ -27,6 +28,7 @@ const NavTooltip = ({ text, children }) => (
 export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const { user, token, logout, loading } = useAuth();
   const { cartItems } = useCart();
+  const { wishlistCount } = useWishlist(); // ❤️ Wishlist Count
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navigate = useNavigate();
@@ -440,7 +442,24 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
 
           {/* ✅ Cart & Wishlist */}
           {!isRestricted && (
-            <div className="relative group/cart border-r border-gray-100 pr-6 mr-2">
+            <>
+              {/* ❤️ Wishlist Icon */}
+              <NavTooltip text="รายการโปรด">
+                <Link 
+                  to="/wishlist" 
+                  className="relative block p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all duration-300"
+                >
+                  <Heart size={22} />
+                  {wishlistCount > 0 && (
+                    <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </Link>
+              </NavTooltip>
+
+              {/* 🛒 Cart Icon */}
+              <div className="relative group/cart border-r border-gray-100 pr-6 mr-2">
                 <Link 
                     to={location.pathname === '/cart' ? '/' : '/cart'} 
                     className="relative block p-2.5 text-gray-400 hover:text-[#1a4d2e] hover:bg-green-50 rounded-2xl transition-all duration-300"
@@ -507,7 +526,8 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                         </Link>
                     </div>
                 </div>
-            </div>
+              </div>
+            </>
           )}
 
 

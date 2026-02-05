@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useWishlist } from '../contexts/WishlistContext';
 import Swal from 'sweetalert2';
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
 import ProductBadge from './ProductBadge';
@@ -62,6 +63,8 @@ function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1); 
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [inWishlist, setInWishlist] = useState(false);
+  const { addToWishlist, removeFromWishlist, isInWishlist, wishlist } = useWishlist();
   const [activeImage, setActiveImage] = useState(null); 
   
   // 🎠 Swiper State: สำหรับเชื่อม Gallery หลักกับ Thumbnails
@@ -212,6 +215,7 @@ function ProductDetail() {
                 thumbnail: data.thumbnail || data.image,
                 category: data.category
             };
+            setInWishlist(isInWishlist(data.id));
             const filtered = recent.filter(item => item.id !== data.id);
             filtered.unshift(newEntry);
             localStorage.setItem('recentlyViewed', JSON.stringify(filtered.slice(0, 10)));
@@ -227,11 +231,94 @@ function ProductDetail() {
       });
   }, [id]);
 
+  // Sync wishlist state when wishlist context changes
+  useEffect(() => {
+    if (product) {
+        setInWishlist(isInWishlist(parseInt(id)));
+    }
+  }, [wishlist, id, product, isInWishlist]);
+
   const fetchRelatedProducts = () => {
     fetch(`${API_BASE_URL}/api/products/${id}/related/`)
       .then(res => res.ok ? res.json() : [])
       .then(data => setRelatedProducts(Array.isArray(data) ? data : []))
       .catch(err => console.error("Error related:", err));
+  };
+
+  // ❤️ Handle Toggle Wishlist
+  // ❤️ Handle Toggle Wishlist
+  const handleToggleWishlist = async (e) => {
+    // Prevent event bubbling if necessary, though it shouldn't be an issue here
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    // 🔒 Login Gate Check FIRST
+    if (!user) {
+      Swal.fire({
+        title: 'กรุณาเข้าสู่ระบบ',
+        text: 'คุณต้องเข้าสู่ระบบก่อนเพิ่มสินค้าในรายการโปรด',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'เข้าสู่ระบบ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#1a4d2e',
+      }).then((result) => {
+        if (result.isConfirmed) {
+          navigate('/login');
+        }
+      });
+      return;
+    }
+
+    const productId = parseInt(id);
+    if (isNaN(productId)) return;
+
+    // Optimistic Update
+    const previousState = inWishlist;
+    setInWishlist(!previousState);
+
+    try {
+      if (previousState) {
+        const success = await removeFromWishlist(productId);
+        if (success) {
+          Swal.fire({
+            icon: 'success',
+            title: 'ลบออกจากรายการโปรดแล้ว',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1500
+          });
+        } else {
+          setInWishlist(previousState); // Revert
+        }
+      } else {
+        const result = await addToWishlist(productId);
+        
+        if (result?.requiresLogin) {
+            setInWishlist(false);
+            return;
+        }
+
+        if (result?.success) {
+          Swal.fire({
+            icon: 'success',
+            title: result.alreadyExists ? 'มีในรายการโปรดอยู่แล้ว' : 'เพิ่มในรายการโปรดแล้ว',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1500,
+            background: '#ffdddd',
+            color: '#c62828',
+          });
+        } else {
+          setInWishlist(previousState); // Revert
+        }
+      }
+    } catch (error) {
+      console.error("Wishlist toggle error:", error);
+      setInWishlist(previousState); // Revert
+    }
   };
 
   const handleAddToCart = () => {
@@ -600,6 +687,19 @@ function ProductDetail() {
                              >
                                 <Zap size={20} fill={product.flash_sale ? "currentColor" : "none"} /> 
                                 {isOutOfStock ? 'OUT OF STOCK' : 'ซื้อเลย'}
+                             </button>
+
+                             {/* ❤️ Button 3: Wishlist (RIGHT SIDE) */}
+                             <button 
+                                onClick={handleToggleWishlist}
+                                className={`px-4 py-4 rounded-[1.5rem] border-2 transition-all hover:-translate-y-1 active:scale-[0.98] ${
+                                  inWishlist 
+                                    ? 'bg-red-50 border-red-500 text-red-500 shadow-lg shadow-red-100' 
+                                    : 'bg-white border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-400'
+                                }`}
+                                title={inWishlist ? 'ลบออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
+                             >
+                                <Heart size={24} fill={inWishlist ? 'currentColor' : 'none'} />
                              </button>
                          </div>
                       )}

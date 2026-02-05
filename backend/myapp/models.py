@@ -44,6 +44,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(max_length=254, unique=True)
     phone = models.CharField(max_length=20, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
+    province = models.CharField(max_length=100, null=True, blank=True) # ✅ New
+    zipcode = models.CharField(max_length=10, null=True, blank=True)   # ✅ New
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)   # ✅ New
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # ✅ New
     image = models.ImageField(upload_to='avatars/', null=True, blank=True, db_column='image') # db_column='image' matches DB
     
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.NEW_USER)
@@ -708,6 +712,11 @@ class Order(models.Model):
     courier_name = models.CharField(max_length=100, null=True, blank=True)
     shipped_at = models.DateTimeField(null=True, blank=True)
     
+    # 🕒 Status Timestamps (Phase 10)
+    processing_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    
     # Legacy Coupon Link (Keep for backward compat, but rely on applied_coupon for V2)
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='legacy_orders')
     applied_coupon = models.ForeignKey(UserCoupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders') # ✅ V2
@@ -777,6 +786,55 @@ class AdminLog(models.Model):
         db_table = 'admin_logs'
 
 # ==========================================
+# ❤️ Wishlist System
+# ==========================================
+
+class Wishlist(models.Model):
+    """
+    User's Wishlist (รายการโปรด) - เก็บสินค้าที่ลูกค้าสนใจ
+    
+    Features:
+    - เพิ่ม/ลบสินค้าจาก Wishlist
+    - บันทึกราคาตอนเพิ่มเข้า Wishlist (สำหรับ Price Drop Alert)
+    - แจ้งเตือนเมื่อราคาลดลง
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='wishlist_items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='wishlisted_by')
+    added_date = models.DateTimeField(auto_now_add=True)
+    initial_price = models.DecimalField(max_digits=10, decimal_places=2, help_text="ราคาตอนเพิ่มเข้า Wishlist")
+    notify_on_drop = models.BooleanField(default=True, help_text="แจ้งเตือนเมื่อราคาลด")
+    last_price_check = models.DateTimeField(auto_now=True, help_text="ตรวจสอบราคาล่าสุดเมื่อไหร่")
+    
+    class Meta:
+        db_table = 'wishlist'
+        unique_together = ('user', 'product')  # 1 user ต่อ 1 product เท่านั้น
+        ordering = ['-added_date']
+        indexes = [
+            models.Index(fields=['user', '-added_date']),
+            models.Index(fields=['product']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.product.title}"
+    
+    @property
+    def current_price(self):
+        """ราคาปัจจุบันของสินค้า"""
+        return self.product.price
+    
+    @property
+    def price_dropped(self):
+        """ตรวจสอบว่าราคาลดลงหรือไม่"""
+        return self.current_price < self.initial_price
+    
+    @property
+    def price_drop_percentage(self):
+        """เปอร์เซ็นต์ที่ราคาลดลง"""
+        if self.price_dropped:
+            return ((self.initial_price - self.current_price) / self.initial_price) * 100
+        return 0
+
+# ==========================================
 # 🤖 Signals & Automation Logic
 # ==========================================
 
@@ -806,3 +864,92 @@ def auto_tag_new_arrival(sender, instance, created, **kwargs):
 # 🍌 Mega Menu Config
 # ==========================================
 from .models_menu import MegaMenuConfig
+
+# ==========================================
+# 🔔 Notification System
+# ==========================================
+class Notification(models.Model):
+    TYPE_CHOICES = [
+        ('price_drop', 'Price Drop Alert'),
+        ('order_update', 'Order Update'),
+        ('system', 'System Message'),
+        ('promotion', 'Promotion'),
+        ('flash_sale', 'Flash Sale Alert'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='system')
+    
+    # Optional: Link to related object (e.g. Product ID for price drop)
+    related_id = models.IntegerField(null=True, blank=True)
+    image_url = models.CharField(max_length=500, null=True, blank=True)
+    
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'notifications'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['is_read']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.title}"
+
+# ==========================================
+# 🏠 Shipping Address System
+# ==========================================
+class ShippingAddress(models.Model):
+    LABEL_CHOICES = [
+        ('Home', 'บ้าน'),
+        ('Work', 'ที่ทำงาน'),
+        ('Other', 'อื่นๆ'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='addresses')
+    receiver_name = models.CharField(max_length=100)
+    phone = models.CharField(max_length=20)
+    address_detail = models.TextField(help_text="บ้านเลขที่, หมู่, อาคาร, ซอย, ถนน")
+    sub_district = models.CharField(max_length=100, blank=True, null=True)
+    district = models.CharField(max_length=100, blank=True, null=True)
+    province = models.CharField(max_length=100)
+    zipcode = models.CharField(max_length=10)
+    
+    label = models.CharField(max_length=20, choices=LABEL_CHOICES, default='Home')
+    is_default = models.BooleanField(default=False)
+    
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    
+    # Address Verification
+    accuracy = models.CharField(
+        max_length=20, 
+        blank=True, 
+        null=True,
+        help_text="Accuracy level: building, house, road, street, city, etc."
+    )
+    verified = models.BooleanField(
+        default=False,
+        help_text="User confirmed this is the actual location"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'shipping_addresses'
+        ordering = ['-is_default', '-created_at']
+        verbose_name_plural = 'Shipping Addresses'
+
+    def save(self, *args, **kwargs):
+        # If set as default, unset others
+        if self.is_default:
+            ShippingAddress.objects.filter(user=self.user, is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.label} - {self.receiver_name} ({self.user.username})"

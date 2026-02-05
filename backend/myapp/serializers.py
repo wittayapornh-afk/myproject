@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, ProductImage, Order, OrderItem, User, Coupon, FlashSale, FlashSaleProduct, FlashSaleCampaign, Tag, Category
+from .models import Product, ProductImage, Order, OrderItem, User, Coupon, FlashSale, FlashSaleProduct, FlashSaleCampaign, Tag, Category, Wishlist, Notification
 from django.utils import timezone
 from django.db import models
 
@@ -194,4 +194,54 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     class Meta:
         model = Order
-        fields = ['id', 'user', 'total_price', 'status', 'created_at', 'items', 'shipping_province', 'discount_amount', 'coupon']
+        fields = ['id', 'user', 'total_price', 'status', 'created_at', 'items', 'shipping_province', 'discount_amount', 'coupon', 'processing_at', 'shipped_at', 'completed_at', 'cancelled_at']
+# =========================================
+#  Wishlist Serializer
+# =========================================
+
+class WishlistSerializer(serializers.ModelSerializer):
+    product_id = serializers.ReadOnlyField(source='product.id')
+    product_title = serializers.ReadOnlyField(source='product.title')
+    product_image = serializers.SerializerMethodField()
+    current_price = serializers.ReadOnlyField(source='product.price')
+    stock = serializers.ReadOnlyField(source='product.stock')
+    in_stock = serializers.SerializerMethodField()
+    price_dropped = serializers.SerializerMethodField()
+    price_drop_percentage = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Wishlist
+        fields = ['id', 'product_id', 'product_title', 'product_image', 'initial_price', 'current_price', 'stock', 'in_stock', 'price_dropped', 'price_drop_percentage', 'added_date', 'notify_on_drop']
+
+    def get_product_image(self, obj):
+        if obj.product.thumbnail:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.product.thumbnail.url)
+            return obj.product.thumbnail.url
+        return None
+
+    def get_in_stock(self, obj):
+        return obj.product.stock > 0
+
+    def get_price_dropped(self, obj):
+        return obj.price_dropped
+
+    def get_price_drop_percentage(self, obj):
+        return round(obj.price_drop_percentage, 2)
+
+class NotificationSerializer(serializers.ModelSerializer):
+    created_at_formatted = serializers.SerializerMethodField()
+    class Meta:
+        model = Notification
+        fields = ['id', 'title', 'message', 'type', 'is_read', 'created_at', 'created_at_formatted', 'related_id', 'image_url']
+    
+    def get_created_at_formatted(self, obj):
+        return obj.created_at.strftime("%d/%m/%Y %H:%M")
+
+class ShippingAddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import ShippingAddress
+        model = ShippingAddress
+        fields = ['id', 'receiver_name', 'phone', 'address_detail', 'sub_district', 'district', 'province', 'zipcode', 'label', 'is_default', 'latitude', 'longitude']
+        read_only_fields = ['id', 'user']
