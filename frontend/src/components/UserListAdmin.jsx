@@ -76,8 +76,6 @@ export default function UserListAdmin() {
       if (user.role !== 'admin') return false;
     } else if (filterRole === 'customer') {
       if (user.role !== 'customer') return false;
-    } else if (filterRole === 'super_admin') {
-      if (user.role !== 'super_admin') return false;
     } else if (filterRole === 'new_user') {
       if (user.role !== 'new_user') return false;
     }
@@ -240,7 +238,7 @@ export default function UserListAdmin() {
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-center">
         {/* Tabs */}
         <div className="flex bg-gray-100 p-1 rounded-2xl w-full md:w-auto overflow-x-auto">
-          {['ทั้งหมด', 'admin', 'super_admin', 'customer', 'new_user'].map(role => (
+          {['ทั้งหมด', 'admin', 'customer', 'new_user'].map(role => (
             <button
               key={role}
               onClick={() => { setFilterRole(role); setCurrentPage(1); }}
@@ -251,7 +249,6 @@ export default function UserListAdmin() {
             >
               {role === 'ทั้งหมด' ? 'ทั้งหมด' :
                 role === 'admin' ? 'ผู้ดูแลระบบ' :
-                  role === 'super_admin' ? 'Super Admin' :
                   role === 'customer' ? 'ลูกค้า' : 'สมาชิกใหม่'}
             </button>
           ))}
@@ -292,8 +289,7 @@ export default function UserListAdmin() {
                   <tr key={user.id} className="hover:bg-green-50/30 transition-colors group">
                     <td className="p-5">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm ${user.role === 'super_admin' ? 'bg-black' : user.role === 'admin' ? 'bg-purple-500' :
-                          user.role === 'seller' ? 'bg-orange-500' : 'bg-[#1a4d2e]'
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm ${user.role === 'admin' ? 'bg-purple-500' : 'bg-[#1a4d2e]'
                           }`}>
                           {user.avatar ? <img src={`${API_BASE_URL}${user.avatar}`} className="w-full h-full object-cover rounded-full" /> : user.username[0].toUpperCase()}
                         </div>
@@ -315,8 +311,7 @@ export default function UserListAdmin() {
                           user.role === 'new_user' ? 'bg-blue-50 text-blue-600 border-blue-200' :
                             'bg-gray-100 text-gray-600 border-gray-200'
                         }`}>
-                        {user.role === 'super_admin' ? 'Super Admin' :
-                          user.role === 'admin' ? 'ผู้ดูแลระบบ' :
+                        {user.role === 'admin' ? 'ผู้ดูแลระบบ' :
                           user.role === 'customer' ? 'ลูกค้าทั่วไป' :
                             user.role === 'new_user' ? 'สมาชิกใหม่' : 'ลูกค้าทั่วไป'}
                       </span>
@@ -415,7 +410,7 @@ export default function UserListAdmin() {
                       <option value="new_user">สมาชิกใหม่ (New User)</option>
                       <option value="customer">ลูกค้าทั่วไป (Customer)</option>
                       <option value="admin">ผู้ดูแลระบบ (Admin)</option>
-                      <option value="super_admin">ผู้ดูแลระบบสูงสุด (Super Admin)</option>
+
                     </select>
                   </div>
 
