@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ShoppingCart, Heart, ArrowLeft, Star, Plus, Minus, 
   ChevronRight, ChevronLeft, MessageSquare, Send, Zap, ShieldCheck, Truck, Package,
@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useWishlist } from '../contexts/WishlistContext';
 import Swal from 'sweetalert2';
 import { formatPrice, getImageUrl } from '../utils/formatUtils';
 import ProductBadge from './ProductBadge';
@@ -58,10 +59,14 @@ function ProductDetail() {
   const { user, isAdmin, token: authToken } = useAuth(); 
   const isRestricted = ['admin', 'super_admin', 'seller'].includes(user?.role?.toLowerCase()); 
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ Hook for State
+  const appliedCoupon = location.state?.appliedCoupon; // 🎟️ คูปองที่เลือกมาจากหน้ารวม
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1); 
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [inWishlist, setInWishlist] = useState(false);
+  const { addToWishlist, removeFromWishlist, isInWishlist, wishlist } = useWishlist();
   const [activeImage, setActiveImage] = useState(null); 
   
   // 🎠 Swiper State: สำหรับเชื่อม Gallery หลักกับ Thumbnails
@@ -212,6 +217,7 @@ function ProductDetail() {
                 thumbnail: data.thumbnail || data.image,
                 category: data.category
             };
+            setInWishlist(isInWishlist(data.id));
             const filtered = recent.filter(item => item.id !== data.id);
             filtered.unshift(newEntry);
             localStorage.setItem('recentlyViewed', JSON.stringify(filtered.slice(0, 10)));
@@ -227,11 +233,94 @@ function ProductDetail() {
       });
   }, [id]);
 
+  // Sync wishlist state when wishlist context changes
+  useEffect(() => {
+    if (product) {
+        setInWishlist(isInWishlist(parseInt(id)));
+    }
+  }, [wishlist, id, product, isInWishlist]);
+
   const fetchRelatedProducts = () => {
     fetch(`${API_BASE_URL}/api/products/${id}/related/`)
       .then(res => res.ok ? res.json() : [])
       .then(data => setRelatedProducts(Array.isArray(data) ? data : []))
       .catch(err => console.error("Error related:", err));
+  };
+
+  // ❤️ Handle Toggle Wishlist
+  // ❤️ Handle Toggle Wishlist
+  const handleToggleWishlist = async (e) => {
+    // Prevent event bubbling if necessary, though it shouldn't be an issue here
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    // 🔒 Login Gate Check FIRST
+    if (!user) {
+      Swal.fire({
+        title: 'กรุณาเข้าสู่ระบบ',
+        text: 'คุณต้องเข้าสู่ระบบก่อนเพิ่มสินค้าในรายการโปรด',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'เข้าสู่ระบบ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#1a4d2e',
+      }).then((result) => {
+        if (result.isConfirmed) {
+          navigate('/login');
+        }
+      });
+      return;
+    }
+
+    const productId = parseInt(id);
+    if (isNaN(productId)) return;
+
+    // Optimistic Update
+    const previousState = inWishlist;
+    setInWishlist(!previousState);
+
+    try {
+      if (previousState) {
+        const success = await removeFromWishlist(productId);
+        if (success) {
+          Swal.fire({
+            icon: 'success',
+            title: 'ลบออกจากรายการโปรดแล้ว',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1500
+          });
+        } else {
+          setInWishlist(previousState); // Revert
+        }
+      } else {
+        const result = await addToWishlist(productId);
+        
+        if (result?.requiresLogin) {
+            setInWishlist(false);
+            return;
+        }
+
+        if (result?.success) {
+          Swal.fire({
+            icon: 'success',
+            title: result.alreadyExists ? 'มีในรายการโปรดอยู่แล้ว' : 'เพิ่มในรายการโปรดแล้ว',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1500,
+            background: '#ffdddd',
+            color: '#c62828',
+          });
+        } else {
+          setInWishlist(previousState); // Revert
+        }
+      }
+    } catch (error) {
+      console.error("Wishlist toggle error:", error);
+      setInWishlist(previousState); // Revert
+    }
   };
 
   const handleAddToCart = () => {
@@ -281,7 +370,13 @@ function ProductDetail() {
           }
 
           // Send specific item to checkout directly (bypass cart context temporarily)
-          navigate('/checkout', { state: { directBuyItem: product, quantity: quantity } });
+          navigate('/checkout', { 
+              state: { 
+                  directBuyItem: product, 
+                  quantity: quantity,
+                  autoApplyCoupon: appliedCoupon?.code // ✅ ส่งคูปองไป Apply อัตโนมัติ
+              } 
+          });
       }
   };
 
@@ -303,6 +398,17 @@ function ProductDetail() {
                             <Link to="/" className="hover:text-[#1a4d2e] transition-colors">หน้าแรก</Link>
                             <ChevronRight size={12} />
                             <Link to="/shop" className="hover:text-[#1a4d2e] transition-colors">สินค้าทั้งหมด</Link>
+                            {product.category && (
+                                <>
+                                    <ChevronRight size={12} />
+                                    <Link 
+                                        to={`/shop?category=${encodeURIComponent(product.category)}`} 
+                                        className="hover:text-[#1a4d2e] transition-colors"
+                                    >
+                                        {product.category}
+                                    </Link>
+                                </>
+                            )}
                             <ChevronRight size={12} />
                             <span className="text-[#1a4d2e] font-bold line-clamp-1">{product.title}</span>
                        </nav>
@@ -319,6 +425,23 @@ function ProductDetail() {
                            </div>
                        </div>
                    </div>
+
+                   {/* 🎟️ Applied Coupon Banner (If exists) */}
+                   {appliedCoupon && (
+                       <motion.div 
+                           initial={{ opacity: 0, x: 20 }}
+                           animate={{ opacity: 1, x: 0 }}
+                           className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-indigo-200 border border-white/20"
+                       >
+                           <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                               <Gift size={18} className="text-white" />
+                           </div>
+                           <div>
+                               <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Selected Coupon</p>
+                               <p className="text-sm font-bold">ใช้คูปอง <span className="text-cyan-300">"{appliedCoupon.code}"</span> กับสินค้านี้ได้!</p>
+                           </div>
+                       </motion.div>
+                   )}
 
                    {/* Controls (Back & Nav) */}
                    <div className="flex items-center gap-3">
@@ -600,6 +723,19 @@ function ProductDetail() {
                              >
                                 <Zap size={20} fill={product.flash_sale ? "currentColor" : "none"} /> 
                                 {isOutOfStock ? 'OUT OF STOCK' : 'ซื้อเลย'}
+                             </button>
+
+                             {/* ❤️ Button 3: Wishlist (RIGHT SIDE) */}
+                             <button 
+                                onClick={handleToggleWishlist}
+                                className={`px-4 py-4 rounded-[1.5rem] border-2 transition-all hover:-translate-y-1 active:scale-[0.98] ${
+                                  inWishlist 
+                                    ? 'bg-red-50 border-red-500 text-red-500 shadow-lg shadow-red-100' 
+                                    : 'bg-white border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-400'
+                                }`}
+                                title={inWishlist ? 'ลบออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
+                             >
+                                <Heart size={24} fill={inWishlist ? 'currentColor' : 'none'} />
                              </button>
                          </div>
                       )}

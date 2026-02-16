@@ -4,7 +4,7 @@ import {
   ShoppingCart, Search, Eye, ChevronLeft, ChevronRight, ChevronDown, 
   CheckCircle, Heart, Star, SlidersHorizontal, XCircle, Filter, X, ShoppingBag, Zap, Tag,
   Flower2, Sofa, Utensils, Shirt, Footprints, Watch, Sparkles, Gem, Smartphone, Monitor, ShoppingBasket, Gift, Rocket, LayoutGrid, Glasses,
-  Tablet, Headphones, Bike, Car, Trophy, Laptop, CookingPot, Dumbbell, Pipette, Briefcase, Menu, CreditCard
+  Tablet, Headphones, Bike, Car, Trophy, Laptop, CookingPot, Dumbbell, Pipette, Briefcase, Menu, CreditCard, Ticket
 } from 'lucide-react'; 
 import { useCart } from '../context/CartContext';
 import Swal from 'sweetalert2';
@@ -473,7 +473,15 @@ function ProductList() {
                <nav className="flex items-center gap-2 text-xs font-medium text-gray-400 mb-2">
                     <Link to="/" className="hover:text-[#1a4d2e] transition-colors">หน้าแรก</Link>
                     <ChevronRight size={12} />
-                    <span className="text-[#1a4d2e] font-bold">สินค้าทั้งหมด</span>
+                    <Link to="/shop" className={`transition-colors ${selectedCategory === 'ทั้งหมด' ? 'text-[#1a4d2e] font-bold' : 'hover:text-[#1a4d2e]'}`}>
+                        สินค้าทั้งหมด
+                    </Link>
+                    {selectedCategory !== 'ทั้งหมด' && (
+                        <>
+                            <ChevronRight size={12} />
+                            <span className="text-[#1a4d2e] font-bold">{selectedCategory}</span>
+                        </>
+                    )}
                </nav>
 
                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -511,6 +519,44 @@ function ProductList() {
 
       <div className="max-w-[1920px] mx-auto px-4 md:px-6 mt-8 flex flex-col lg:flex-row gap-8 items-start">
         
+      {/* 🎉 Active Coupon Banner (Show if redirected from My Coupons) */}
+      {location.state?.appliedCoupon && (
+          <div className="w-full mb-6 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white shadow-lg rounded-2xl overflow-hidden relative z-30 animate-fade-in-down">
+              <div className="px-6 py-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                      <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm animate-pulse">
+                          <Ticket size={24} className="text-white" />
+                      </div>
+                      <div>
+                          <div className="flex items-center gap-2">
+                              <p className="text-xs font-bold opacity-90 uppercase tracking-widest bg-black/20 px-2 py-0.5 rounded">Active Coupon</p>
+                              {location.state.appliedCoupon.category && (
+                                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                                     {location.state.appliedCoupon.category}
+                                  </span>
+                              )}
+                          </div>
+                          <p className="font-bold text-lg flex items-center gap-2 mt-1">
+                              กำลังใช้คูปอง: <span className="bg-white text-purple-600 px-2 rounded-lg text-base py-0.5 font-black tracking-widest shadow-sm">{location.state.appliedCoupon.code}</span>
+                              <span className="hidden sm:inline opacity-90 text-sm font-medium ml-1 border-l border-white/30 pl-3">{location.state.appliedCoupon.description}</span>
+                          </p>
+                      </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                        // Clear state logic if needed, or just visual dismiss
+                        const state = { ...location.state };
+                        delete state.appliedCoupon;
+                        navigate(location.pathname + location.search, { state, replace: true });
+                    }}
+                    className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-colors flex-shrink-0"
+                  >
+                      <X size={20} />
+                  </button>
+              </div>
+          </div>
+      )}
+        
         {/* 🍌 LEFT SIDEBAR (Desktop Only - Modern Redesign) */}
         <aside className="hidden lg:block w-[280px] flex-shrink-0 sticky top-24 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden px-4 py-2">
              
@@ -525,7 +571,15 @@ function ProductList() {
                         {selectedCategory === 'ทั้งหมด' && <CheckCircle size={14} />}
                      </button>
 
-                     {categories.map(catObj => {
+                     {categories
+                         .filter(catObj => {
+                             // ✅ Hide categories with 0 products
+                             if (typeof catObj === 'object' && catObj.product_count !== undefined) {
+                                 return catObj.product_count > 0;
+                             }
+                             return true; // Show legacy string format
+                         })
+                         .map(catObj => {
                          // ✅ Handle both object (from new API) and legacy string format
                          const catName = typeof catObj === 'string' ? catObj : catObj.name;
                          
@@ -536,7 +590,11 @@ function ProductList() {
                          return (
                             <button 
                                 key={catName}
-                                onClick={() => { setSelectedCategory(catName); updatePage(1); }}
+                                onClick={() => { 
+                                    // ✅ Toggle: click again to deselect
+                                    setSelectedCategory(selectedCategory === catName ? 'ทั้งหมด' : catName); 
+                                    updatePage(1); 
+                                }}
                                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-sm font-bold group ${isSelected ? 'bg-[#1a4d2e] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-[#1a4d2e]'}`}
                             >
                                 <span className="flex items-center gap-2 text-left line-clamp-1">
@@ -700,10 +758,23 @@ function ProductList() {
                      <div>
                         <h4 className="font-bold mb-3">หมวดหมู่</h4>
                         <div className="flex flex-wrap gap-2">
-                            {categories.map(catObj => {
+                            {categories
+                                .filter(catObj => {
+                                    // ✅ Hide categories with 0 products
+                                    if (typeof catObj === 'object' && catObj.product_count !== undefined) {
+                                        return catObj.product_count > 0;
+                                    }
+                                    return true;
+                                })
+                                .map(catObj => {
                                 const catName = typeof catObj === 'string' ? catObj : catObj.name;
                                 return (
-                                    <button key={catName} onClick={() => { setSelectedCategory(catName); setShowMobileFilter(false); updatePage(1); }} className={`px-4 py-2 rounded-lg border text-sm font-bold ${selectedCategory === catName ? 'bg-[#1a4d2e] text-white' : 'bg-white'}`}>
+                                    <button key={catName} onClick={() => { 
+                                        // ✅ Toggle: click again to deselect
+                                        setSelectedCategory(selectedCategory === catName ? 'ทั้งหมด' : catName); 
+                                        setShowMobileFilter(false); 
+                                        updatePage(1); 
+                                    }} className={`px-4 py-2 rounded-lg border text-sm font-bold ${selectedCategory === catName ? 'bg-[#1a4d2e] text-white' : 'bg-white'}`}>
                                         {catName}
                                     </button>
                                 );
@@ -727,7 +798,15 @@ function ProductList() {
                 >
                     ทั้งหมด
                 </button>
-                {categories.map(catObj => {
+                {categories
+                    .filter(catObj => {
+                        // ✅ Hide categories with 0 products
+                        if (typeof catObj === 'object' && catObj.product_count !== undefined) {
+                            return catObj.product_count > 0;
+                        }
+                        return true;
+                    })
+                    .map(catObj => {
                     const catName = typeof catObj === 'string' ? catObj : catObj.name;
                     const config = getCategoryConfig(catName);
                     const isSelected = selectedCategory === catName;
@@ -735,7 +814,11 @@ function ProductList() {
                     return (
                         <button 
                             key={catName}
-                            onClick={() => { setSelectedCategory(catName); updatePage(1); }}
+                            onClick={() => { 
+                                // ✅ Toggle: click again to deselect
+                                setSelectedCategory(selectedCategory === catName ? 'ทั้งหมด' : catName); 
+                                updatePage(1); 
+                            }}
                             className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold border transition-all shadow-sm flex items-center gap-2 group ${isSelected ? 'bg-[#1a4d2e] text-white border-[#1a4d2e] ring-2 ring-green-900/10' : 'bg-white text-gray-600 border-gray-200 hover:border-[#1a4d2e] hover:text-[#1a4d2e]'}`}
                         >
                             {config.icon && <config.icon size={14} className={isSelected ? 'text-white' : 'text-gray-400 group-hover:text-[#1a4d2e]'} />}

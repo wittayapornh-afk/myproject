@@ -4,6 +4,8 @@ import HeroBanner from './HeroBanner';
 import FlashSaleSection from './FlashSaleSection'; // ✅ Import Flash Sale
 import CategoryRow from './CategoryRow';
 import CouponSection from './CouponSection'; // ✅ Import Coupon Section
+import PromotionSection from './PromotionSection'; // ✅ Import Promotion Section
+import PromotionPopup from './PromotionPopup'; // ✅ Import Promotion Popup
 import { 
     ArrowRight, Star, Truck, ShieldCheck, RefreshCw, CreditCard, Rocket, RotateCcw, Headphones, Zap, 
     Sofa, LayoutGrid, Watch, Monitor, Smartphone, Shirt, Footprints,
@@ -35,11 +37,11 @@ const HomePage = () => {
         const fetchData = async () => {
              // 1. Products
              try {
-                const res = await fetch(`${API_BASE_URL}/api/products/?page_size=8`);
+                const res = await fetch(`${API_BASE_URL}/api/products/?ordering=-created_at&page_size=4`);
                 const data = await res.json();
                 const items = data.results || data;
                 if (Array.isArray(items)) {
-                    setNewArrivals(items.slice(0, 8)); 
+                    setNewArrivals(items.slice(0, 4)); 
                 }
              } catch(err) { console.error("Products fetch error:", err); }
 
@@ -61,12 +63,17 @@ const HomePage = () => {
 
              // 3. Essentials / Often Bought (Low Price)
              // 🎓 Optimization: Fetch items sorted by price (asc) to represent "Essentials" or "Easy to buy" items
+             // 3. Essentials / Often Bought (Randomized)
              try {
-                 const res = await fetch(`${API_BASE_URL}/api/products/?ordering=price&page_size=4`);
+                 // Fetch more items to shuffle
+                 const res = await fetch(`${API_BASE_URL}/api/products/?page_size=20`);
                  const data = await res.json();
-                 const items = data.results || data;
-                 if (Array.isArray(items)) setEssentials(items.slice(0, 4));
-                 if (Array.isArray(items)) setEssentials(items.slice(0, 4));
+                 let items = data.results || data;
+                 if (Array.isArray(items)) {
+                     // Shuffle
+                     items = items.sort(() => 0.5 - Math.random());
+                     setEssentials(items.slice(0, 4));
+                 }
              } catch(err) { console.error("Essentials fetch error:", err); }
 
              // 4. Categories
@@ -202,6 +209,30 @@ const HomePage = () => {
             {/* 🍌 Top Section: Hero */}
             <div className="bg-white shadow-sm border-b border-gray-200 relative z-20">
                 <HeroBanner />
+            </div>
+
+            {/* 🧧 Promotion Popup */}
+            <PromotionPopup />
+
+            {/* 🎁 Promotion Sections (New) */}
+            <div className="max-w-7xl mx-auto px-4 mt-8">
+                {/* 1. Deals Under 150 */}
+                <PromotionSection 
+                    title="ราคาไม่เกิน 150.-" 
+                    subtitle="คุ้มค่า สบายกระเป๋า"
+                    products={newArrivals.filter(p => p.price <= 150).slice(0, 8)}
+                    bgColor="bg-gradient-to-r from-blue-500 to-cyan-500"
+                    linkTo="/shop?max_price=150"
+                />
+
+                {/* 2. Skin Care Sets */}
+                <PromotionSection 
+                    title="ครบเครื่องเรื่องผิว" 
+                    subtitle="เซ็ตดูแลผิวหน้าใส"
+                    products={newArrivals.filter(p => p.category === 'Skincare' || p.category === 'Beauty').slice(0, 8)} 
+                    bgColor="bg-gradient-to-r from-orange-400 to-pink-500"
+                    linkTo="/shop?category=Skincare"
+                />
             </div>
 
             {/* Flash Sale Section - Login Required - Render All Active Sales */}

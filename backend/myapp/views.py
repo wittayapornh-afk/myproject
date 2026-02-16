@@ -9,14 +9,15 @@ from django.db import transaction  # ✅ สำหรับระบบ Checkout
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework.authtoken.models import Token
 # ✅ รวม Model ทุกตัวไว้ในบรรทัดเดียว (ป้องกัน Error)
-from .models import Product, Order, OrderItem, AdminLog, ProductImage, Review, StockHistory, Category, Tag, Coupon, FlashSale, FlashSaleProduct, UserCoupon, FlashSaleCampaign
-from .serializers import CouponSerializer, FlashSaleSerializer, FlashSaleProductSerializer, FlashSaleCampaignSerializer 
+from .models import Product, Order, OrderItem, AdminLog, ProductImage, Review, StockHistory, Category, Tag, Coupon, FlashSale, FlashSaleProduct, UserCoupon, FlashSaleCampaign, Notification
+from .serializers import CouponSerializer, FlashSaleSerializer, FlashSaleProductSerializer, FlashSaleCampaignSerializer, NotificationSerializer 
 from .validators import validate_order_data
 from .exceptions import InlineValidationError 
 from .services import CouponService # ✅ Import Service 
 import logging
 import traceback
 from django.utils import timezone
+
 import csv
 from django.http import HttpResponse
 from datetime import timedelta, datetime
@@ -24,6 +25,23 @@ import calendar
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+# ✅ Import Flash Sale APIs
+from .flash_sale_views import (
+    admin_flash_sale_api,
+    get_active_flash_sales_api,
+    admin_campaign_api,
+    get_campaign_flash_sales
+)
+
+# ✅ Import Analytics APIs
+from .analytics_views import (
+    flash_sale_analytics_api,
+    tag_analytics_api,
+    coupon_analytics_api,
+    coupon_detail_analytics_api
+)
+
 
 # ==========================================
 # 🍌 Mega Menu API
@@ -36,7 +54,11 @@ def get_menu_configs_api(request):
     Frontend: BananaMenu.jsx
     """
     try:
-        categories = Category.objects.all().prefetch_related('menu_config')
+        from django.db.models import Count
+        # ✅ Annotate product_count for filtering empty categories
+        categories = Category.objects.all().prefetch_related('menu_config').annotate(
+            product_count=Count('products')  # ✅ Use related_name='products' not 'product_set'
+        )
         # We need a custom serializer for the list of categories with their config
         from .serializers import CategorySerializer
         serializer = CategorySerializer(categories, many=True)
@@ -397,6 +419,7 @@ def products_api(request):
                     "stock": p.stock,
                     "rating": p.rating,
                     "thumbnail": thumbnail_url,
+                    "tags": [{"id": t.id, "name": t.name} for t in p.tags.all()], # ✅ Added Tags for Matching
                 })
             except Exception:
                 continue
@@ -908,6 +931,10 @@ def user_profile_api(request):
             "email": user.email,
             "phone": user.phone,
             "address": user.address, 
+            "province": user.province, # ✅ New
+            "zipcode": user.zipcode,   # ✅ New
+            "latitude": user.latitude, # ✅ New
+            "longitude": user.longitude, # ✅ New
             "role": user.get_role_display(),
             "role_code": user.role,
             "avatar": user.image.url if user.image else "" # Use image field
@@ -933,9 +960,14 @@ def user_profile_api(request):
             if 'first_name' in data: user.first_name = data['first_name']
             if 'last_name' in data: user.last_name = data['last_name']
 
-            # 2. อัปเดตข้อมูล Profile fields (phone, address, image)
+            # 2. อัปเดตข้อมูล Profile fields (phone, address, etc.)
             if 'phone' in data: user.phone = data['phone']
             if 'address' in data: user.address = data['address']
+            if 'province' in data: user.province = data['province'] # ✅ New
+            if 'zipcode' in data: user.zipcode = data['zipcode']   # ✅ New
+            if 'latitude' in data: user.latitude = data['latitude'] # ✅ New
+            if 'longitude' in data: user.longitude = data['longitude'] # ✅ New
+
             if 'avatar' in request.FILES: user.image = request.FILES['avatar']
             
             user.save()
@@ -952,6 +984,10 @@ def user_profile_api(request):
                 "email": user.email,
                 "phone": user.phone,
                 "address": user.address,
+                "province": user.province, # ✅ New
+                "zipcode": user.zipcode,   # ✅ New
+                "latitude": user.latitude, # ✅ New
+                "longitude": user.longitude, # ✅ New
                 "avatar": user.image.url if user.image else ""
             })
         except Exception as e:
@@ -1125,10 +1161,51 @@ def create_order(request):
                 coupon.used_count = F('used_count') + 1
                 coupon.save()
                 
-                grand_total -= discount_amount
+            grand_total -= discount_amount
 
-            # ✅ 4. Create Order
+            # ✅ 4. Auto-Save User Profile (Persistence) - INSERTED BEFORE CREATE
+            user = request.user
+            has_update = False
+            
+            if customer_data.get('name'):
+                 parts = customer_data.get('name').strip().split(' ', 1)
+                 if not user.first_name and len(parts) > 0: 
+                     user.first_name = parts[0]
+                     has_update = True
+                 if not user.last_name and len(parts) > 1:
+                     user.last_name = parts[1]
+                     has_update = True
+
+            if customer_data.get('phone'):
+                user.phone = customer_data.get('phone')
+                has_update = True
+
+            if customer_data.get('address'):
+                user.address = customer_data.get('address')
+                has_update = True
+                
+            if customer_data.get('province'):
+                user.province = customer_data.get('province')
+                has_update = True
+                
+            if customer_data.get('zip_code'):
+                user.zipcode = customer_data.get('zip_code')
+                has_update = True
+
+            if customer_data.get('latitude'):
+                user.latitude = customer_data.get('latitude')
+                has_update = True
+                
+            if customer_data.get('longitude'):
+                user.longitude = customer_data.get('longitude')
+                has_update = True
+                
+            if has_update:
+                user.save()
+
+            # ✅ 5. Create Order
             order = Order.objects.create(
+
                 user=request.user,
                 customer_name=customer_data.get('name', request.user.first_name or request.user.username),
 
@@ -1136,6 +1213,7 @@ def create_order(request):
                 customer_email=customer_data.get('email', request.user.email),
                 shipping_address=customer_data.get('address', request.user.address), 
                 shipping_province=customer_data.get('province'), 
+                # Auto-Save all missing profile info
                 payment_method=request.data.get('paymentMethod', 'Transfer'),
                 
                 item_subtotal=item_subtotal_val,
@@ -1696,6 +1774,18 @@ def update_order_status_api(request, order_id):
         
     new_status = request.data.get('status')
     if new_status:
+        # 🕒 Auto-set timestamps based on status transition (Phase 10)
+        now = timezone.now()
+        
+        if new_status == 'Processing' and not order.processing_at:
+            order.processing_at = now
+        elif new_status == 'Shipped' and not order.shipped_at:
+            order.shipped_at = now
+        elif new_status == 'Completed' and not order.completed_at:
+            order.completed_at = now
+        elif new_status == 'Cancelled' and not order.cancelled_at:
+            order.cancelled_at = now
+        
         order.status = new_status
         order.save()
         
@@ -1795,8 +1885,10 @@ def tag_api(request, tag_id=None):
     # ==========================================
     elif request.method == 'POST':
         # ✅ ตรวจสอบสิทธิ์: เฉพาะ Admin เท่านั้น
-        if not request.user.is_authenticated or request.user.role not in ['admin', 'super_admin', 'seller']:
-            return Response({"error": "Unauthorized"}, status=403)
+        if not request.user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=401)
+        if request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({"error": "Forbidden"}, status=403)
         
         try:
             from .models import Tag
@@ -1820,8 +1912,10 @@ def tag_api(request, tag_id=None):
     # 📝 PUT/PATCH - แก้ไข Tag
     # ==========================================
     elif request.method in ['PUT', 'PATCH']:
-        if not request.user.is_authenticated or request.user.role not in ['admin', 'super_admin', 'seller']:
-            return Response({"error": "Unauthorized"}, status=403)
+        if not request.user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=401)
+        if request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({"error": "Forbidden"}, status=403)
             
         if not tag_id:
             return Response({"error": "ต้องระบุ Tag ID"}, status=400)
@@ -1853,8 +1947,10 @@ def tag_api(request, tag_id=None):
     # ==========================================
     elif request.method == 'DELETE':
         # ✅ ตรวจสอบสิทธิ์: เฉพาะ Admin เท่านั้น
-        if not request.user.is_authenticated or request.user.role not in ['admin', 'super_admin', 'seller']:
-            return Response({"error": "Unauthorized"}, status=403)
+        if not request.user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=401)
+        if request.user.role not in ['admin', 'super_admin', 'seller']:
+            return Response({"error": "Forbidden"}, status=403)
         
         if not tag_id:
             return Response({"error": "ต้องระบุ Tag ID"}, status=400)
@@ -2185,7 +2281,7 @@ def validate_coupon_api(request):
         )
         
         if not is_valid:
-            return Response({"error": message}, status=400)
+            return Response({"valid": False, "error": message}, status=200)
         
         # 2. Check Stackability (Backend Gatekeeper)
         # If items contain flash sale and coupon is NOT stackable -> Reject?
@@ -2481,6 +2577,16 @@ def admin_flash_sale_api(request, fs_id=None):
                     if not pid:
                         raise ValueError(f"Missing product_id in item: {p_item}")
                         
+                    # ✅ Validation: Flash Sale Price check
+                    if float(p_item['sale_price']) <= 0:
+                         raise ValueError(f"ราคา Flash Sale ต้องมากกว่า 0 บาท (Product ID: {pid})")
+                    
+                    # ✅ Validation: Sale Price <= Original Price
+                    product = Product.objects.get(id=pid)
+                    if float(p_item['sale_price']) > product.price:
+                        # Allow 1-2 baht flexibility (Optional) but strict per request
+                        raise ValueError(f"ราคา Flash Sale ({p_item['sale_price']}) ต้องไม่เกินราคาปกติ ({product.price}) (Product ID: {pid})")
+
                     FlashSaleProduct.objects.create(
                         flash_sale=fs,
                         product_id=pid,
@@ -2527,21 +2633,35 @@ def admin_flash_sale_api(request, fs_id=None):
                 except FlashSale.DoesNotExist:
                     return Response({"error": "Flash Sale not found"}, status=404)
                 
-                # Clear old products and re-add (Simple Strategy)
-                FlashSaleProduct.objects.filter(flash_sale=fs).delete()
-                
-                # Add Products
-                # products_data is parsed above
-                print(f"DEBUG: Processing products for update: {products_data}")
+                # 1. ✅ Validate all products first
+                print(f"DEBUG: Validating products for update: {products_data}")
                 for p_item in products_data:
                     pid = p_item.get('product_id') or p_item.get('id')
                     if not pid:
                         raise ValueError(f"Missing product_id in item: {p_item}")
+                    
+                    sale_price = float(p_item['sale_price'])
+                    if sale_price <= 0:
+                        raise ValueError(f"ราคา Flash Sale ต้องมากกว่า 0 บาท (Product ID: {pid})")
+                        
+                    product = Product.objects.get(id=pid)
+                    if sale_price > product.price:
+                         # Improved Error Message
+                         raise ValueError(f"ราคา Flash Sale ({sale_price}) ต้องไม่เกินราคาปกติ ({product.price}) ของสินค้า '{product.title}'")
+
+                # 2. Clear old products and re-add (Simple Strategy)
+                FlashSaleProduct.objects.filter(flash_sale=fs).delete()
+                
+                # 3. Add Products
+                print(f"DEBUG: Processing products for update: {products_data}")
+                for p_item in products_data:
+                    pid = p_item.get('product_id') or p_item.get('id')
+                    sale_price = float(p_item['sale_price'])
 
                     FlashSaleProduct.objects.create(
                         flash_sale=fs,
                         product_id=pid,
-                        sale_price=p_item['sale_price'],
+                        sale_price=sale_price,
                         quantity_limit=p_item.get('quantity_limit', p_item.get('limit', 10)),
                         limit_per_user=p_item.get('limit_per_user', 1)
                     )
@@ -3227,17 +3347,26 @@ def delete_order_api(request, order_id):
 @permission_classes([IsAuthenticated])
 def generate_promptpay_qr_api(request):
     try:
-        amount = float(request.data.get('amount', 0))
-        if amount <= 0:
-             return Response({"error": "Invalid amount"}, status=400)
+        amount = request.data.get('amount')
+        if amount is None:
+            return Response({"error": "Missing amount"}, status=400)
+            
+        try:
+            amount_val = float(amount)
+        except (ValueError, TypeError):
+             return Response({"error": f"Invalid amount format: {amount}"}, status=400)
+
+        if amount_val <= 0:
+             return Response({"error": "Amount must be greater than zero"}, status=400)
              
-        # Generate Fake PromptPay Payload
-        phone = "0812345678" 
-        payload = f"00020101021129370016A00000067701011101130066{phone[1:]}5802TH5303764540{int(amount * 100):04d}0000" 
+        # ✅ ใช้ Helper Function ที่มี CRC16 (Line 65)
+        payload = generate_promptpay_payload(amount_val)
         
         return Response({"payload": payload})
     except Exception as e:
-        return Response({"error": str(e)}, status=400)
+        import traceback
+        traceback.print_exc() # ✅ Print to Docker logs for easier debugging
+        return Response({"error": f"Server Error: {str(e)}"}, status=500)
 
 
 @api_view(['GET'])
@@ -3511,4 +3640,128 @@ def sitemap_xml(request):
     
     return HttpResponse(xml_content, content_type="application/xml")
 
-# ✅ Trigger Reload
+
+# ==========================================
+# 🔔 Notification API
+# ==========================================
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def notification_api(request):
+    """
+    API สำหรับจัดการ Notification
+    GET: ดึงรายการแจ้งเตือน (ล่าสุด 50 รายการ)
+         - รองรับ ?since=TIMESTAMP เพื่อดึงเฉพาะที่ยังไม่เคยดึง
+    POST: Mark as Read
+    """
+    user = request.user
+    
+    if request.method == 'GET':
+        # Filter by since timestamp if provided
+        since_param = request.query_params.get('since')
+        notifications = Notification.objects.filter(user=user)
+        
+        if since_param:
+            try:
+                # since_param might be ISO string "2024-01-01T10:00:00.000Z"
+                from django.utils.dateparse import parse_datetime
+                dt = parse_datetime(since_param)
+                if dt:
+                    notifications = notifications.filter(created_at__gt=dt)
+            except Exception as e:
+                print(f"Error parsing since param: {e}")
+                
+        # Limit to last 50 to prevent overload
+        notifications = notifications[:50]
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        # Mark as read
+        # If 'id' is provided, mark specific. If not, mark all.
+        notif_id = request.data.get('id')
+        if notif_id:
+            try:
+                 obj = Notification.objects.get(id=notif_id, user=user)
+                 obj.is_read = True
+                 obj.save()
+            except Notification.DoesNotExist:
+                return Response({'error': 'Not found'}, status=404)
+        else:
+             # Mark all as read
+             Notification.objects.filter(user=user, is_read=False).update(is_read=True)
+             
+        return Response({'success': True})
+
+# ==========================================
+# 🏠 Shipping Address APIs
+# ==========================================
+from .models import ShippingAddress
+from .serializers import ShippingAddressSerializer
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+
+def address_list_create_api(request):
+    try:
+        if request.method == 'GET':
+            addresses = ShippingAddress.objects.filter(user=request.user)
+            serializer = ShippingAddressSerializer(addresses, many=True)
+            return Response(serializer.data)
+        
+        elif request.method == 'POST':
+            # Auto-set as default if it's the first address
+            is_first = not ShippingAddress.objects.filter(user=request.user).exists()
+            
+            data = request.data.copy()
+            if is_first:
+                data['is_default'] = True
+                
+            serializer = ShippingAddressSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save(user=request.user)
+                return Response(serializer.data, status=201)
+            return Response(serializer.errors, status=400)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def address_detail_api(request, pk):
+    try:
+        address = ShippingAddress.objects.get(pk=pk, user=request.user)
+    except ShippingAddress.DoesNotExist:
+        return Response({'error': 'Address not found'}, status=404)
+
+    if request.method == 'PUT':
+        serializer = ShippingAddressSerializer(address, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    elif request.method == 'DELETE':
+        address.delete()
+        # If default was deleted, make the most recent one default
+        if address.is_default:
+            latest = ShippingAddress.objects.filter(user=request.user).first()
+            if latest:
+                latest.is_default = True
+                latest.save()
+        return Response({'message': 'Address deleted successfully'}, status=204)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_default_address_api(request, pk):
+    try:
+        address = ShippingAddress.objects.get(pk=pk, user=request.user)
+        # Model save method handles unsetting other defaults
+        address.is_default = True
+        address.save() 
+        
+        # Reload to ensure changes are reflected (though save() logic does filtering)
+        # Just return success
+        return Response({'success': True, 'message': f'Set {address.label} as default'})
+    except ShippingAddress.DoesNotExist:
+        return Response({'error': 'Address not found'}, status=404)

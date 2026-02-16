@@ -4,17 +4,32 @@ import Swal from 'sweetalert2';
 import { Camera, Save, User, Mail, Phone, MapPin, ArrowLeft, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getImageUrl, getUserAvatar } from '../utils/formatUtils';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import AddressModal from './AddressModal'; // 🆕 Import Address Modal
+import ThaiAddressPicker from './ThaiAddressPicker';
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
 
 // Fix for Leaflet marker icon issue in React
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconRetinaUrl: iconRetina,
+  iconUrl: icon,
+  shadowUrl: iconShadow,
 });
+
+const RecenterAutomatically = ({ lat, lng }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (lat && lng) {
+      map.setView([lat, lng], map.getZoom());
+    }
+  }, [lat, lng]);
+  return null;
+};
 
 function UserProfile() {
   const { user, token, fetchUser, login } = useAuth();
@@ -34,6 +49,146 @@ function UserProfile() {
   // ✅ Password Criteria State (Matches RegisterPage)
   const [passwordCriteria, setPasswordCriteria] = useState({ length: false, number: false, special: false });
 
+  // 🆕 Address Management State
+  const [addresses, setAddresses] = useState([]);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [addressToEdit, setAddressToEdit] = useState(null);
+
+  // Fetch Addresses
+  const fetchAddresses = async () => {
+    if (!token) {
+        console.log("❌ No token available to fetch addresses");
+        return;
+    }
+    try {
+      console.log("🔄 Fetching addresses...");
+      const res = await fetch(`${API_BASE_URL}/api/addresses/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log("✅ Addresses fetched:", data);
+        setAddresses(data);
+      } else {
+         console.error("❌ Fetch failed:", res.status, res.statusText);
+      }
+    } catch (err) {
+      console.error("❌ Error fetching addresses:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchAddresses();
+  }, [token]);
+
+  const handleEditAddress = (addr) => {
+    setAddressToEdit(addr);
+    setShowAddressModal(true);
+  };
+
+  const handleDeleteAddress = async (id) => {
+      const result = await Swal.fire({
+          title: 'ยืนยันการลบ?',
+          text: "คุณต้องการลบที่อยู่นี้ใช่หรือไม่",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#3085d6',
+          confirmButtonText: 'ลบข้อมูล',
+          cancelButtonText: 'ยกเลิก'
+      });
+
+      if (result.isConfirmed) {
+          try {
+              const res = await fetch(`${API_BASE_URL}/api/addresses/${id}/`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Token ${token}` }
+              });
+
+              if (!res.ok) {
+                  const errorData = await res.json().catch(() => ({}));
+                  throw new Error(errorData.error || 'ไม่สามารถลบข้อมูลได้');
+              }
+
+              fetchAddresses();
+              Swal.fire('Deleted!', 'ลบที่อยู่เรียบร้อยแล้ว.', 'success');
+          } catch (error) {
+              console.error("Delete Error:", error);
+              Swal.fire('Error', error.message || 'ไม่สามารถลบข้อมูลได้', 'error');
+          }
+      }
+  };
+
+  const handleSetDefault = async (id) => {
+      try {
+           await fetch(`${API_BASE_URL}/api/addresses/${id}/set_default/`, {
+               method: 'POST',
+               headers: { Authorization: `Token ${token}` }
+           });
+           fetchAddresses();
+      } catch (error) {
+          console.error("Set default error", error);
+      }
+  };
+
+  const handleAddressSaved = async (addressData) => {
+      try {
+          let updatedAddress;
+          
+          if (addressToEdit && addressToEdit.id) {
+              // EDIT Mode
+              const res = await fetch(`${API_BASE_URL}/api/addresses/${addressToEdit.id}/`, {
+                  method: 'PUT',
+                  headers: { 
+                      'Authorization': `Token ${token}`,
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(addressData)
+              });
+              if (res.ok) {
+                   updatedAddress = await res.json();
+                   // Update local state immediately
+                   setAddresses(prev => prev.map(a => a.id === updatedAddress.id ? updatedAddress : a));
+                   Swal.fire('สำเร็จ', 'แก้ไขที่อยู่เรียบร้อยแล้ว', 'success');
+              } else {
+                  throw new Error('Update failed');
+              }
+
+          } else {
+              // CREATE Mode
+              const res = await fetch(`${API_BASE_URL}/api/addresses/`, {
+                  method: 'POST',
+                  headers: { 
+                      'Authorization': `Token ${token}`,
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(addressData)
+              });
+              
+              if (res.ok) {
+                   updatedAddress = await res.json();
+                   // Add to local state immediately
+                   setAddresses(prev => [updatedAddress, ...prev]);
+                   Swal.fire('สำเร็จ', 'เพิ่มที่อยู่ใหม่เรียบร้อยแล้ว', 'success');
+              } else {
+                  const errorData = await res.json();
+                  console.error("❌ Backend Validation Error:", errorData);
+                  throw new Error(JSON.stringify(errorData));
+              }
+          }
+          
+          setShowAddressModal(false);
+          setAddressToEdit(null);
+          
+          // Double check with fetch (background)
+          fetchAddresses();
+          
+      } catch (error) {
+          console.error("Save address error:", error);
+          Swal.fire('เกิดข้อผิดพลาด', `ไม่สามารถบันทึกที่อยู่ได้: ${error.message}`, 'error');
+      }
+  };
+
   // Form Data
   const [formData, setFormData] = useState({
     username: '',
@@ -41,7 +196,9 @@ function UserProfile() {
     last_name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    province: '',
+    zipcode: ''
   });
 
   // Validation State
@@ -60,8 +217,15 @@ function UserProfile() {
         last_name: user.last_name || '',
         email: user.email || '',
         phone: user.phone || '',
-        address: user.address || ''
+        address: user.address || '',
+        province: user.province || '',
+        district: user.district || '',
+        sub_district: user.sub_district || '',
+        zipcode: user.zipcode || ''
       });
+      if (user.latitude && user.longitude) {
+        setMapPosition({ lat: parseFloat(user.latitude), lng: parseFloat(user.longitude) });
+      }
     }
   }, [user]);
 
@@ -136,6 +300,16 @@ function UserProfile() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleAddressSelect = (newAddress) => {
+    setFormData(prev => ({
+      ...prev,
+      province: newAddress.province,
+      district: newAddress.district,
+      sub_district: newAddress.sub_district,
+      zipcode: newAddress.zipcode
+    }));
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (usernameStatus === 'taken') {
@@ -151,6 +325,14 @@ function UserProfile() {
       data.append('last_name', formData.last_name);
       data.append('phone', formData.phone);
       data.append('address', formData.address);
+      data.append('province', formData.province);
+      data.append('district', formData.district);
+      data.append('sub_district', formData.sub_district);
+      data.append('zipcode', formData.zipcode);
+      if (mapPosition) {
+        data.append('latitude', mapPosition.lat);
+        data.append('longitude', mapPosition.lng);
+      }
       // Email is read-only in this form logic, but if needed: data.append('email', formData.email);
       if (selectedFile) data.append('avatar', selectedFile);
 
@@ -322,7 +504,15 @@ function UserProfile() {
       const data = await response.json();
 
       if (data && data.display_name) {
-        setFormData(prev => ({ ...prev, address: data.display_name }));
+        const addr = data.address || {};
+        const province_name = addr.province || addr.city || addr.state || "";
+        
+        setFormData(prev => ({ 
+          ...prev, 
+          address: data.display_name,
+          province: province_name,
+          zipcode: addr.postcode || ""
+        }));
         setShowMap(false);
         Swal.fire({
           icon: 'success',
@@ -356,14 +546,12 @@ function UserProfile() {
     );
   };
 
-  if (!user) return <div className="p-20 text-center font-bold text-gray-500 font-sans">กำลังโหลดข้อมูล...</div>;
-
   return (
     <div className="min-h-screen bg-[#F9F9F7] py-10 px-4 flex justify-center pt-28 pb-20 relative overflow-hidden font-sans">
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-[#1a4d2e] to-transparent -z-0"></div>
 
-      <div className="w-full max-w-2xl bg-white/90 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/50 overflow-hidden relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="w-full max-w-5xl bg-white/90 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/50 overflow-hidden relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
         {/* Header Image */}
         <div className="h-40 bg-gradient-to-r from-[#1a4d2e] to-[#143d24] relative overflow-hidden">
@@ -463,6 +651,8 @@ function UserProfile() {
               </div>
             </div>
 
+
+
             <div className="group">
               <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">เบอร์โทรศัพท์</label>
               <div className="flex items-center gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
@@ -471,26 +661,84 @@ function UserProfile() {
               </div>
             </div>
 
-            <div className="group">
-              <div className="flex justify-between items-center mb-1.5 ml-1">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">ที่อยู่จัดส่งสินค้า</label>
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={handleOpenMap}
-                    disabled={gpsLoading}
-                    className="px-4 py-2 bg-[#1a4d2e]/10 hover:bg-[#1a4d2e] text-[#1a4d2e] hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 group"
-                  >
-                    <MapPin size={16} className={`transition-transform group-hover:scale-110 ${gpsLoading ? "animate-spin" : ""}`} />
-                    {gpsLoading ? 'กำลังโหลด...' : 'เลือกจากแผนที่'}
-                  </button>
-                )}
-              </div>
-              <div className="flex gap-3 bg-gray-50/50 hover:bg-white border border-gray-200 group-hover:border-[#1a4d2e]/30 rounded-2xl px-4 py-3.5 transition-all focus-within:ring-2 focus-within:ring-[#1a4d2e]/20 focus-within:bg-white focus-within:border-[#1a4d2e]">
-                <MapPin size={20} className="text-gray-400 mt-1 group-focus-within:text-[#1a4d2e]" />
-                <textarea rows="2" name="address" value={formData.address} onChange={handleInputChange} disabled={!isEditing} className="bg-transparent w-full outline-none text-sm font-bold text-gray-700 resize-none placeholder-gray-300" placeholder="ที่อยู่จัดส่งสินค้า..."></textarea>
-              </div>
+            {/* 🆕 My Addresses Section */}
+            <div className="pt-8 border-t border-gray-100">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-black text-[#263A33] flex items-center gap-2">
+                        <MapPin size={20} className="text-[#1a4d2e]" /> ที่อยู่ของฉัน
+                    </h3>
+                    <button 
+                        type="button" 
+                        onClick={() => { setAddressToEdit(null); setShowAddressModal(true); }}
+                        className="bg-[#1a4d2e] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#143d24] transition flex items-center gap-2"
+                    >
+                        <MapPin size={14} /> เพิ่มที่อยู่ใหม่
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    {addresses.length === 0 ? (
+                        <div className="text-center p-8 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                            <p className="text-gray-500 font-bold text-sm">ยังไม่มีที่อยู่ที่บันทึกไว้</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4">
+                            {addresses.map(addr => (
+                                <div key={addr.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm relative group hover:border-[#1a4d2e] transition">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-start gap-4">
+                                            <div className="bg-gray-100 p-2.5 rounded-xl text-gray-500">
+                                                <MapPin size={20} />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-bold text-gray-800">{addr.label === 'Home' ? 'บ้าน' : addr.label === 'Work' ? 'ที่ทำงาน' : 'อื่นๆ'}</span>
+                                                    {addr.is_default && <span className="text-[10px] bg-[#1a4d2e] text-white px-2 py-0.5 rounded-full font-bold">ค่าเริ่มต้น</span>}
+                                                </div>
+                                                <p className="text-sm font-bold text-gray-700">{addr.receiver_name} | {addr.phone}</p>
+                                                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                                                    {addr.address_detail} {addr.sub_district} {addr.district} <br/>
+                                                    จ. {addr.province} {addr.zipcode}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition">
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleEditAddress(addr)}
+                                                className="p-2 hover:bg-gray-100 rounded-lg text-blue-600 transition" 
+                                                title="แก้ไข"
+                                            >
+                                                <User size={16} /> {/* Using User icon as Edit placeholder or import Edit icon */}
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleDeleteAddress(addr.id)}
+                                                className="p-2 hover:bg-red-50 rounded-lg text-red-600 transition" 
+                                                title="ลบ"
+                                            >
+                                                <XCircle size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {!addr.is_default && (
+                                        <button 
+                                            onClick={() => handleSetDefault(addr.id)}
+                                            className="mt-3 text-xs font-bold text-gray-400 hover:text-[#1a4d2e] transition block ml-14"
+                                        >
+                                            ตั้งเป็นค่าเริ่มต้น
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
+
+
 
             {/* Change Password Toggle */}
             <div className="pt-4">
@@ -589,6 +837,16 @@ function UserProfile() {
               )}
             </div>
           </form>
+
+            {/* Address Modal - Moved outside form to prevent nesting error */}
+            <AddressModal 
+                isOpen={showAddressModal}
+                onClose={() => setShowAddressModal(false)}
+                onSave={handleAddressSaved}
+                token={token}
+                addressToEdit={addressToEdit}
+            />
+
         </div>
       </div>
       {/* Map Modal */}
@@ -609,6 +867,7 @@ function UserProfile() {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
                   <LocationMarker />
+                  {mapPosition && <RecenterAutomatically lat={mapPosition.lat} lng={mapPosition.lng} />}
                 </MapContainer>
               )}
             </div>

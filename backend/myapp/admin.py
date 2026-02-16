@@ -97,3 +97,15 @@ admin.site.register(AdminLog)
 admin.site.register(FlashSaleCampaign, FlashSaleCampaignAdmin)
 admin.site.register(FlashSale, FlashSaleAdmin)
 admin.site.register(MegaMenuConfig, MegaMenuConfigAdmin)
+
+# ==========================================
+# 🏠 Shipping Address Admin
+# ==========================================
+from .models import ShippingAddress
+
+@admin.register(ShippingAddress)
+class ShippingAddressAdmin(admin.ModelAdmin):
+    list_display = ['receiver_name', 'user', 'label', 'province', 'zipcode', 'is_default']
+    list_filter = ['label', 'is_default', 'province']
+    search_fields = ['receiver_name', 'phone', 'address_detail', 'user__username', 'user__first_name']
+    ordering = ['-is_default', '-created_at']

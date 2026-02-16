@@ -1,0 +1,27 @@
+Found 53 test(s).
+DEBUG: Flash Sale Access - User: user, Role: customer, Superuser: False
+DEBUG: Access Denied for user
+
+Creating test database for alias 'default'...
+System check identified some issues:
+
+WARNINGS:
+?: (urls.W005) URL namespace 'admin' isn't unique. You may not be able to reverse all URLs in this namespace
+
+System check identified 1 issue (0 silenced).
+................F....................................
+======================================================================
+FAIL: test_coupon_invalid_for_disallowed_role (myapp.tests.test_coupon.RoleBasedCouponTest.test_coupon_invalid_for_disallowed_role)
+Test coupon is invalid for disallowed role
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\HP\Documents\myproject-main\myproject\backend\myapp\tests\test_coupon.py", line 293, in test_coupon_invalid_for_disallowed_role
+    self.assertIn("ไม่ได้รับสิทธิ์", message)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'ไม่ได้รับสิทธิ์' not found in 'ขออภัยครับ คูปองนี้สำหรับสมาชิกใหม่เท่านั้น'
+
+----------------------------------------------------------------------
+Ran 53 tests in 11.312s
+
+FAILED (failures=1)
+Destroying test database for alias 'default'...

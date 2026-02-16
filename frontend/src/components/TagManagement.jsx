@@ -29,6 +29,15 @@ function TagManagement() {
   const [tagIcon, setTagIcon] = useState('Tag');
   const [tagPriority, setTagPriority] = useState(0); 
   const [smartRule, setSmartRule] = useState('');    
+  
+  // ✅ NEW: Analytics & Preview States
+  const [tagAnalyticsData, setTagAnalyticsData] = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [showLivePreview, setShowLivePreview] = useState(true);
+  
+  // ✅ NEW: Bulk Delete State
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
 
   // ✅ ระบบช่วยตั้งชื่ออัตโนมัติตามไอคอน (Smart Icon Naming)
   const handleIconSelect = (iconName) => {
@@ -83,12 +92,12 @@ function TagManagement() {
 
   // Automation Rule States
   const [automationRules, setAutomationRules] = useState([
-    { id: 1, name: 'สินค้าขายดี (🏆)', condition: 'ยอดขาย > 50 ใน 30 วัน', action: 'เพิ่มป้าย: Best Seller', active: true, icon: <Star size={24} />, color: '#581c87' },
+    { id: 1, name: 'สินค้าขายดี (🏆)', condition: 'ยอดขาย > 50 ใน 30 วัน', action: 'เพิ่มป้าย: Best Seller', active: true, icon: <Star size={24} />, color: '#ffa200ff' },
     { id: 2, name: 'สินค้าแนะนำ/มาแรง (🔥)', condition: 'ยอดขาย > 10 ใน 2 วัน', action: 'เพิ่มป้าย: Hot Selling', active: true, icon: <Zap size={24} />, color: '#f97316' },
-    { id: 3, name: 'โอกาสสุดท้าย/สต็อกต่ำ (⌛)', condition: 'สต็อก < 5', action: 'เพิ่มป้าย: Last Chance', active: true, icon: <AlertCircle size={24} />, color: '#ef4444' },
+    { id: 3, name: 'โอกาสสุดท้าย/สต็อกต่ำ (⌛)', condition: 'สต็อก < 5', action: 'เพิ่มป้าย: Last Chance', active: true, icon: <AlertCircle size={24} />, color: '#00ff33ff' },
     { id: 4, name: 'สินค้าเข้าใหม่ (🆕)', condition: 'สร้างไม่เกิน 7 วัน', action: 'เพิ่มป้าย: New Arrival', active: true, icon: <Sparkles size={24} />, color: '#3b82f6' },
-    { id: 5, name: 'สินค้าลดราคา (🏷️)', condition: 'ราคาลดจากราคาปกติ', action: 'เพิ่มป้าย: On Sale', active: true, icon: <Percent size={24} />, color: '#10b981' },
-    { id: 7, name: 'สินค้าหมด (❌)', condition: 'สินค้าหมดสต็อก', action: 'เพิ่มป้าย: Out of Stock', active: true, icon: <Slash size={24} />, color: '#64748b' },
+    { id: 5, name: 'สินค้าลดราคา (🏷️)', condition: 'ราคาลดจากราคาปกติ', action: 'เพิ่มป้าย: On Sale', active: true, icon: <Percent size={24} />, color: '#e7ff0eff' },
+    { id: 7, name: 'สินค้าหมด (❌)', condition: 'สินค้าหมดสต็อก', action: 'เพิ่มป้าย: Out of Stock', active: true, icon: <Slash size={24} />, color: '#f40000ff' },
   ]);
   const [automationStats, setAutomationStats] = useState(null);
 
@@ -97,6 +106,12 @@ function TagManagement() {
   const [itemsPerPage, setItemsPerPage] = useState(12);
 
   const API_BASE = 'http://localhost:8000';
+
+  // ✅ NEW: Reset Delete Mode when switching tabs
+  useEffect(() => {
+    setIsDeleteMode(false);
+    setSelectedTags([]);
+  }, [activeTab]);
 
   // ==========================================
   // 🔄 Fetch Data
@@ -163,7 +178,24 @@ function TagManagement() {
     fetchTags();
     fetchProducts();
     fetchCategories();
+    fetchTagAnalytics(); // ✅ NEW: Initial analytics fetch
   }, []);
+
+  // ✅ NEW: Fetch Tag Analytics
+  const fetchTagAnalytics = async () => {
+    try {
+      setLoadingAnalytics(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE}/api/analytics/tags/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setTagAnalyticsData(response.data);
+    } catch (err) {
+      console.error('Error fetching tag analytics:', err);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
 
   // ==========================================
   // ➕ Create & Edit Tag
@@ -198,12 +230,33 @@ function TagManagement() {
       return;
     }
 
+    // ✅ Priority Validation
+    if (tagPriority < 0) {
+      Swal.fire({
+          icon: 'error',
+          title: 'เกิดข้อผิดพลาด',
+          text: 'ลำดับความสำคัญ (Priority) ต้องไม่ติดลบ',
+          confirmButtonColor: '#d33',
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
+      // ✅ Map Thai group names to Backend Choice Keys
+      const groupMap = {
+        'ทั่วไป': 'other',
+        'สถานะสินค้า': 'feature', // หรือ 'category' ตามความเหมาะสม
+        'แคมเปญ': 'promotion',
+        'ส่วนลด': 'promotion',
+        'แบรนด์': 'brand',
+        'คุณสมบัติพิเศษ': 'feature'
+      };
+
       const payload = { 
         name: newTagName.trim(),
-        group_name: tagGroup,
+        group_name: groupMap[tagGroup] || 'other', // ✅ Use Key instead of Thai string
         color: tagColor,
         icon: tagIcon,
         priority: tagPriority,
@@ -464,6 +517,65 @@ function TagManagement() {
       }
   };
 
+  const handleBulkDeleteTags = async () => {
+    if (selectedTags.length === 0) return;
+
+    const result = await Swal.fire({
+      title: `ลบป้ายกำกับ ${selectedTags.length} รายการ?`,
+      text: "คุณต้องการลบป้ายกำกับทั้งหมดที่เลือกใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'ยืนยันการลบลายตัว',
+      cancelButtonText: 'ยกเลิก'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        
+        // Parallel deletion
+        await Promise.all(selectedTags.map(id => 
+          axios.delete(`${API_BASE}/api/tags/${id}/`, {
+            headers: { Authorization: `Token ${token}` }
+          })
+        ));
+
+        Swal.fire({
+          icon: 'success',
+          title: 'ลบสำเร็จ',
+          text: `ลบป้ายกำกับทั้งหมดรวม ${selectedTags.length} รายการแล้ว`,
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        setSelectedTags([]);
+        fetchTags();
+      } catch (err) {
+        console.error(err);
+        Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการลบบางรายการ', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const toggleTagSelection = (tagId) => {
+    setSelectedTags(prev => 
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    );
+  };
+
+  const handleSelectAllTags = () => {
+    if (selectedTags.length === filteredTags.length) {
+      setSelectedTags([]);
+    } else {
+      setSelectedTags(filteredTags.map(t => t.id));
+    }
+  };
+
   const [filterType, setFilterType] = useState('all'); 
   const [groupFilter, setGroupFilter] = useState('all');
   
@@ -501,19 +613,60 @@ function TagManagement() {
           </div>
           
           <div className="flex gap-3">
-             <button 
-                onClick={() => {
-                  setSelectedTag(null);
-                  setNewTagName('');
-                  setSelectedProducts([]);
-                  resetProductFilters();
-                  setShowCreateModal(true);
-                }}
-                className="bg-[#581c87] hover:bg-[#4c1d95] text-white px-8 py-3.5 rounded-2xl font-black shadow-2xl shadow-purple-200 hover:shadow-purple-300 hover:translate-y-[-2px] transition-all flex items-center gap-2"
-              >
-                <Plus size={22} strokeWidth={3} />
-                สร้างป้ายกำกับใหม่
-              </button>
+             {isDeleteMode ? (
+                <>
+                  <button 
+                    onClick={handleSelectAllTags}
+                    className={`px-6 py-3.5 rounded-2xl border-2 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 ${selectedTags.length === filteredTags.length && filteredTags.length > 0 ? 'bg-red-700 border-red-700 text-white shadow-lg shadow-red-200' : 'bg-red-50 border-red-100 text-red-600 hover:bg-red-100 hover:border-red-300'}`}
+                  >
+                     {selectedTags.length === filteredTags.length && filteredTags.length > 0 ? (
+                       <><X size={18} strokeWidth={3} /> ยกเลิกการเลือก</>
+                     ) : (
+                       <><Check size={18} strokeWidth={3} /> เลือกทั้งหมด</>
+                     )}
+                  </button>
+                  <button 
+                    onClick={handleBulkDeleteTags}
+                    disabled={selectedTags.length === 0}
+                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-3.5 rounded-2xl font-black shadow-2xl shadow-red-200 hover:translate-y-[-2px] transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Trash2 size={20} />
+                    ลบที่เลือก ({selectedTags.length})
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsDeleteMode(false);
+                      setSelectedTags([]);
+                    }}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-3.5 rounded-2xl font-black transition-all flex items-center gap-2"
+                  >
+                    ยกเลิก
+                  </button>
+                </>
+             ) : (
+                <>
+                  <button 
+                    onClick={() => setIsDeleteMode(true)}
+                    className="bg-white border border-red-100 text-red-500 hover:bg-red-50 px-6 py-3.5 rounded-2xl font-black shadow-sm transition-all flex items-center gap-2"
+                  >
+                    <Trash2 size={20} />
+                    จัดการ/ลบป้าย
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setSelectedTag(null);
+                      setNewTagName('');
+                      setSelectedProducts([]);
+                      resetProductFilters();
+                      setShowCreateModal(true);
+                    }}
+                    className="bg-[#581c87] hover:bg-[#4c1d95] text-white px-8 py-3.5 rounded-2xl font-black shadow-2xl shadow-purple-200 hover:shadow-purple-300 hover:translate-y-[-2px] transition-all flex items-center gap-2"
+                  >
+                    <Plus size={22} strokeWidth={3} />
+                    สร้างป้ายกำกับใหม่
+                  </button>
+                </>
+             )}
           </div>
         </div>
 
@@ -530,6 +683,12 @@ function TagManagement() {
                className={`px-8 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${activeTab === 'automation' ? 'bg-[#581c87] text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
             >
                <Zap size={18} /> กฎอัจฉริยะ (Smart Rules)
+            </button>
+            <button 
+               onClick={() => setActiveTab('performance')}
+               className={`px-8 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${activeTab === 'performance' ? 'bg-[#581c87] text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+            >
+               <Activity size={18} /> ประสิทธิภาพ (Performance)
             </button>
         </div>
 
@@ -579,28 +738,50 @@ function TagManagement() {
                      </div>
                   </div>
                   
-                  <div className="bg-gradient-to-br from-[#581c87] to-[#7c3aed] rounded-[28px] p-6 text-white shadow-2xl shadow-purple-100 flex items-center justify-between relative overflow-hidden">
-                     <div className="relative z-10">
-                        <p className="text-purple-100 text-xs font-black uppercase tracking-[0.2em] mb-1">จำนวนป้ายทั้งหมด</p>
-                        <h3 className="text-4xl font-black tracking-tighter">{tags.length}</h3>
-                     </div>
-                     <Activity size={40} className="text-purple-300 opacity-20" />
-                  </div>
+                   <div className="bg-[#581c87] rounded-[28px] p-6 text-white shadow-2xl shadow-purple-200/50 flex items-center justify-between relative overflow-hidden border border-white/10">
+                      <div className="relative z-10">
+                         <p className="text-purple-200 text-[10px] font-black uppercase tracking-[0.2em] mb-1">จำนวนป้ายทั้งหมด</p>
+                         <h3 className="text-4xl font-black tracking-tighter">{tags.length}</h3>
+                      </div>
+                      <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
+                      <Tag size={40} className="text-white/20 relative z-10" strokeWidth={3} />
+                   </div>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredTags.map((tag) => (
-                    <div key={tag.id} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group relative overflow-hidden">
-                       <div className="flex justify-between items-start mb-6">
-                          <div 
-                             className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-xl"
-                             style={{ backgroundColor: tag.color || '#581c87' }}
-                          >
-                             <Tag size={28} strokeWidth={2.5} />
+                   {filteredTags.map((tag) => {
+                    const isSelected = selectedTags.includes(tag.id);
+                    return (
+                    <div 
+                      key={tag.id} 
+                      onClick={() => isDeleteMode ? toggleTagSelection(tag.id) : handleEditTag(tag)}
+                      className={`bg-white p-6 rounded-[32px] border transition-all group relative overflow-hidden cursor-pointer ${
+                        isSelected 
+                        ? (isDeleteMode ? 'border-red-600 border-[3px] shadow-2xl shadow-red-200 bg-red-100' : 'border-[#581c87] shadow-xl bg-purple-50/10')
+                        : 'border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1'
+                      }`}
+                    >
+                       {/* Selection Checkbox */}
+                       {(isDeleteMode || isSelected) && (
+                          <div className="absolute top-4 right-4 z-20">
+                             <div className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${
+                               isSelected 
+                               ? (isDeleteMode ? 'bg-red-600 border-red-600 scale-125 shadow-lg' : 'bg-[#581c87] border-[#581c87] scale-110')
+                               : 'bg-white/50 backdrop-blur-sm border-slate-200'
+                             }`}>
+                                {isSelected && <Check size={16} className="text-white" strokeWidth={5} />}
+                             </div>
                           </div>
+                       )}
+                       <div className="flex justify-between items-start mb-6">
+                           <div 
+                              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-xl bg-[#581c87]"
+                           >
+                              <Tag size={28} strokeWidth={2.5} />
+                           </div>
                           
                           <div className="flex flex-col items-end gap-2">
-                             <label className="relative inline-flex items-center cursor-pointer">
+                             <label className="relative inline-flex items-center cursor-pointer" onClick={e => e.stopPropagation()}>
                                  <input 
                                      type="checkbox" 
                                      className="sr-only peer"
@@ -608,7 +789,7 @@ function TagManagement() {
                                      onChange={() => handleToggleStatus(tag)}
                                  />
                                  <div className="w-11 h-6 bg-slate-100 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#581c87]"></div>
-                             </label>
+                              </label>
                              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-black text-slate-400">
                                 <Clock size={10} />
                                 ลำดับ: {tag.priority || 0}
@@ -655,28 +836,34 @@ function TagManagement() {
                                    </div>
                                 )}
                              </div>
-                             <p className="text-xs font-bold text-slate-400">
-                                <span className="text-slate-700">{tag.product_count || 0}</span> สินค้าในป้ายนี้
-                             </p>
+                              <div className="flex flex-col gap-0.5 min-w-[80px]">
+                                 <p className="text-[14px] font-black text-slate-800 leading-none">
+                                    {tag.product_count || 0}
+                                 </p>
+                                 <p className="text-[9px] font-black uppercase tracking-tighter text-slate-400 whitespace-nowrap">
+                                    สินค้าในป้ายนี้
+                                 </p>
+                              </div>
                           </div>
                           
-                          <div className="flex gap-2">
-                             <button 
-                                onClick={() => handleEditTag(tag)}
-                                className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-[#581c87] hover:bg-purple-50 rounded-xl transition-all border border-slate-100"
-                             >
-                                <Edit2 size={16} />
-                             </button>
-                             <button 
-                                onClick={() => handleDeleteTag(tag)}
-                                className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-slate-100"
-                             >
-                                <Trash2 size={16} />
-                             </button>
-                          </div>
+                           <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                              <button 
+                                 onClick={() => handleEditTag(tag)}
+                                 className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-[#581c87] hover:bg-purple-50 rounded-xl transition-all border border-slate-100"
+                              >
+                                 <Edit2 size={16} />
+                              </button>
+                              <button 
+                                 onClick={() => handleDeleteTag(tag)}
+                                 className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-slate-100"
+                              >
+                                 <Trash2 size={16} />
+                              </button>
+                           </div>
                        </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   
                   {filteredTags.length === 0 && (
                     <div className="col-span-full py-20 bg-white rounded-[40px] border border-dashed border-slate-200 flex flex-col items-center justify-center gap-4 text-slate-300">
@@ -799,6 +986,109 @@ function TagManagement() {
              </motion.div>
           )}
 
+          {activeTab === 'performance' && (
+            <motion.div 
+              key="performance"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-8"
+            >
+              {/* 📊 Analytics Dashboard */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                 {[
+                   { label: 'จำนวนป้ายทั้งหมด', value: tags.length, icon: Tag, color: 'bg-indigo-50 text-indigo-500' },
+                   { label: 'สินค้าที่ติดป้าย', value: tagAnalyticsData?.total_tagged_products || 0, icon: Box, color: 'bg-purple-50 text-purple-500' },
+                   { label: 'ป้ายที่ยอดนิยมสูงสุด', value: tagAnalyticsData?.most_used_tag || '-', icon: Award, color: 'bg-blue-50 text-blue-500' },
+                   { label: 'ยอดขายรวมจากป้าย', value: `฿${(tagAnalyticsData?.total_revenue || 0).toLocaleString()}`, icon: DollarSign, color: 'bg-rose-50 text-rose-500' }
+                 ].map((stat, i) => (
+                   <div key={i} className="bg-white p-6 rounded-[32px] shadow-xl border border-slate-50 flex items-center gap-4">
+                     <div className={`p-4 rounded-2xl ${stat.color}`}>
+                       <stat.icon size={24} />
+                     </div>
+                     <div>
+                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{stat.label}</p>
+                       <h4 className="text-2xl font-black text-slate-800">{stat.value}</h4>
+                     </div>
+                   </div>
+                 ))}
+              </div>
+
+              {/* 📈 Detailed Performance Table */}
+              <div className="bg-white rounded-[40px] shadow-2xl border border-slate-50 overflow-hidden">
+                <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-[#581c87] text-white rounded-lg">
+                      <Activity size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800 italic">รายงานประสิทธิภาพการใช้งานป้าย</h3>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Tag Revenue & Conversion Attribution</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={fetchTagAnalytics}
+                    className="p-4 bg-white rounded-2xl border border-slate-100 text-[#581c87] shadow-sm hover:rotate-180 transition-all duration-500"
+                  >
+                    <Activity size={24} className={loadingAnalytics ? 'animate-spin' : ''} />
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] bg-slate-50 border-b border-slate-100">
+                        <th className="px-8 py-6">ชื่อป้ายกำกับ (Tag Name)</th>
+                        <th className="px-8 py-6 text-center">สินค้า (Products)</th>
+                        <th className="px-8 py-6 text-center">ยอดการมองเห็น (Reach)</th>
+                        <th className="px-8 py-6 text-right">ยอดขายสะสม (Revenue)</th>
+                        <th className="px-8 py-6 text-center">อัตราการซื้อ (Conv.)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {(tagAnalyticsData?.tag_performance || []).map((perf, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-100" style={{ backgroundColor: perf.color || '#581c87' }}>
+                                <Tag size={18} />
+                              </div>
+                              <span className="font-bold text-slate-700">{perf.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-center">
+                            <span className="font-black text-slate-400 italic">{perf.product_count}</span>
+                          </td>
+                          <td className="px-8 py-6 text-center">
+                            <span className="font-black text-slate-800">{(perf.reach || 0).toLocaleString()}</span>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <span className="font-black text-[#581c87]">฿{(perf.revenue || 0).toLocaleString()}</span>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-full max-w-[100px] h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${perf.conversion_rate || 0}%` }} />
+                              </div>
+                              <span className="text-[10px] font-black text-emerald-600">{perf.conversion_rate || 0}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!tagAnalyticsData?.tag_performance || tagAnalyticsData.tag_performance.length === 0) && (
+                        <tr>
+                          <td colSpan="5" className="px-8 py-20 text-center font-black text-slate-300 uppercase italic">
+                            ไม่พบข้อมูลประสิทธิภาพในช่วงเวลานี้...
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
         </AnimatePresence>
 
       </div>
@@ -877,8 +1167,9 @@ function TagManagement() {
                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Priority</label>
                                     <input 
                                        type="number" 
+                                       min="0"
                                        value={tagPriority}
-                                       onChange={(e) => setTagPriority(parseInt(e.target.value) || 0)}
+                                       onChange={(e) => setTagPriority(Math.max(0, parseInt(e.target.value) || 0))}
                                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black text-[#581c87] outline-none"
                                     />
                                  </div>
@@ -923,7 +1214,7 @@ function TagManagement() {
                             </div>
                         </div>
 
-                        <div className="lg:col-span-2 bg-gradient-to-br from-[#581c87] to-[#7c3aed] p-10 rounded-[50px] shadow-3xl text-white relative overflow-hidden group">
+                        <div className="lg:col-span-2 bg-[#581c87] p-10 rounded-[50px] shadow-3xl text-white relative overflow-hidden group border border-white/5">
                               <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-white/5 rounded-full blur-[80px] pointer-events-none group-hover:bg-white/10 transition-all duration-700"></div>
                               
                               <div className="flex flex-col md:flex-row gap-10 items-center">
@@ -955,21 +1246,61 @@ function TagManagement() {
                                     </div>
                                  </div>
 
-                                 <div className="w-full md:w-80 shrink-0">
-                                    <div className="p-8 bg-black/20 backdrop-blur-3xl rounded-[40px] border border-white/10 space-y-4 shadow-2xl">
-                                       <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">ตัวอย่าง (Preview)</p>
-                                       <div className="flex items-center justify-center p-6 bg-white/5 rounded-3xl border border-white/5">
-                                          <div 
-                                             className="px-6 py-3 rounded-full flex items-center gap-3 shadow-2xl animate-bounce"
-                                             style={{ backgroundColor: tagColor, color: '#fff' }}
-                                          >
-                                             <Zap size={20} fill="#fff" />
-                                             <span className="font-black text-sm uppercase tracking-[0.1em]">{newTagName || 'ป้ายจำลอง'}</span>
+                                  <div className="w-full md:w-80 shrink-0">
+                                    <div className="p-8 bg-black/20 backdrop-blur-3xl rounded-[40px] border border-white/10 space-y-6 shadow-2xl relative overflow-hidden">
+                                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                                       
+                                       <div className="flex justify-between items-center">
+                                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-purple-200">Product Preview</p>
+                                          <div className="flex gap-1">
+                                             <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+                                             <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+                                             <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
                                           </div>
                                        </div>
-                                       <p className="text-[10px] text-center font-bold text-purple-200">ระบบจะทำการเลือกสินค้าให้คุณแบบไร้รอยต่อ</p>
+
+                                       {/* 🖼️ Real-world Mockup */}
+                                       <div className="relative aspect-square bg-white rounded-3xl overflow-hidden shadow-inner group/preview">
+                                          <img 
+                                             src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=400" 
+                                             alt="Sample Product" 
+                                             className="w-full h-full object-cover transform group-hover/preview:scale-110 transition-transform duration-700 opacity-90"
+                                          />
+                                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                                          
+                                          {/* 🏷️ The Tag Overlay */}
+                                          <motion.div 
+                                             initial={{ x: -20, opacity: 0 }}
+                                             animate={{ x: 0, opacity: 1 }}
+                                             transition={{ delay: 0.2 }}
+                                             className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-lg shadow-xl"
+                                             style={{ backgroundColor: tagColor, color: '#fff' }}
+                                          >
+                                             {(() => {
+                                                const IconComp = [
+                                                   { name: 'Tag', icon: Tag }, { name: 'Zap', icon: Zap }, { name: 'Star', icon: Star },
+                                                   { name: 'Award', icon: Award }, { name: 'Sparkles', icon: Sparkles }, { name: 'Percent', icon: Percent },
+                                                   { name: 'Gift', icon: Gift }, { name: 'Clock', icon: Clock }, { name: 'Package', icon: Package },
+                                                   { name: 'ShoppingBag', icon: ShoppingBag }, { name: 'Activity', icon: Activity }, { name: 'Hash', icon: Hash }
+                                                ].find(i => i.name === tagIcon)?.icon || Tag;
+                                                return <IconComp size={14} fill="currentColor" />;
+                                             })()}
+                                             <span className="font-black text-[10px] uppercase tracking-wider">{newTagName || 'PREVIEW'}</span>
+                                          </motion.div>
+                                          
+                                          {/* Price Tag Mockup */}
+                                          <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full shadow-lg">
+                                             <span className="text-xs font-black text-slate-900">฿1,290</span>
+                                          </div>
+                                       </div>
+
+                                       <div className="pt-2">
+                                          <p className="text-[10px] text-center font-bold text-purple-100 leading-relaxed italic opacity-80">
+                                            "ตัวอย่างการแสดงผลบนการ์ดสินค้าจริงในแอปฯ"
+                                          </p>
+                                       </div>
                                     </div>
-                                 </div>
+                                  </div>
                               </div>
                          </div>
                       </div>

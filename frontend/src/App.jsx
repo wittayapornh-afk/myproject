@@ -38,10 +38,12 @@ import MyCoupons from './components/MyCoupons'; // ✅ My Coupons Page
 
 import TagManagement from './components/TagManagement'; // 🏷️ Tag Management
 import TagPage from './components/TagPage'; // 🏷️ Tag Landing Page
+import WishlistPage from './components/WishlistPage'; // ❤️ Wishlist Page
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { SearchProvider } from './context/SearchContext';
+import { WishlistProvider } from './contexts/WishlistContext'; // ❤️ Wishlist Context
 import ProtectedRoute from './components/ProtectedRoute';
 
 
@@ -99,6 +101,7 @@ const AppContent = () => {
               <Route path="/tag/:slug" element={<TagPage />} />
 
               <Route path="/cart" element={<CartPage />} />
+              <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} /> {/* ❤️ Wishlist Page */}
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/payment" element={<PaymentPage />} /> {/* This was previously protected, now public */}
               <Route path="/flash-sale" element={<FlashSalePage />} /> {/* ✅ Flash Sale Page */}
@@ -204,11 +207,13 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <SearchProvider>
-          <AppContent />
-        </SearchProvider>
-      </CartProvider>
+      <WishlistProvider>
+        <CartProvider>
+          <SearchProvider>
+            <AppContent />
+          </SearchProvider>
+        </CartProvider>
+      </WishlistProvider>
     </AuthProvider>
   );
 }

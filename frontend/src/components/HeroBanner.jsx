@@ -271,7 +271,7 @@ const HeroBanner = () => {
                                 className={`absolute bottom-[-10%] right-[10%] w-[400px] h-[400px] rounded-full blur-[100px] mix-blend-screen transition-all duration-300 ${theme.orb} opacity-30 animate-blob animation-delay-2000`}
                                 style={{ transform: `translate(${mousePos.x * -15}px, ${mousePos.y * -15}px)` }}
                             ></div>
-                            <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }}></div>
+                            <div className="absolute inset-0 opacity-[0.02] pointer-events-none"></div>
                         </div>
 
                         {/* เนื้อหา Slide */}

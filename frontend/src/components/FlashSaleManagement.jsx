@@ -18,7 +18,7 @@ import {
     Bell,
     Truck,
     Ticket, List,
-    User, RotateCw
+    User, RotateCw, BarChart2, DollarSign
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DatePicker, { registerLocale } from 'react-datepicker';
@@ -517,6 +517,12 @@ const FlashSaleManagement = () => {
     const [tagDiscountValue, setTagDiscountValue] = useState('10'); // Default 10%
     const [useTagMode, setUseTagMode] = useState(false); // Toggle between Manual / Tag Mode
 
+    // ✅ NEW: Analytics State
+    const [analyticsData, setAnalyticsData] = useState(null);
+    const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+    const [statsModalOpen, setStatsModalOpen] = useState(false);
+    const [conflictWarnings, setConflictWarnings] = useState([]);
+
     // Refs for DatePickers
     const startDateRef = useRef(null);
     const endDateRef = useRef(null);
@@ -604,6 +610,28 @@ const FlashSaleManagement = () => {
     const displayedSales = sortedFlashSales.slice(startIndex, startIndex + itemsPerPage);
 
 
+    // ✅ NEW: Analytics Fetching
+    const fetchAnalytics = async (fsId) => {
+        setLoadingAnalytics(true);
+        setStatsModalOpen(true);
+        try {
+            const response = await axios.get(`${API_BASE_URL}/api/analytics/flash-sales/${fsId}/`, {
+                headers: { Authorization: `Token ${authContextToken}` }
+            });
+            setAnalyticsData(response.data);
+        } catch (error) {
+            console.error("Error fetching analytics:", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'เกิดข้อผิดพลาด',
+                text: 'ไม่สามารถโหลดข้อมูลสถิติได้'
+            });
+            setStatsModalOpen(false);
+        } finally {
+            setLoadingAnalytics(false);
+        }
+    };
+
     const fetchFlashSales = async () => {
         try {
             const token = authContextToken || localStorage.getItem('token');
@@ -690,6 +718,51 @@ const FlashSaleManagement = () => {
             console.error("Error fetching tags", error);
         }
     };
+
+    // ✅ NEW: Real-time Conflict Detector
+    useEffect(() => {
+        if (!formData.start_time || !formData.end_time || formData.products.length === 0) {
+            setConflictWarnings([]);
+            return;
+        }
+
+        const detectConflicts = () => {
+            const start = new Date(formData.start_time);
+            const end = new Date(formData.end_time);
+            const warnings = [];
+
+            // Check against existing flash sales
+            flashSales.forEach(fs => {
+                // Skip if it's the same flash sale (editing)
+                if (fs.id === formData.id) return;
+
+                const fsStart = new Date(fs.start_time);
+                const fsEnd = new Date(fs.end_time);
+
+                // Check for time overlap
+                const isOverlapping = (start < fsEnd && end > fsStart);
+
+                if (isOverlapping) {
+                    // Check if any product in formData is also in this fs
+                    const commonProducts = formData.products.filter(p => 
+                        fs.products?.some(fsp => (typeof fsp.product === 'object' ? fsp.product.id : fsp.product) === p.product_id)
+                    );
+
+                    if (commonProducts.length > 0) {
+                        warnings.push({
+                            flash_sale_name: fs.name,
+                            products: commonProducts.map(p => p.product_name || `Product ID: ${p.product_id}`),
+                            overlap_time: `${new Date(fsStart).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${new Date(fsEnd).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+                        });
+                    }
+                }
+            });
+
+            setConflictWarnings(warnings);
+        };
+
+        detectConflicts();
+    }, [formData.start_time, formData.end_time, formData.products, flashSales]);
 
     // ✅ NEW: Handle Add Products by Tag
     // ✅ NEW: Handle Add Products by Tag (Backend Integrated)
@@ -931,12 +1004,34 @@ const handleAddProductsByTags = async (tagsToFetch = selectedTags) => { // Accep
             } else {
                 let price = parseFloat(cleanVal);
                 if (isNaN(price)) price = 0;
+
+                // Strict 0 Guard: If user enters 0, keep it as 0 but valid logic handles error
+                // Optional: If price < 0, force to 0
+                if (price < 0) price = 0;
                 
-                // Clamp: 0 <= price < original_price (Prevention Mode)
-                if (price < 0) price = 0; // Double check though regex removed signs
-                if (price >= product.original_price) {
-                     price = Math.max(0, product.original_price - 1); 
+                // Real-time Validation: Check 0 or > Original Price
+                const originalPrice = product.original_price || product.price || 0;
+                let errorMsg = null;
+
+                if (price <= 0) {
+                    errorMsg = 'ราคาต้องมากกว่า 0';
+                } else if (price > originalPrice) {
+                    errorMsg = 'ราคาเกินราคาปกติ';
                 }
+
+                // Update Row Errors
+                setRowErrors(prev => {
+                    const newErrs = { ...prev };
+                    if (errorMsg) {
+                        if (!newErrs[index]) newErrs[index] = {};
+                        newErrs[index][field] = errorMsg;
+                    } else if (newErrs[index]) {
+                        delete newErrs[index][field];
+                        if (Object.keys(newErrs[index]).length === 0) delete newErrs[index];
+                    }
+                    return newErrs;
+                });
+
                 newValue = price;
             }
         }
@@ -1056,8 +1151,61 @@ const handleAddProductsByTags = async (tagsToFetch = selectedTags) => { // Accep
             return;
         }
 
+
+
+        // ✅ Validation Sweep: Check all items before submit
+        const potentialErrors = {};
+        let hasErrors = false;
+
+        formData.products.forEach((p, idx) => {
+             const price = parseFloat(p.sale_price);
+             const originalHelper = p.original_price || p.price || 0;
+             
+             if (isNaN(price) || price <= 0) {
+                 if (!potentialErrors[idx]) potentialErrors[idx] = {};
+                 potentialErrors[idx].sale_price = 'ราคาต้องมากกว่า 0';
+                 hasErrors = true;
+             } else if (price > originalHelper) {
+                 if (!potentialErrors[idx]) potentialErrors[idx] = {};
+                 potentialErrors[idx].sale_price = 'ราคาเกินราคาปกติ';
+                 hasErrors = true;
+             }
+        });
+
+        if (hasErrors) {
+             setRowErrors(prev => ({ ...prev, ...potentialErrors }));
+             Swal.fire('ข้อมูลไม่ถูกต้อง', 'กรุณาแก้ไขข้อผิดพลาดในตาราง (ขอบแดง)', 'warning');
+             return;
+        }
+
         if (Object.keys(rowErrors).length > 0) {
             Swal.fire('ข้อมูลไม่ถูกต้อง', 'กรุณาแก้ไขราคาหรือจำนวนในตารางให้ถูกต้อง', 'warning');
+            return;
+        }
+
+        // ✅ NEW: Validate start_time < end_time
+        const startTime = typeof formData.start_time === 'object' ? formData.start_time : new Date(formData.start_time);
+        const endTime = typeof formData.end_time === 'object' ? formData.end_time : new Date(formData.end_time);
+        
+        if (startTime >= endTime) {
+            Swal.fire({
+                title: 'เวลาไม่ถูกต้อง',
+                text: 'เวลาเริ่มต้องมาก่อนเวลาสิ้นสุด',
+                icon: 'error',
+                confirmButtonColor: '#f97316'
+            });
+            return;
+        }
+
+        // ✅ NEW: Check if Flash Sale duration is too short (less than 5 minutes)
+        const durationMinutes = (endTime - startTime) / (1000 * 60);
+        if (durationMinutes < 5) {
+            Swal.fire({
+                title: 'ระยะเวลาสั้นเกินไป',
+                text: 'Flash Sale ต้องมีระยะเวลาอย่างน้อย 5 นาที',
+                icon: 'warning',
+                confirmButtonColor: '#f97316'
+            });
             return;
         }
 
@@ -1421,6 +1569,13 @@ const handleAddProductsByTags = async (tagsToFetch = selectedTags) => { // Accep
                                             </td>
                                             <td className="px-10 py-6 text-right">
                                                 <div className="flex justify-end gap-3 opacity-0 group-hover/row:opacity-100 transition-all duration-300 translate-x-4 group-hover/row:translate-x-0">
+                                                    <button 
+                                                        onClick={() => fetchAnalytics(fs.id)}
+                                                        className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all flex items-center justify-center border border-blue-100 shadow-sm active:scale-90"
+                                                        title="ดูสถิติแคมเปญ"
+                                                    >
+                                                        <BarChart2 size={18} />
+                                                    </button>
                                                     <button 
                                                         onClick={() => {
                                                             setFormData({
@@ -1923,6 +2078,38 @@ const handleAddProductsByTags = async (tagsToFetch = selectedTags) => { // Accep
                                                 />
                                             </div>
 
+                                            {/* ⚠️ Conflict Warnings (Real-time Feedback) */}
+                                            <AnimatePresence>
+                                                {conflictWarnings.length > 0 && (
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: 'auto' }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        className="bg-red-50 border-2 border-red-100 rounded-[2rem] p-6 space-y-3"
+                                                    >
+                                                        <div className="flex items-center gap-3 text-red-600">
+                                                            <AlertCircle size={20} className="animate-bounce" />
+                                                            <span className="font-black text-sm uppercase tracking-widest">ตรวจพบสินค้าซ้ำซ้อนในเวลาเดียวกัน</span>
+                                                        </div>
+                                                        <div className="space-y-4">
+                                                            {conflictWarnings.map((warning, i) => (
+                                                                <div key={i} className="bg-white/60 p-4 rounded-2xl border border-red-50">
+                                                                    <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-tight">ติดในแคมเปญ: <span className="text-red-500">{warning.flash_sale_name}</span> ({warning.overlap_time})</p>
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {warning.products.map((p, pi) => (
+                                                                            <span key={pi} className="px-2 py-1 bg-red-100 text-red-600 rounded-lg text-[10px] font-bold">
+                                                                                {p}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <p className="text-[10px] text-red-400 font-bold italic">* กรุณาปรับเปลี่ยนช่วงเวลาหรือลบสินค้าที่ทับซ้อนออก เพื่อป้องกันปัญหาการแสดงผลยอดขาย</p>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+
                                             {/* 3. Inventory Integration (Extended Table) */}
                                             <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-gray-100/50 border border-gray-100 flex flex-col gap-6">
 
@@ -2196,7 +2383,7 @@ const handleAddProductsByTags = async (tagsToFetch = selectedTags) => { // Accep
                                                                                             type="text" 
                                                                                             className={`w-full pl-1 pr-1 py-1 bg-gray-50 border-y border-transparent transition-all font-black text-gray-900 outline-none text-lg tracking-tighter shadow-inner text-center h-8
                                                                                                 ${rowErrors[idx]?.sale_price 
-                                                                                                    ? 'bg-red-50 text-red-600 focus:bg-white' 
+                                                                                                    ? 'bg-red-50 text-red-600 focus:bg-white border-2 border-red-500 rounded-md' 
                                                                                                     : 'focus:bg-white focus:border-orange-500 hover:bg-white'
                                                                                                 }`}
                                                                                             value={item.sale_price}
@@ -2354,7 +2541,12 @@ const handleAddProductsByTags = async (tagsToFetch = selectedTags) => { // Accep
                                                 {/* Save Button (Action) */}
                                                 <button 
                                                     type="submit" 
-                                                    className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black text-lg uppercase tracking-wider shadow-xl shadow-gray-200 hover:bg-orange-600 hover:shadow-orange-200 transition-all flex items-center justify-center gap-3 active:scale-95"
+                                                    disabled={Object.keys(rowErrors).length > 0}
+                                                    className={`w-full py-4 rounded-2xl font-black text-lg uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-3 
+                                                        ${Object.keys(rowErrors).length > 0 
+                                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' 
+                                                            : 'bg-gray-900 text-white shadow-gray-200 hover:bg-orange-600 hover:shadow-orange-200 active:scale-95'
+                                                        }`}
                                                 >
                                                     <Save size={20} />
                                                     บันทึก Flash Sale
@@ -2571,6 +2763,160 @@ const handleAddProductsByTags = async (tagsToFetch = selectedTags) => { // Accep
                 availableFlashSales={flashSales}
             />
 
+            {/* 📊 Analytics Modal (High-Fidelity Dashboard) */}
+            <AnimatePresence>
+                {statsModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 lg:p-12">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setStatsModalOpen(false)}
+                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-md"
+                        />
+                        <motion.div 
+                            initial={{ scale: 0.9, y: 20, opacity: 0 }}
+                            animate={{ scale: 1, y: 0, opacity: 1 }}
+                            exit={{ scale: 0.9, y: 20, opacity: 0 }}
+                            className="relative w-full max-w-5xl bg-white rounded-[3rem] shadow-[0_32px_128px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[90vh]"
+                        >
+                            {/* Modal Header */}
+                            <div className="p-8 lg:p-10 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-16 h-16 rounded-2xl bg-gray-900 text-white flex items-center justify-center shadow-lg">
+                                        <BarChart2 size={32} className="animate-pulse" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-3xl font-black text-gray-900 tracking-tight">รายงานวิเคราะห์แคมเปญ</h2>
+                                        <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mt-1">Real-time Performance Metrics</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setStatsModalOpen(false)}
+                                    className="w-14 h-14 rounded-2xl hover:bg-white hover:shadow-md transition-all flex items-center justify-center text-gray-400 hover:text-gray-900 active:scale-95 border border-transparent hover:border-gray-100"
+                                >
+                                    <X size={28} />
+                                </button>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="flex-1 overflow-y-auto p-10 space-y-12">
+                                {loadingAnalytics ? (
+                                    <div className="flex flex-col items-center justify-center py-20 gap-6">
+                                        <div className="w-20 h-20 border-8 border-gray-100 border-t-orange-500 rounded-full animate-spin" />
+                                        <p className="text-xl font-black text-gray-300 animate-pulse tracking-tight">กำลังรวบรวมข้อมูลหลังบ้าน...</p>
+                                    </div>
+                                ) : analyticsData ? (
+                                    <>
+                                        {/* Info & Core Metrics Grid */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                            {/* Campaign Profile */}
+                                            <div className="bg-gray-900 p-8 rounded-[2.5rem] text-white flex flex-col justify-between shadow-xl">
+                                                <div>
+                                                    <div className="inline-block px-3 py-1 bg-orange-500 rounded-full text-[10px] font-black tracking-widest uppercase mb-4">
+                                                        {analyticsData.flash_sale.status}
+                                                    </div>
+                                                    <h3 className="text-4xl font-black leading-none tracking-tighter mb-2">{analyticsData.flash_sale.name}</h3>
+                                                    <p className="text-gray-400 text-sm font-bold opacity-80">ช่วงเวลา: {new Date(analyticsData.flash_sale.start_time).toLocaleString('th-TH')}</p>
+                                                </div>
+                                                <div className="mt-10 space-y-2">
+                                                    <div className="flex justify-between text-xs font-black text-gray-500 uppercase tracking-widest">
+                                                        <span>Progress (Sold/Quota)</span>
+                                                        <span>{analyticsData.metrics.sell_through_rate}%</span>
+                                                    </div>
+                                                    <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+                                                        <motion.div 
+                                                            initial={{ width: 0 }}
+                                                            animate={{ width: `${analyticsData.metrics.sell_through_rate}%` }}
+                                                            className="h-full bg-orange-500 rounded-full"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Revenue & Sold Metrics */}
+                                            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                {[
+                                                    { label: 'ยอดขายรวม (Revenue)', value: `฿${analyticsData.metrics.total_revenue?.toLocaleString()}`, icon: DollarSign, color: 'green' },
+                                                    { label: 'จำนวนที่ขายสมบูรณ์', value: `${analyticsData.metrics.total_sold?.toLocaleString()} ชิ้น`, icon: ShoppingBag, color: 'blue' },
+                                                    { label: 'สินค้าทั้งหมดในแคมเปญ', value: `${analyticsData.metrics.total_products} SKUs`, icon: Package, color: 'indigo' },
+                                                    { label: 'อัตราการขายเฉลี่ย', value: `${analyticsData.metrics.sell_through_rate}%`, icon: Zap, color: 'orange' }
+                                                ].map((metric, i) => (
+                                                    <div key={i} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-6 hover:shadow-md transition-shadow">
+                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                                                            metric.color === 'green' ? 'bg-green-50 text-green-600' :
+                                                            metric.color === 'blue' ? 'bg-blue-50 text-blue-600' :
+                                                            metric.color === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'
+                                                        }`}>
+                                                            <metric.icon size={24} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-2xl font-black text-gray-900 tracking-tight">{metric.value}</p>
+                                                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">{metric.label}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Top Products Table */}
+                                        <div className="space-y-6">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                                                    <Star size={24} className="text-orange-500 fill-orange-500" />
+                                                    สินค้าขายดีอันดับต้นๆ
+                                                </h4>
+                                                <div className="px-4 py-2 bg-gray-50 rounded-xl text-xs font-black text-gray-400 uppercase tracking-widest">Top Performance</div>
+                                            </div>
+                                            
+                                            <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+                                                <table className="w-full text-left">
+                                                    <thead className="bg-gray-50/50 border-b border-gray-50">
+                                                        <tr>
+                                                            <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">ข้อมูลสินค้า</th>
+                                                            <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">ขายไปแล้ว</th>
+                                                            <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">ยอดขาย (ประมาณ)</th>
+                                                            <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">มาร์จิ้น</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-50">
+                                                        {analyticsData.top_products.map((p, i) => (
+                                                            <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                                                                <td className="px-8 py-5">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center font-black text-gray-300">{i+1}</div>
+                                                                        <div className="font-black text-gray-900 tracking-tight">{p.product_name}</div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-8 py-5 text-center">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <span className="font-black text-gray-900">{p.sold} / {p.quota}</span>
+                                                                        <div className="w-20 h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                                                                            <div className="h-full bg-orange-500" style={{ width: `${p.sell_rate}%` }} />
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-8 py-5 text-center font-black text-gray-900">฿{p.revenue.toLocaleString()}</td>
+                                                                <td className="px-8 py-5 text-right font-black text-green-600">+{p.sell_rate.toFixed(1)}%</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                                         <AlertCircle size={60} className="text-gray-200 mb-6" />
+                                         <h4 className="text-2xl font-black text-gray-400">ไม่พบข้อมูลการขายในขณะนี้</h4>
+                                         <p className="text-gray-400 font-bold opacity-60">แคมเปญอาจจะยังไม่เริ่ม หรือยังไม่มีข้อมูลการสั่งซื้อ</p>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
