@@ -12,30 +12,25 @@ class Migration(migrations.Migration):
 
     operations = [
         # 1. State Update Only: Tell Django these columns exist, but DON'T run SQL (avoid duplicate error)
-        migrations.SeparateDatabaseAndState(
-            state_operations=[
-                migrations.AddField(
-                    model_name='tag',
-                    name='color',
-                    field=models.CharField(default='#6366f1', help_text='สีของ Tag (Hex Code)', max_length=20),
-                ),
-                migrations.AddField(
-                    model_name='tag',
-                    name='group_name',
-                    field=models.CharField(choices=[('category', 'หมวดหมู่ (Category)'), ('promotion', 'โปรโมชั่น (Promotion)'), ('feature', 'คุณสมบัติ (Feature)'), ('brand', 'แบรนด์ (Brand)'), ('other', 'อื่นๆ (Other)')], default='other', help_text='กลุ่มของ Tag', max_length=50),
-                ),
-                migrations.AddField(
-                    model_name='tag',
-                    name='icon',
-                    field=models.CharField(blank=True, help_text='ชื่อไอคอนจาก Lucide', max_length=50, null=True),
-                ),
-                migrations.AddField(
-                    model_name='tag',
-                    name='is_active',
-                    field=models.BooleanField(default=True),
-                ),
-            ],
-            database_operations=[],
+        migrations.AddField(
+            model_name='tag',
+            name='color',
+            field=models.CharField(default='#6366f1', help_text='สีของ Tag (Hex Code)', max_length=20),
+        ),
+        migrations.AddField(
+            model_name='tag',
+            name='group_name',
+            field=models.CharField(choices=[('category', 'หมวดหมู่ (Category)'), ('promotion', 'โปรโมชั่น (Promotion)'), ('feature', 'คุณสมบัติ (Feature)'), ('brand', 'แบรนด์ (Brand)'), ('other', 'อื่นๆ (Other)')], default='other', help_text='กลุ่มของ Tag', max_length=50),
+        ),
+        migrations.AddField(
+            model_name='tag',
+            name='icon',
+            field=models.CharField(blank=True, help_text='ชื่อไอคอนจาก Lucide', max_length=50, null=True),
+        ),
+        migrations.AddField(
+            model_name='tag',
+            name='is_active',
+            field=models.BooleanField(default=True),
         ),
 
         # 2. Real SQL: Create the columns that are ACTUALLY missing
@@ -74,13 +69,8 @@ class Migration(migrations.Migration):
         # Better safe: Move group_name index to State Only as well.
         # But slug index is new.
         
-        migrations.SeparateDatabaseAndState(
-             state_operations=[
-                migrations.AddIndex(
-                    model_name='tag',
-                    index=models.Index(fields=['group_name'], name='tags_group_n_f0e6f1_idx'),
-                ),
-             ],
-             database_operations=[], # Don't try to create index on group_name (assume exists from old 0005)
+        migrations.AddIndex(
+            model_name='tag',
+            index=models.Index(fields=['group_name'], name='tags_group_n_f0e6f1_idx'),
         ),
     ]

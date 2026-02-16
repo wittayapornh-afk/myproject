@@ -28,46 +28,17 @@ const RecenterAutomatically = ({ lat, lng }) => {
     return null;
 };
 
-// Draggable Marker Component
-const DraggableMarker = ({ position, setPosition, onDragEnd }) => {
-    const markerRef = React.useRef(null);
-    
-    const eventHandlers = React.useMemo(
-        () => ({
-            dragend() {
-                const marker = markerRef.current;
-                if (marker != null) {
-                    const newPos = marker.getLatLng();
-                    setPosition(newPos);
-                    if (onDragEnd) {
-                        onDragEnd(newPos);
-                    }
-                }
-            },
-        }),
-        [setPosition, onDragEnd]
-    );
-    
-    // Also handle map clicks
+const LocationMarker = ({ setPosition, onLocationClick }) => {
     useMapEvents({
         click(e) {
             setPosition(e.latlng);
-            if (onDragEnd) {
-                onDragEnd(e.latlng);
+            // Trigger reverse geocoding immediately when pin is placed
+            if (onLocationClick) {
+                onLocationClick(e.latlng.lat, e.latlng.lng);
             }
         },
     });
-    
-    if (!position) return null;
-    
-    return (
-        <Marker
-            draggable={true}
-            eventHandlers={eventHandlers}
-            position={position}
-            ref={markerRef}
-        />
-    );
+    return null;
 };
 
 const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) => {
@@ -80,62 +51,55 @@ const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) 
         province: '',
         zipcode: '',
         label: 'Home',
-        is_default: false,
-        accuracy: '',
-        verified: false
+        is_default: false
     });
-    
+    const [customLabel, setCustomLabel] = useState(''); // For "Other" custom name
     // Map & GPS State
     const [showMap, setShowMap] = useState(false);
     const [mapPosition, setMapPosition] = useState(null); 
     const [resolvingAddress, setResolvingAddress] = useState(false);
     const [gettingLocation, setGettingLocation] = useState(false);
-    
-    // Address Verification State
-    const [addressAccuracy, setAddressAccuracy] = useState(null); // building, road, city, etc.
 
     // --- Fetch & Process Thai Address Data ---
     // (Logic moved to ThaiAddressPicker) 
 
     useEffect(() => {
-        if (addressToEdit) {
-            setFormData({
-                receiver_name: addressToEdit.receiver_name || '',
-                phone: addressToEdit.phone || '',
-                address_detail: addressToEdit.address_detail || '',
-                sub_district: addressToEdit.sub_district || '',
-                district: addressToEdit.district || '',
-                province: addressToEdit.province || '',
-                zipcode: addressToEdit.zipcode || '',
-                label: addressToEdit.label || 'Home',
-                is_default: addressToEdit.is_default || false,
-                accuracy: addressToEdit.accuracy || '',
-                verified: addressToEdit.verified || false
-            });
-            if (addressToEdit.latitude && addressToEdit.longitude) {
-                setMapPosition({
-                    lat: parseFloat(addressToEdit.latitude),
-                    lng: parseFloat(addressToEdit.longitude)
+        if (isOpen) {
+            if (addressToEdit) {
+                setFormData(addressToEdit);
+                if (addressToEdit.latitude && addressToEdit.longitude) {
+                    setMapPosition({
+                        lat: parseFloat(addressToEdit.latitude),
+                        lng: parseFloat(addressToEdit.longitude)
+                    });
+                }
+            } else {
+                setFormData({
+                    receiver_name: '',
+                    phone: '',
+                    province: '',
+                    district: '',
+                    sub_district: '',
+                    zipcode: '',
+                    address_detail: '',
+                    label: 'Home',
+                    is_default: false
                 });
+                setMapPosition(null);
             }
-        } else {
-             // Reset form for new address
-             setFormData({
-                receiver_name: '',
-                phone: '',
-                address_detail: '',
-                sub_district: '',
-                district: '',
-                province: '',
-                zipcode: '',
-                label: 'Home',
-                is_default: false,
-                accuracy: '',
-                verified: false
-            });
-            setMapPosition(null);
         }
-    }, [addressToEdit, isOpen]);
+    }, [isOpen, addressToEdit]);
+
+    // 🐛 DEBUG: Monitor formData changes
+    useEffect(() => {
+        console.log('🔍 AddressModal formData changed:', {
+            province: formData.province,
+            district: formData.district,
+            sub_district: formData.sub_district,
+            zipcode: formData.zipcode,
+            address_detail: formData.address_detail
+        });
+    }, [formData]);
 
     const handleAddressSelect = (newAddress) => {
         setFormData(prev => ({
@@ -173,6 +137,34 @@ const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) 
         }
     };
 
+    // Helper: Normalize OSM address data to match ThaiAddressPicker database
+    const normalizeThaiAddress = (osmData) => {
+        const { province, district, subDistrict } = osmData;
+        
+        // Province normalization map
+        const provinceMap = {
+            'กรุงเทพ': 'กรุงเทพมหานคร',
+            'กทม': 'กรุงเทพมหานคร',
+            'กทม.': 'กรุงเทพมหานคร',
+            'Bangkok': 'กรุงเทพมหานคร',
+            // Add more common variations as needed
+        };
+        
+        // Try exact match first
+        let normalizedProvince = provinceMap[province] || province;
+        
+        // Bangkok special handling - if contains 'กรุงเทพ' anywhere
+        if (!provinceMap[province] && province && province.includes('กรุงเทพ')) {
+            normalizedProvince = 'กรุงเทพมหานคร';
+        }
+        
+        return {
+            province: normalizedProvince,
+            district: district,
+            subDistrict: subDistrict
+        };
+    };
+
     const resolveAddressFromCoordinates = async (lat, lng) => {
         setResolvingAddress(true);
          try {
@@ -188,72 +180,55 @@ const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) 
                 // ดึงข้อมูลทุกฟิลด์ที่เป็นไปได้
                 const houseNumber = addr.house_number || '';
                 const road = addr.road || '';
-                const village = addr.village || '';
+                const village = addr.village || addr.hamlet || ''; // เพิ่ม hamlet
                 const amenity = addr.amenity || '';
                 const shop = addr.shop || '';
                 const building = addr.building || '';
                 
-                // ตรวจสอบว่าเป็นกรุงเทพฯ หรือไม่
-                const isBangkok = addr.city === 'กรุงเทพมหานคร' || addr.state === 'กรุงเทพมหานคร';
+                // Extract province, district, sub_district และตัด prefix ออก
+                const rawProvince = addr.province || addr.state || addr.state_district || "";
+                const rawDistrict = addr.county || "";
                 
-                let rawProvince, rawDistrict, rawSubDistrict;
+                // สำหรับ sub_district - ไม่ใช้ municipality เพราะมันไม่ใช่ตำบล
+                const rawSubDistrict = addr.suburb || addr.subdistrict || addr.neighbourhood || addr.quarter || "";
+                
+                // แต่ถ้าไม่มีตำบลเลย ให้ลองดู municipality สำหรับนำไปแสดงผล (แต่ไม่ใส่ในช่องตำบลเพื่อให้เลือกเองได้)
+                const municipality = addr.municipality || addr.city || "";
+                
+                // 🆕 Bangkok Special Handling
+                // OSM ส่งข้อมูลกรุงเทพฯ ในรูปแบบพิเศษ: เขตอยู่ใน suburb, ไม่มี province/county
+                const isBangkok = rawSubDistrict.includes('เขต') || municipality.includes('เขต') || 
+                                  addr.city === 'กรุงเทพมหานคร' || addr.state === 'กรุงเทพมหานคร';
+                
+                let finalProvince = rawProvince;
+                let finalDistrict = rawDistrict;
+                let finalSubDistrict = rawSubDistrict;
                 
                 if (isBangkok) {
-                    // กรุงเทพฯ: city=จังหวัด, suburb=เขต, quarter=แขวง
-                    rawProvince = addr.city || addr.state || "";
-                    rawDistrict = addr.suburb || "";  // เขต
-                    rawSubDistrict = addr.quarter || addr.neighbourhood || "";  // แขวง
-                } else {
-                    // ต่างจังหวัด: province=จังหวัด, county=อำเภอ, suburb=ตำบล
-                    rawProvince = addr.province || addr.state || "";
-                    rawDistrict = addr.county || "";
-                    // ใช้เฉพาะ suburb/subdistrict ที่เชื่อถือได้ - ไม่ใช้ municipality
-                    rawSubDistrict = addr.suburb || addr.subdistrict || addr.neighbourhood || addr.quarter || "";
-                }
-                
-                // ลบ prefix ที่ไม่จำเป็น
-                const cleanProvince = rawProvince.replace(/^(จังหวัด|จ\.)/, '').trim();
-                const cleanDistrict = rawDistrict.replace(/^(อำเภอ|เขต|อ\.)/, '').trim();
-                let cleanSubDistrict = rawSubDistrict.replace(/^(ตำบล|แขวง|ต\.)/, '').trim();
-                
-                // 🔄 Cross-Reference: ถ้าไม่มี subdistrict → หาจาก ThaiAddressPicker database
-                if (!cleanSubDistrict && cleanProvince && cleanDistrict && !isBangkok) {
-                    console.log('🔍 Nominatim ไม่มีตำบล → ใช้ Cross-Reference');
+                    console.log('🏙️ Bangkok address detected!');
+                    finalProvince = 'กรุงเทพมหานคร';
                     
-                    // ดึงข้อมูลจาก Thailand Address Database (เดียวกับที่ ThaiAddressPicker ใช้)
-                    try {
-                        const dbResponse = await fetch('https://raw.githubusercontent.com/earthchie/jquery.Thailand.js/master/jquery.Thailand.js/database/raw_database/raw_database.json');
-                        const rawData = await dbResponse.json();
-                        
-                        // กรองเฉพาะตำบลในอำเภอที่กำลังมอง
-                        const subdistrictsInDistrict = rawData.filter(item => 
-                            item.province === cleanProvince && 
-                            item.amphoe === cleanDistrict
-                        );
-                        
-                        if (subdistrictsInDistrict.length > 0) {
-                            // ถ้ามีตำบลเดียว → ใช้เลย
-                            if (subdistrictsInDistrict.length === 1) {
-                                cleanSubDistrict = subdistrictsInDistrict[0].district;
-                                console.log('✅ Found single subdistrict:', cleanSubDistrict);
-                            } else {
-                                // ถ้ามีหลายตำบล → เลือกตำบลแรก (fallback)
-                                // TODO: ในอนาคตอาจใช้ distance calculation หาตำบลที่ใกล้ที่สุด
-                                cleanSubDistrict = subdistrictsInDistrict[0].district;
-                                console.log(`⚠️ Found ${subdistrictsInDistrict.length} subdistricts, using first:`, cleanSubDistrict);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('❌ Cross-reference failed:', error);
+                    // ใน Bangkok: เขต = District, แขวง = Sub-district
+                    // OSM มักส่ง "เขต" มาใน suburb หรือ city_district
+                    if (rawSubDistrict.includes('เขต')) {
+                        finalDistrict = rawSubDistrict; // เช่น "เขตปทุมวัน"
+                        finalSubDistrict = addr.neighbourhood || addr.quarter || ""; // แขวง
+                    } else if (municipality.includes('เขต')) {
+                        finalDistrict = municipality;
+                        finalSubDistrict = rawSubDistrict; // ถ้า suburb ไม่ใช่เขต ก็คือแขวง
+                    } else if (addr.city_district) {
+                        finalDistrict = addr.city_district;
+                        finalSubDistrict = rawSubDistrict;
                     }
                 }
                 
-                // ตรวจสอบว่า sub_district ควรแสดงใน address_detail หรือไม่
-                const shouldShowSubDistrict = cleanSubDistrict && 
-                    cleanSubDistrict !== cleanProvince && 
-                    cleanSubDistrict !== cleanDistrict;
-                
-                // สร้าง address_detail แบบไทยมาตรฐาน
+                // ลบ prefix ที่ไม่จำเป็น
+                const cleanProvince = finalProvince.replace(/^(จังหวัด|จ\.)/, '').trim();
+                const cleanDistrict = finalDistrict.replace(/^(อำเภอ|เขต|อ\.)/, '').trim();
+                const cleanSubDistrict = finalSubDistrict.replace(/^(ตำบล|แขวง|ต\.)/, '').trim();
+                const cleanMunicipality = municipality.replace(/^(เทศบาล|เทศบาลเมือง|เทศบาลตำบล|เทศบาลนคร)/, '').trim();
+
+                // สร้าง address_detail แบบไทยมาตรฐาน: เลขที่ ถนน ตำบล อำเภอ จังหวัด รหัส
                 let detailParts = [];
                 
                 // 1. สถานที่/อาคาร (ถ้ามี)
@@ -262,57 +237,88 @@ const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) 
                 if (building && building !== 'yes') detailParts.push(building);
                 
                 // 2. เลขที่
-                if (houseNumber) detailParts.push(houseNumber);
+                if (houseNumber) detailParts.push(houseNumber); // ไม่ใส่คำว่า "เลขที่" นำหน้าแล้ว เพื่อความกระชับหรือตาม format ที่userขอ (33/64 ...)
                 
                 // 3. หมู่บ้าน
                 if (village) detailParts.push(village);
                 
-                // 4. ถนน/ซอย
+                // 4. ถนน
                 if (road) {
-                    // ตรวจสอบว่ามี "ถนน" หรือ "ซอย" อยู่แล้วหรือไม่
-                    const roadText = (road.startsWith('ถนน') || road.startsWith('ซอย')) ? road : `ถนน${road}`;
+                    // ตรวจสอบว่ามีคำว่า "ถนน" อยู่แล้วหรือไม่
+                    const roadText = road.startsWith('ถนน') ? road : `ถนน ${road}`;
                     detailParts.push(roadText);
                 }
                 
-                // 5. ตำบล/แขวง (ถ้ามีและไม่ซ้ำกับจังหวัด/อำเภอ)
-                if (shouldShowSubDistrict) {
-                    const prefix = isBangkok ? 'แขวง' : 'ตำบล';
-                    detailParts.push(`${prefix}${cleanSubDistrict}`);
+                // 5. ตำบล (ถ้ามี) - ถ้าไม่มี ลองใช้ municipality มาแสดงเพื่อให้รู้ตำแหน่งคร่าวๆ ใน text
+                if (cleanSubDistrict) {
+                    detailParts.push(`ตำบล${cleanSubDistrict}`);
+                } else if (municipality) {
+                    // แสดงเทศบาลถ้าไม่มีตำบล ใส่ชื่อเต็มไปเลยเพื่อให้ได้รายละเอียดมากที่สุด
+                    detailParts.push(municipality);
                 }
                 
-                // 6. อำเภอ/เขต
-                if (cleanDistrict) {
-                    const prefix = isBangkok ? 'เขต' : 'อำเภอ';
-                    detailParts.push(`${prefix}${cleanDistrict}`);
-                }
+                // 6. อำเภอ (ถ้ามี)
+                if (cleanDistrict) detailParts.push(`อำเภอ${cleanDistrict}`);
                 
-                // 7. จังหวัด
+                // 7. จังหวัด (ถ้ามี)
                 if (cleanProvince) detailParts.push(cleanProvince);
                 
-                // 8. รหัสไปรษณีย์
+                // 8. รหัสไปรษณีย์ (ถ้ามี)
                 if (addr.postcode) detailParts.push(addr.postcode);
                 
                 const addressDetail = detailParts.length > 0 
                     ? detailParts.join(' ') 
                     : data.display_name.split(',')[0] || '';
                 
-                // Extract accuracy level from Nominatim
-                const accuracy = data.addresstype || data.type || 'unknown';
-                setAddressAccuracy(accuracy);
-                
-                const changes = {
+                // ✅ Use municipality as fallback for sub_district if not set (non-Bangkok only)
+                if (!isBangkok && !finalSubDistrict) {
+                    finalSubDistrict = cleanMunicipality || "";
+                }
+
+                // ✅ NEW: Normalize OSM data to match ThaiAddressPicker
+                const normalized = normalizeThaiAddress({
                     province: cleanProvince,
                     district: cleanDistrict,
-                    sub_district: cleanSubDistrict,
+                    subDistrict: finalSubDistrict
+                });
+
+                const changes = {
+                    province: normalized.province,      // ✅ Normalized province
+                    district: normalized.district,
+                    sub_district: normalized.subDistrict,
                     zipcode: addr.postcode || "",
-                    address_detail: addressDetail,
-                    accuracy: accuracy
+                    address_detail: addressDetail
                 };
                 
-                console.log('🏙️ Is Bangkok:', isBangkok);
-                console.log('📍 Accuracy:', accuracy);
-                console.log('✅ Extracted Address Components:', changes);
+                console.log('✅ Extracted Address Components (Raw):', {
+                    province: cleanProvince,
+                    district: cleanDistrict,
+                    sub_district: finalSubDistrict
+                });
+                console.log('✅ Normalized Address Components:', changes);
                 setFormData(prev => ({ ...prev, ...changes }));
+                
+                // ✅ NEW: Show success notification
+                if (changes.province || changes.district) {
+                    const addressParts = [
+                        changes.province,
+                        changes.district,
+                        changes.sub_district
+                    ].filter(Boolean);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'ดึงข้อมูลที่อยู่สำเร็จ',
+                        text: addressParts.join(' > '),
+                        timer: 2500,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top',
+                        background: '#ecfdf5',
+                        color: '#065f46',
+                        iconColor: '#10b981'
+                    });
+                }
             }
         } catch (error) {
             console.error('❌ GPS Resolve Error:', error);
@@ -331,21 +337,31 @@ const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) 
     const handleSubmit = (e) => {
         e.preventDefault();
         
-        // Final validations
-        if (!formData.receiver_name || !formData.phone || !formData.province || !formData.district || !formData.sub_district || !formData.zipcode) {
-             Swal.fire({
-                icon: 'warning',
-                title: 'ข้อมูลไม่ครบถ้วน',
-                text: 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน',
-                confirmButtonColor: '#1a4d2e'
-            });
-            return;
-        }
+    // Final validations
+    const missingFields = [];
+    if (!formData.receiver_name) missingFields.push('ชื่อผู้รับ');
+    if (!formData.phone) missingFields.push('เบอร์โทรศัพท์');
+    if (!formData.province) missingFields.push('จังหวัด');
+    if (!formData.district) missingFields.push('อำเภอ/เขต');
+    if (!formData.sub_district) missingFields.push('ตำบล/แขวง');
+    if (!formData.zipcode) missingFields.push('รหัสไปรษณีย์');
+
+    if (missingFields.length > 0) {
+            Swal.fire({
+            icon: 'warning',
+            title: 'ข้อมูลไม่ครบถ้วน',
+            text: `กรุณากรอกข้อมูลให้ครบ: ${missingFields.join(', ')}`,
+            confirmButtonColor: '#1a4d2e'
+        });
+        return;
+    }
 
         const payload = {
             ...formData,
-            latitude: mapPosition ? mapPosition.lat : null,
-            longitude: mapPosition ? mapPosition.lng : null
+            latitude: mapPosition ? parseFloat(mapPosition.lat.toFixed(6)) : null,
+            longitude: mapPosition ? parseFloat(mapPosition.lng.toFixed(6)) : null,
+            // Include custom label name if "Other" is selected
+            custom_label_name: formData.label === 'Other' ? customLabel : null
         };
         
         onSave(payload);
@@ -377,16 +393,24 @@ const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) 
                                 <p className="text-xs text-green-700">{mapPosition ? 'ปักหมุดตำแหน่งแล้ว' : 'ยังไม่ได้ระบุตำแหน่ง'}</p>
                             </div>
                          </div>
-                         <button 
-                            type="button" 
-                            onClick={() => {
-                                setShowMap(true);
-                                if (!mapPosition) handleGetCurrentLocation();
-                            }}
-                            className="bg-white text-green-700 border border-green-200 px-4 py-2 rounded-xl font-bold text-sm hover:bg-green-100 transition shadow-sm"
-                        >
-                            {mapPosition ? 'แก้ไขตำแหน่ง' : 'เลือกตำแหน่ง'}
-                        </button>
+                         <div className="flex gap-2">
+                            <button 
+                                type="button" 
+                                onClick={handleGetCurrentLocation}
+                                className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-green-700 transition shadow-sm flex items-center gap-2"
+                            >
+                                <Navigation size={16} className={gettingLocation ? 'animate-spin' : ''} />
+                                {gettingLocation ? 'กำลังระบุ...' : 'ใช้ตำแหน่งปัจจุบัน'}
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={() => setShowMap(true)}
+                                className="bg-white text-green-700 border border-green-200 px-4 py-2 rounded-xl font-bold text-sm hover:bg-green-100 transition shadow-sm flex items-center gap-2"
+                            >
+                                <MapIcon size={16} />
+                                {mapPosition ? 'ดูแผนที่' : 'เปิดแผนที่'}
+                            </button>
+                         </div>
                     </div>
 
                     {/* Show Map Modal */}
@@ -404,22 +428,9 @@ const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) 
                                     <MapContainer center={mapPosition || [13.7563, 100.5018]} zoom={13} style={{ height: "100%", width: "100%" }}>
                                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                                         <RecenterAutomatically lat={mapPosition?.lat} lng={mapPosition?.lng} />
-                                        <DraggableMarker 
-                                            position={mapPosition} 
-                                            setPosition={setMapPosition}
-                                            onDragEnd={(pos) => {
-                                                // Auto-resolve address on drag
-                                                resolveAddressFromCoordinates(pos.lat, pos.lng);
-                                            }}
-                                        />
+                                        <LocationMarker setPosition={setMapPosition} onLocationClick={resolveAddressFromCoordinates} />
+                                        {mapPosition && <Marker position={mapPosition} />}
                                     </MapContainer>
-                                    
-                                    {/* Map hint */}
-                                    {mapPosition && (
-                                      <div className="absolute top-4 left-4 bg-white px-4 py-2 rounded-lg shadow-md text-sm text-gray-700 z-[400]">
-                                           💡 ลากหมุดเพื่อปรับตำแหน่ง
-                                       </div>
-                                    )}
                                     
                                     {/* Map Controls */}
                                     <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-[400]">
@@ -471,88 +482,48 @@ const AddressModal = ({ isOpen, onClose, addressToEdit = null, onSave, token }) 
 
                         {/* Address Detail */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">รายละเอียดที่อยู่ (บ้านเลขที่, หมู่บ้าน, ซอย, ถนน)</label>
-                            <textarea required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition min-h-[80px]" value={formData.address_detail} onChange={e => setFormData({...formData, address_detail: e.target.value})} placeholder="เช่น 123/45 หมู่ 1 ถนน..." />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">รายละเอียดที่อยู่ (บ้านเลขที่ / หมู่บ้าน / ซอย / ถนน)</label>
+                            <textarea 
+                                required 
+                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition min-h-[80px]" 
+                                value={formData.address_detail} 
+                                onChange={e => setFormData({...formData, address_detail: e.target.value})} 
+                                placeholder="เช่น 123/45 หมู่ 1 ถนน..." 
+                            />
                         </div>
-
-                        {/* Accuracy Indicator */}
-                        {addressAccuracy && mapPosition && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="flex-shrink-0">
-                                        {((acc) => {
-                                            if (acc === 'building' || acc === 'house') 
-                                                return <div className="w-3 h-3 rounded-full bg-green-500 mt-1"></div>;
-                                            if (acc === 'road' || acc === 'street' || acc === 'residential')
-                                                return <div className="w-3 h-3 rounded-full bg-yellow-500 mt-1"></div>;
-                                            return <div className="w-3 h-3 rounded-full bg-red-500 mt-1"></div>;
-                                        })(addressAccuracy)}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="font-bold text-sm text-gray-900 mb-1">
-                                            ความแม่นยำของตำแหน่ง: {
-                                                (() => {
-                                                    if (addressAccuracy === 'building' || addressAccuracy === 'house') 
-                                                        return <span className="text-green-700">สูงมาก ✓</span>;
-                                                    if (addressAccuracy === 'road' || addressAccuracy === 'street' || addressAccuracy === 'residential')
-                                                        return <span className="text-yellow-700">ปานกลาง ⚠</span>;
-                                                    return <span className="text-red-700">ต่ำ ✗</span>;
-                                                })()
-                                            }
-                                        </div>
-                                        <p className="text-xs text-gray-600">
-                                            {addressAccuracy === 'building' || addressAccuracy === 'house' 
-                                                ? 'ตำแหน่งระบุได้ถึงระดับอาคาร/บ้าน - แม่นยำมาก'
-                                                : addressAccuracy === 'road' || addressAccuracy === 'street' || addressAccuracy === 'residential'
-                                                ? 'ตำแหน่งระบุได้ถึงระดับถนน - ควรปรับตำแหน่งให้แม่นยำขึ้น'
-                                                : 'ตำแหน่งไม่แม่นยำ - กรุณาลากหมุดไปยังตำแหน่งที่ถูกต้อง'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Verification Checkbox */}
-                        {mapPosition && (
-                            <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
-                                <label className="flex items-start gap-3 cursor-pointer group">
-                                    <input 
-                                        type="checkbox"
-                                        checked={formData.verified}
-                                        onChange={(e) => setFormData({...formData, verified: e.target.checked})}
-                                        className="mt-1 w-5 h-5 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-pointer"
-                                        required={mapPosition !== null}
-                                    />
-                                    <div className="flex-1">
-                                        <span className="font-bold text-sm text-orange-900 group-hover:text-orange-700 transition">
-                                            ✓ ยืนยันว่านี่คือตำแหน่งที่อยู่จริงของฉัน
-                                        </span>
-                                        <p className="text-xs text-orange-700 mt-1">
-                                            กรุณาตรวจสอบว่าหมุดอยู่ตรงตำแหน่งที่ถูกต้องก่อนยืนยัน
-                                        </p>
-                                    </div>
-                                </label>
-                            </div>
-                        )}
 
                         {/* Label & Default */}
                         <div className="flex items-center gap-4 pt-2">
                              <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">ตั้งชื่อสถานที่</label>
-                                <div className="flex gap-2">
-                                    {['Home', 'Office', 'Other'].map(l => (
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">ประเภทที่อยู่</label>
+                                <div className="flex gap-2 mb-2">
+                                    {[
+                                        { value: 'Home', label: 'บ้าน', icon: <Home size={14} /> },
+                                        { value: 'Work', label: 'ที่ทำงาน', icon: <Briefcase size={14} /> },
+                                        { value: 'Other', label: 'อื่นๆ', icon: <MapPin size={14} /> }
+                                    ].map(item => (
                                         <button 
-                                            key={l} 
+                                            key={item.value} 
                                             type="button" 
-                                            onClick={() => setFormData({...formData, label: l})}
-                                            className={`px-4 py-2 rounded-lg text-sm font-bold border transition flex items-center gap-2 ${formData.label === l ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                                            onClick={() => setFormData({...formData, label: item.value})}
+                                            className={`px-4 py-2 rounded-lg text-sm font-bold border transition flex items-center gap-2 ${formData.label === item.value ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
                                         >
-                                            {l === 'Home' && <Home size={14} />}
-                                            {l === 'Office' && <Briefcase size={14} />}
-                                            {l}
+                                            {item.icon}
+                                            {item.label}
                                         </button>
                                     ))}
                                 </div>
+                                
+                                {/* Custom label input for "Other" */}
+                                {formData.label === 'Other' && (
+                                    <input 
+                                        type="text"
+                                        value={customLabel}
+                                        onChange={e => setCustomLabel(e.target.value)}
+                                        placeholder="ระบุชื่อสถานที่ เช่น ร้านค้า, คอนโด, โรงเรียน..."
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition"
+                                    />
+                                )}
                              </div>
                              <div className="flex items-center gap-2">
                                 <input type="checkbox" id="is_default" checked={formData.is_default} onChange={e => setFormData({...formData, is_default: e.target.checked})} className="w-5 h-5 text-green-600 rounded focus:ring-green-500 border-gray-300" />

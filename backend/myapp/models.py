@@ -288,8 +288,8 @@ class Coupon(models.Model):
 
     def is_valid(self, user=None):
         now = timezone.now()
-        # V2: Check total_supply OR usage_limit (legacy)
-        limit = max(self.total_supply, self.usage_limit)
+        # V2: Check total_supply and usage_limit (respect the tighter limit)
+        limit = min(self.total_supply, self.usage_limit)
         is_active = self.active and self.start_date <= now <= self.end_date and self.used_count < limit
         if not is_active:
             return False
@@ -925,17 +925,8 @@ class ShippingAddress(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     
-    # Address Verification
-    accuracy = models.CharField(
-        max_length=20, 
-        blank=True, 
-        null=True,
-        help_text="Accuracy level: building, house, road, street, city, etc."
-    )
-    verified = models.BooleanField(
-        default=False,
-        help_text="User confirmed this is the actual location"
-    )
+    # ✅ Fix: Missing field causing DB error (1364)
+    verified = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

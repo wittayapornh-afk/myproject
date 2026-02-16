@@ -6,7 +6,9 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; // 👤 ดึงข้อมูล User เพื่อเช็คสิทธิ์
+import { formatPrice, getImageUrl } from '../utils/formatUtils';
 
 // ========================================
 // 🎟️ CouponCenter Component
@@ -15,14 +17,17 @@ import { useAuth } from '../context/AuthContext'; // 👤 ดึงข้อม�
 // ========================================
 const CouponCenter = () => {
     // 1. Hook & State
+    const navigate = useNavigate();
     const { user, token } = useAuth(); // ดึง User Profile
     const [coupons, setCoupons] = useState([]); // รายการคูปองทั้งหมดจาก API
+    const [products, setProducts] = useState([]); // 📦 รายการสินค้าทั้งหมด
     const [collectedIds, setCollectedIds] = useState([]); // รายการ ID คูปองที่ user คนนี้เก็บไปแล้ว
     const [loading, setLoading] = useState(true); // Loading State
 
     // 2. Fetch Data on Mount
     useEffect(() => {
         fetchCoupons();
+        fetchProducts(); // 📦 ดึงสินค้ามาเพื่อพรีวิวในคูปอง
         if (token) {
             fetchCollectedCoupons();
         }
@@ -36,6 +41,19 @@ const CouponCenter = () => {
             setCoupons(res.data);
         } catch (error) {
             console.error("❌ Error fetching coupons", error);
+        }
+    };
+
+    // 🔄 ฟังก์ชันดึงสินค้าทั้งหมด เพื่อนำมาแมตช์กับคูปอง
+    const fetchProducts = async () => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/products/`);
+            // ✅ Handle Paginated Response (API returns { results: [...] })
+            const productsList = Array.isArray(res.data) ? res.data : (res.data.results || []);
+            setProducts(productsList);
+        } catch (error) {
+            console.error("❌ Error fetching products", error);
+            setProducts([]); // Fallback to empty array
         } finally {
             setLoading(false);
         }
@@ -97,6 +115,15 @@ const CouponCenter = () => {
                 confirmButtonText: 'ตกลง'
             });
         }
+    };
+
+    // 🛒 ฟังก์ชันไปหน้าสินค้า พร้อมถือคูปองไปใช้งาน
+    const goToProduct = (product, coupon) => {
+        navigate(`/product/${product.id}`, { 
+            state: { 
+                appliedCoupon: coupon 
+            } 
+        });
     };
 
     // ========================================
@@ -288,6 +315,49 @@ const CouponCenter = () => {
                                         </div>
 
                                         <div className="mt-auto">
+                                            {/* 📦 Matching Products Preview (Slot) */}
+                                            {coupon.conditions?.applicable_tags?.length > 0 && (
+                                                <div className="mb-6">
+                                                    <div className="flex items-center justify-between mb-3 px-1">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-[#1a4d2e]/40 flex items-center gap-1">
+                                                            <ShoppingBag size={10} /> สินค้าแนะนำ
+                                                        </span>
+                                                        <span className="text-[9px] font-bold text-gray-300">Matching Products</span>
+                                                    </div>
+                                                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
+                                                        {(Array.isArray(products) ? products : [])
+                                                            .filter(p => p.tags?.some(tag => coupon.conditions?.applicable_tags?.includes(tag.name)))
+                                                            .slice(0, 5) // Show top 5 matching products
+                                                            .map(product => (
+                                                                <button
+                                                                    key={product.id}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        goToProduct(product, coupon);
+                                                                    }}
+                                                                    className="flex-shrink-0 w-24 group/item text-left"
+                                                                >
+                                                                    <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden mb-1.5 border border-gray-100 group-hover/item:border-blue-200 transition-colors relative">
+                                                                        <img 
+                                                                            src={getImageUrl(product.thumbnail || product.image)} 
+                                                                            className="w-full h-full object-contain p-2 group-hover/item:scale-110 transition-transform" 
+                                                                            alt={product.title}
+                                                                        />
+                                                                        <div className="absolute inset-0 bg-blue-600/0 group-hover/item:bg-blue-600/5 transition-colors"></div>
+                                                                    </div>
+                                                                    <p className="text-[9px] font-bold text-gray-700 truncate group-hover/item:text-blue-600 transition-colors">{product.title}</p>
+                                                                    <p className="text-[10px] font-black text-indigo-600">{formatPrice(product.price)}</p>
+                                                                </button>
+                                                            ))}
+                                                        {products.filter(p => p.tags?.some(tag => coupon.conditions.applicable_tags.includes(tag.name))).length === 0 && (
+                                                            <div className="w-full text-center py-2 bg-gray-50/50 rounded-xl border border-dashed border-gray-100">
+                                                                <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">No products found</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {/* Code & Collect Button */}
                                             <div className="bg-white rounded-xl p-1 flex items-center gap-2 border border-gray-200 group-hover:border-blue-200 transition-colors shadow-inner">
                                                 <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2.5 text-center relative overflow-hidden group-hover:bg-blue-50/30 transition-colors">

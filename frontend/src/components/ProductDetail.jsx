@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ShoppingCart, Heart, ArrowLeft, Star, Plus, Minus, 
   ChevronRight, ChevronLeft, MessageSquare, Send, Zap, ShieldCheck, Truck, Package,
@@ -59,6 +59,8 @@ function ProductDetail() {
   const { user, isAdmin, token: authToken } = useAuth(); 
   const isRestricted = ['admin', 'super_admin', 'seller'].includes(user?.role?.toLowerCase()); 
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ Hook for State
+  const appliedCoupon = location.state?.appliedCoupon; // 🎟️ คูปองที่เลือกมาจากหน้ารวม
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1); 
@@ -368,7 +370,13 @@ function ProductDetail() {
           }
 
           // Send specific item to checkout directly (bypass cart context temporarily)
-          navigate('/checkout', { state: { directBuyItem: product, quantity: quantity } });
+          navigate('/checkout', { 
+              state: { 
+                  directBuyItem: product, 
+                  quantity: quantity,
+                  autoApplyCoupon: appliedCoupon?.code // ✅ ส่งคูปองไป Apply อัตโนมัติ
+              } 
+          });
       }
   };
 
@@ -390,6 +398,17 @@ function ProductDetail() {
                             <Link to="/" className="hover:text-[#1a4d2e] transition-colors">หน้าแรก</Link>
                             <ChevronRight size={12} />
                             <Link to="/shop" className="hover:text-[#1a4d2e] transition-colors">สินค้าทั้งหมด</Link>
+                            {product.category && (
+                                <>
+                                    <ChevronRight size={12} />
+                                    <Link 
+                                        to={`/shop?category=${encodeURIComponent(product.category)}`} 
+                                        className="hover:text-[#1a4d2e] transition-colors"
+                                    >
+                                        {product.category}
+                                    </Link>
+                                </>
+                            )}
                             <ChevronRight size={12} />
                             <span className="text-[#1a4d2e] font-bold line-clamp-1">{product.title}</span>
                        </nav>
@@ -406,6 +425,23 @@ function ProductDetail() {
                            </div>
                        </div>
                    </div>
+
+                   {/* 🎟️ Applied Coupon Banner (If exists) */}
+                   {appliedCoupon && (
+                       <motion.div 
+                           initial={{ opacity: 0, x: 20 }}
+                           animate={{ opacity: 1, x: 0 }}
+                           className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-indigo-200 border border-white/20"
+                       >
+                           <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                               <Gift size={18} className="text-white" />
+                           </div>
+                           <div>
+                               <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Selected Coupon</p>
+                               <p className="text-sm font-bold">ใช้คูปอง <span className="text-cyan-300">"{appliedCoupon.code}"</span> กับสินค้านี้ได้!</p>
+                           </div>
+                       </motion.div>
+                   )}
 
                    {/* Controls (Back & Nav) */}
                    <div className="flex items-center gap-3">

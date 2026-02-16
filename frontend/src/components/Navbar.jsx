@@ -488,7 +488,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
                             <div key={idx} className={`flex gap-3 p-2.5 rounded-2xl transition-all duration-300 ${isFlashSale ? 'bg-orange-50 hover:bg-orange-100 hover:scale-[1.02] border border-orange-200/50 shadow-sm shadow-orange-100' : 'hover:bg-gray-50'}`}>
                                 <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden shrink-0 border border-gray-100 relative shadow-inner">
                                     {(item.thumbnail || item.image) ? (
-                                        <img src={API_BASE_URL + (item.thumbnail || item.image)} alt={item.title} className="w-full h-full object-cover mix-blend-multiply" />
+                                        <img src={getImageUrl(item.thumbnail || item.image)} alt={item.title} className="w-full h-full object-cover mix-blend-multiply" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-400 font-bold bg-gray-50">NO IMG</div>
                                     )}

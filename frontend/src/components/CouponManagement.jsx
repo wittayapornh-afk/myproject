@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useMemo } from 'react';
 import axios from 'axios';
+import ImpactSimulator from './ImpactSimulator';
 import Swal from 'sweetalert2';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Ticket, Tag, Clock, Plus, Trash2, X, Info, Percent, 
     ChevronRight, Calendar, Users, Check, AlertCircle, Search, Filter, 
     Truck, Settings, Copy, ChevronDown, ChevronUp, ChevronLeft, Edit2, Star,
-    UserPlus, Crown, HelpCircle 
+    UserPlus, Crown, HelpCircle, AlertOctagon, AlertTriangle, ShieldCheck,
+    Layout, Sparkles, RotateCw, ShoppingBag
 } from 'lucide-react';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -217,6 +219,8 @@ const ThaiTimePicker = ({ value, onDateChange, minDate }) => {
         document.addEventListener('mouseleave', cleanup);
     };
 
+
+    // --- Tab Navigation Component ---
     // Manual Input Commit
     const handleInputCommit = (type) => {
         const newDate = new Date(dateValue);
@@ -335,12 +339,74 @@ const CouponManagement = () => {
 
     const API_BASE_URL = "http://localhost:8000";
 
+    // --- UI States (Premium Management) ---
+    const [activeTab, setActiveTab] = useState('active'); // 'active' | 'scheduled' | 'expired' | 'performance'
+    const [couponAnalyticsData, setCouponAnalyticsData] = useState(null);
+    const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
     const [tags, setTags] = useState([]); // ✅ Tags State
+    const [products, setProducts] = useState([]); // ✅ NEW: Products State for Preview
+
+    // 🛡️ NEW: Real-time Coupon Risk Guard Calculation
+    const couponRisk = useMemo(() => {
+        const discountVal = parseFloat(formData.discount_value) || 0;
+        const minSpend = parseFloat(formData.min_spend) || 0;
+        const maxDiscount = parseFloat(formData.max_discount_amount) || 0;
+
+        // 🚨 CRITICAL: Loss Leader Detection (Discount >= Min Spend)
+        if (formData.discount_type === 'fixed' && minSpend > 0 && discountVal >= minSpend) {
+            return { level: 'critical', message: 'คูปองนี้จะทำให้ขาดทุน! ยอดส่วนลดมากกว่าหรือเท่ากับยอดซื้อขั้นต่ำ' };
+        }
+
+        // ⚠️ WARNING: High Percentage (Over 50%)
+        if (formData.discount_type === 'percent' && discountVal > 50) {
+            return { level: 'warning', message: 'คำเตือน: ส่วนลดเปอร์เซ็นต์สูงมาก (มากกว่า 50%) กรุณาตรวจสอบความถูกต้อง' };
+        }
+
+        // ⚠️ WARNING: High Fixed Discount (Over 1000 THB)
+        if (formData.discount_type === 'fixed' && discountVal >= 1000) {
+            return { level: 'warning', message: 'คำเตือน: ส่วนลดมูลค่าสูง (≥ ฿1,000) โปรดระวังการตั้งค่า Usage Limit' };
+        }
+
+        // ✅ NORMAL: Safe configurations
+        return { level: 'normal', message: 'เงื่อนไขคูปองอยู่ในเกณฑ์ปกติ ระบบความปลอดภัยทำงานเป็นปกติ' };
+    }, [formData]);
+
+    // ✅ NEW: Filtered Matching Products for Preview
+    const matchingProducts = useMemo(() => {
+        const applicableTags = formData.conditions?.applicable_tags || [];
+        if (applicableTags.length === 0) return [];
+        
+        // Match product tags with coupon applicable tags
+        return products.filter(product => 
+            product.tags && product.tags.some(tag => applicableTags.includes(tag.id))
+        ).slice(0, 10); // Display top 10 matches
+    }, [products, formData.conditions?.applicable_tags]);
+
     
+    // ✅ Initial Fetch
     useEffect(() => {
         fetchCoupons();
         fetchTags();
+        fetchAnalytics(); 
+        fetchProducts(); // ✅ NEW: Fetch products for preview
     }, []);
+
+    // ✅ NEW: Fetch Coupon Analytics
+    const fetchAnalytics = async () => {
+        try {
+            setLoadingAnalytics(true);
+            const token = authContextToken || localStorage.getItem('token');
+            const response = await axios.get(`${API_BASE_URL}/api/analytics/coupons/`, {
+                headers: { Authorization: `Token ${token}` }
+            });
+            setCouponAnalyticsData(response.data);
+        } catch (err) {
+            console.error('Error fetching coupon analytics:', err);
+        } finally {
+            setLoadingAnalytics(false);
+        }
+    };
 
     const fetchTags = async () => {
         try {
@@ -382,6 +448,18 @@ const CouponManagement = () => {
                     window.location.href = '/admin/login';
                 });
             }
+        }
+    };
+
+    const fetchProducts = async () => {
+        try {
+            const token = authContextToken || localStorage.getItem('token');
+            const res = await axios.get(`${API_BASE_URL}/api/admin/products/`, {
+                headers: { Authorization: `Token ${token}` }
+            });
+            setProducts(res.data);
+        } catch (error) {
+            console.error("Error fetching products:", error);
         }
     };
 
@@ -547,7 +625,15 @@ const CouponManagement = () => {
     };
     
     const openEdit = (coupon) => {
-        setFormData(coupon);
+        setFormData({
+            ...coupon,
+            name: coupon.name || '',
+            description: coupon.description || '',
+            discount_value: coupon.discount_value ?? '',
+            max_discount_amount: coupon.max_discount_amount ?? '',
+            min_spend: coupon.min_spend ?? 0,
+            conditions: coupon.conditions || { applicable_tags: [] }
+        });
         setSelectedCoupon(coupon); 
         setIsEditing(true);
         setShowModal(true);
@@ -569,8 +655,6 @@ const CouponManagement = () => {
             is_public: true,
             auto_apply: false,
             is_stackable_with_flash_sale: false,
-            start_date: new Date(),
-            end_date: new Date(new Date().setDate(new Date().getDate() + 7)),
             start_date: new Date(),
             end_date: new Date(new Date().setDate(new Date().getDate() + 7)),
             allowed_roles: [],
@@ -629,249 +713,340 @@ const CouponManagement = () => {
                     </h1>
                     <p className="text-gray-500 font-bold text-lg max-w-xl">สร้างและจัดการคูปองส่วนลด เพื่อดึงดูดลูกค้าและกระตุ้นยอดขายของคุณ</p>
                 </div>
-                
-                <motion.button 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                        resetForm();
-                        setIsEditing(false);
-                        setShowModal(true);
-                    }}
-                    className="mt-8 group bg-indigo-600 text-white pl-8 pr-10 py-5 rounded-[2rem] hover:shadow-2xl hover:shadow-indigo-300 transition-all flex items-center gap-4 font-black text-xl"
-                >
-                    <Plus size={28} className="group-hover:rotate-90 transition-transform duration-300" />
-                    <span>สร้างคูปองใหม่</span>
-                </motion.button>
             </div>
+                
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <div className="bg-white p-2 rounded-[2rem] shadow-xl border border-gray-100 flex gap-2">
+                    <button 
+                        onClick={() => setActiveTab('active')}
+                        className={`px-10 py-4 rounded-[1.5rem] font-black text-sm transition-all flex items-center gap-3 ${activeTab !== 'performance' ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-200' : 'text-gray-400 hover:text-indigo-500'}`}
+                    >
+                        <Ticket size={20} /> คลังคูปอง (Coupon Vault)
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('performance')}
+                        className={`px-10 py-4 rounded-[1.5rem] font-black text-sm transition-all flex items-center gap-3 ${activeTab === 'performance' ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-200' : 'text-gray-400 hover:text-indigo-500'}`}
+                    >
+                        <Star size={20} /> วิเคราะห์ผล (Performance)
+                    </button>
+                </div>
+
+                <button 
+                    onClick={() => { resetForm(); setShowModal(true); }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-[1.5rem] font-black text-sm shadow-2xl shadow-indigo-200 transition-all flex items-center gap-2 hover:scale-105 active:scale-95 group"
+                >
+                    <div className="bg-white/20 p-1.5 rounded-xl group-hover:rotate-90 transition-transform duration-300">
+                        <Plus size={18} strokeWidth={4} />
+                    </div>
+                    สร้างคูปองใหม่ (Create)
+                </button>
+            </div>
+
             <DatePickerStyles />
 
-            {/* 🔍 Filters Bar */}
-            <div className="max-w-7xl mx-auto mb-8 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col lg:flex-row gap-4 items-center justify-between">
-                <div className="flex flex-wrap gap-2 items-center flex-1">
-                    <div className="flex items-center gap-2 text-gray-400 px-2">
-                        <Filter size={18} />
-                        <span className="text-xs font-bold uppercase tracking-widest hidden sm:inline">Filters:</span>
+             {activeTab === 'performance' ? (
+                /* 📊 Analytics Dashboard View */
+                <div className="max-w-7xl mx-auto space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                         {[
+                            { label: 'คูปองทั้งหมด', value: couponAnalyticsData?.total_coupons || 0, icon: Ticket, color: 'indigo' },
+                            { label: 'ถูกเก็บไปแล้ว', value: couponAnalyticsData?.total_collected || 0, icon: Copy, color: 'blue' },
+                            { label: 'ใช้ไปแล้ว', value: couponAnalyticsData?.total_used || 0, icon: Check, color: 'emerald' },
+                            { label: 'อัตราการใช้', value: `${couponAnalyticsData?.overall_conversion_rate || 0}%`, icon: Star, color: 'amber' }
+                         ].map((stat, i) => (
+                            <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                                <div className={`w-12 h-12 rounded-2xl bg-${stat.color}-50 text-${stat.color}-600 flex items-center justify-center mb-6`}>
+                                    <stat.icon size={24} />
+                                </div>
+                                <p className="text-3xl font-black text-gray-900">{stat.value}</p>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-2">{stat.label}</p>
+                            </div>
+                         ))}
                     </div>
-                    
-                    {/* Status Tabs */}
-                    <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-200 overflow-x-auto max-w-full no-scrollbar">
-                        {[
-                            { id: 'all', label: 'ทั้งหมด' },
-                            { id: 'active', label: 'ใช้งานได้' },
-                            { id: 'upcoming', label: 'เร็วๆนี้' },
-                            { id: 'expired', label: 'หมดอายุ' },
-                            { id: 'sold_out', label: 'สิทธิ์เต็ม' },
-                            { id: 'inactive', label: 'ปิดใช้งาน' },
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setFilterStatus(tab.id)}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                                    filterStatus === tab.id 
-                                    ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' 
-                                    : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                {tab.label}
+
+                    <div className="bg-white rounded-[3rem] shadow-xl border border-gray-100 overflow-hidden">
+                         <div className="p-10 border-b border-gray-50 bg-gray-50/30 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-2xl font-black text-gray-800">ประสิทธิภาพรายแคมเปญ</h3>
+                                <p className="text-sm font-bold text-gray-400 mt-1">วิเคราะห์เจาะลึก อัตราการเปลี่ยน (Conversion Funnel)</p>
+                            </div>
+                            <button onClick={fetchAnalytics} className="p-4 bg-white rounded-2xl border border-gray-100 text-indigo-600 shadow-sm hover:rotate-180 transition-all duration-500">
+                                <RotateCw size={24} className={loadingAnalytics ? 'animate-spin' : ''} />
                             </button>
-                        ))}
-                    </div>
-
-                    {/* Divider */}
-                    <div className="h-6 w-px bg-gray-200 hidden lg:block mx-2"></div>
-
-                    {/* Type Select */}
-                    <select 
-                        value={filterType}
-                        onChange={(e) => setFilterType(e.target.value)}
-                        className="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 font-medium outline-none cursor-pointer hover:bg-white transition-colors"
-                    >
-                        <option value="all">ทุกประเภท</option>
-                        <option value="fixed">ส่วนลดบาท (Fixed)</option>
-                        <option value="percent">ส่วนลด % (Percent)</option>
-                        <option value="free_shipping">ส่งฟรี (Free Shipping)</option>
-                    </select>
-
-                    {/* ✅ New Filters: No Min & New User */}
-                    <div className="flex gap-2">
-                         <button
-                            onClick={() => setFilterNoMin(!filterNoMin)}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
-                                filterNoMin ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
-                            }`}
-                         >
-                            {filterNoMin && <Check size={12} />}
-                            ไม่มีขั้นต่ำ
-                         </button>
-                         <button
-                            onClick={() => setFilterNewUser(!filterNewUser)}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
-                                filterNewUser ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
-                            }`}
-                         >
-                            {filterNewUser && <Check size={12} />}
-                            ลูกค้าใหม่
-                         </button>
+                         </div>
+                         <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50/50">
+                                    <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                        <th className="px-10 py-6">คูปอง</th>
+                                        <th className="px-8 py-6 text-center">ยอดเก็บ</th>
+                                        <th className="px-8 py-6 text-center">ยอดใช้</th>
+                                        <th className="px-8 py-6 text-right">Conversion Funnel</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 font-sans">
+                                    {couponAnalyticsData?.coupons?.map(coupon => (
+                                        <tr key={coupon.id} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-10 py-8">
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-gray-900 text-lg uppercase tracking-wider">{coupon.code}</span>
+                                                    <span className="text-xs font-bold text-gray-400">{coupon.name || 'ไม่มีชื่อแคมเปญ'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-8 text-center font-black text-blue-600 text-lg">{coupon.collected_count}</td>
+                                            <td className="px-8 py-8 text-center font-black text-emerald-600 text-lg">{coupon.used_count}</td>
+                                            <td className="px-8 py-8">
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black text-gray-400 uppercase">อัตราการใช้คูปอง (Redemption Rate)</span>
+                                                        <span className="text-lg font-black text-gray-900">{coupon.conversion_rate}%</span>
+                                                    </div>
+                                                    <div className="w-48 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                        <motion.div 
+                                                            initial={{ width: 0 }}
+                                                            animate={{ width: `${coupon.conversion_rate}%` }}
+                                                            className={`h-full ${coupon.conversion_rate > 20 ? 'bg-emerald-500' : 'bg-amber-400'}`} 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                         </div>
                     </div>
                 </div>
+             ) : (
+                /* 📋 Data Table Layout (Existing) */
+                <>
+                    {/* 🔍 Filters Bar */}
+                    <div className="max-w-7xl mx-auto mb-8 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col lg:flex-row gap-4 items-center justify-between">
+                        <div className="flex flex-wrap gap-2 items-center flex-1">
+                            <div className="flex items-center gap-2 text-gray-400 px-2">
+                                <Filter size={18} />
+                                <span className="text-xs font-bold uppercase tracking-widest hidden sm:inline">Filters:</span>
+                            </div>
+                            
+                            {/* Status Tabs */}
+                            <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-200 overflow-x-auto max-w-full no-scrollbar">
+                                {[
+                                    { id: 'all', label: 'ทั้งหมด' },
+                                    { id: 'active', label: 'ใช้งานได้' },
+                                    { id: 'upcoming', label: 'เร็วๆนี้' },
+                                    { id: 'expired', label: 'หมดอายุ' },
+                                    { id: 'sold_out', label: 'สิทธิ์เต็ม' },
+                                    { id: 'inactive', label: 'ปิดใช้งาน' },
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setFilterStatus(tab.id)}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                                            filterStatus === tab.id 
+                                            ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' 
+                                            : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
 
-                {/* Search */}
-                <div className="relative w-full lg:w-72">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-                        <Search size={18} />
+                            {/* Divider */}
+                            <div className="h-6 w-px bg-gray-200 hidden lg:block mx-2"></div>
+
+                            {/* Type Select */}
+                            <select 
+                                value={filterType}
+                                onChange={(e) => setFilterType(e.target.value)}
+                                className="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 font-medium outline-none cursor-pointer hover:bg-white transition-colors"
+                            >
+                                <option value="all">ทุกประเภท</option>
+                                <option value="fixed">ส่วนลดบาท (Fixed)</option>
+                                <option value="percent">ส่วนลด % (Percent)</option>
+                                <option value="free_shipping">ส่งฟรี (Free Shipping)</option>
+                            </select>
+
+                            {/* New Filters */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setFilterNoMin(!filterNoMin)}
+                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
+                                        filterNoMin ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                    }`}
+                                >
+                                    {filterNoMin && <Check size={12} />}
+                                    ไม่มีขั้นต่ำ
+                                </button>
+                                <button
+                                    onClick={() => setFilterNewUser(!filterNewUser)}
+                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
+                                        filterNewUser ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                    }`}
+                                >
+                                    {filterNewUser && <Check size={12} />}
+                                    ลูกค้าใหม่
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Search */}
+                        <div className="relative w-full lg:w-72">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                                <Search size={18} />
+                            </div>
+                            <input 
+                                type="text" 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 p-2.5 outline-none font-medium placeholder-gray-400 transition-all focus:bg-white" 
+                                placeholder="ค้นหารหัส หรือ ชื่อแคมเปญ..." 
+                            />
+                        </div>
                     </div>
-                    <input 
-                        type="text" 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 p-2.5 outline-none font-medium placeholder-gray-400 transition-all focus:bg-white" 
-                        placeholder="ค้นหารหัส หรือ ชื่อแคมเปญ..." 
-                    />
-                </div>
-            </div>
 
-            {/* 📋 Data Table Layout */}
-            <div className="max-w-7xl mx-auto bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-gray-50/50 border-b border-gray-100 text-gray-400 text-xs uppercase tracking-wider font-bold">
-                                <th className="p-6">รหัส / ชื่อ (Code / Name)</th>
-                                <th className="p-6 text-center">ประเภท (Type)</th>
-                                <th className="p-6">การใช้งาน (Usage)</th>
-                                <th className="p-6 text-center">สถานะ (Status)</th>
-                                <th className="p-6 text-right">จัดการ (Manage)</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {filteredCoupons.length > 0 ? filteredCoupons.map((coupon) => (
-                                <tr key={coupon.id} className="hover:bg-indigo-50/30 transition-colors group">
-                                    {/* 1. Code / Name */}
-                                    <td className="p-6 align-top">
-                                        <div className="flex flex-col">
-                                            <span className="font-black text-lg text-gray-800 tracking-wide flex items-center gap-2">
-                                                {coupon.code}
-                                                <button 
-                                                    onClick={() => {navigator.clipboard.writeText(coupon.code); Swal.fire({toast:true, position:'top-end', icon:'success', title:'Copied', showConfirmButton:false, timer:1000})}}
-                                                    className="text-gray-300 hover:text-indigo-500 transition-colors"
-                                                >
-                                                    <Copy size={14} />
-                                                </button>
-                                            </span>
-                                            <span className="text-sm text-gray-400 font-medium mt-1">{coupon.name}</span>
-                                            <span className="text-xs text-gray-300 mt-0.5 line-clamp-1">{coupon.description}</span>
-                                        </div>
-                                    </td>
+                    <div className="max-w-7xl mx-auto bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/50 border-b border-gray-100 text-gray-400 text-xs uppercase tracking-wider font-bold">
+                                        <th className="p-6">รหัส / ชื่อ (Code / Name)</th>
+                                        <th className="p-6 text-center">ประเภท (Type)</th>
+                                        <th className="p-6">การใช้งาน (Usage)</th>
+                                        <th className="p-6 text-center">สถานะ (Status)</th>
+                                        <th className="p-6 text-right">จัดการ (Manage)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredCoupons.length > 0 ? filteredCoupons.map((coupon) => (
+                                        <tr key={coupon.id} className="hover:bg-indigo-50/30 transition-colors group">
+                                            {/* 1. Code / Name */}
+                                            <td className="p-6 align-top">
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-lg text-gray-800 tracking-wide flex items-center gap-2">
+                                                        {coupon.code}
+                                                        <button 
+                                                            onClick={() => {navigator.clipboard.writeText(coupon.code); Swal.fire({toast:true, position:'top-end', icon:'success', title:'Copied', showConfirmButton:false, timer:1000})}}
+                                                            className="text-gray-300 hover:text-indigo-500 transition-colors"
+                                                        >
+                                                            <Copy size={14} />
+                                                        </button>
+                                                    </span>
+                                                    <span className="text-sm text-gray-400 font-medium mt-1">{coupon.name}</span>
+                                                    <span className="text-xs text-gray-300 mt-0.5 line-clamp-1">{coupon.description}</span>
+                                                </div>
+                                            </td>
 
-                                    {/* 2. Type */}
-                                    <td className="p-6 align-top text-center">
-                                        <div className={`inline-flex flex-col items-center justify-center px-4 py-2 rounded-xl border min-w-[100px] ${
-                                            coupon.discount_type === 'free_shipping' 
-                                            ? 'bg-emerald-50 border-emerald-100 text-emerald-600' // Green for Free Shipping
-                                            : coupon.discount_type === 'percent'
-                                                ? 'bg-purple-50 border-purple-100 text-purple-600'
-                                                : 'bg-blue-50 border-blue-100 text-blue-600'
-                                        }`}>
-                                            <span className="font-black text-lg leading-none">
-                                                {coupon.discount_type === 'free_shipping' 
-                                                    ? <Truck size={20} />
-                                                    : coupon.discount_type === 'percent' 
-                                                        ? `${Number(coupon.discount_value)}%` 
-                                                        : `฿${Number(coupon.discount_value)}`
-                                                }
-                                            </span>
-                                            <span className="text-[10px] uppercase font-bold tracking-widest mt-1 opacity-80">
-                                                {coupon.discount_type === 'free_shipping' ? 'ส่งฟรี' : coupon.discount_type === 'percent' ? 'ส่วนลด' : 'ลดบาท'}
-                                            </span>
-                                        </div>
-                                    </td>
+                                            {/* 2. Type */}
+                                            <td className="p-6 align-top text-center">
+                                                <div className={`inline-flex flex-col items-center justify-center px-4 py-2 rounded-xl border min-w-[100px] ${
+                                                    coupon.discount_type === 'free_shipping' 
+                                                    ? 'bg-emerald-50 border-emerald-100 text-emerald-600' // Green for Free Shipping
+                                                    : coupon.discount_type === 'percent'
+                                                        ? 'bg-purple-50 border-purple-100 text-purple-600'
+                                                        : 'bg-blue-50 border-blue-100 text-blue-600'
+                                                }`}>
+                                                    <span className="font-black text-lg leading-none">
+                                                        {coupon.discount_type === 'free_shipping' 
+                                                            ? <Truck size={20} />
+                                                            : coupon.discount_type === 'percent' 
+                                                                ? `${Number(coupon.discount_value)}%` 
+                                                                : `฿${Number(coupon.discount_value)}`
+                                                        }
+                                                    </span>
+                                                    <span className="text-[10px] uppercase font-bold tracking-widest mt-1 opacity-80">
+                                                        {coupon.discount_type === 'free_shipping' ? 'ส่งฟรี' : coupon.discount_type === 'percent' ? 'ส่วนลด' : 'ลดบาท'}
+                                                    </span>
+                                                </div>
+                                            </td>
 
-                                    {/* 3. Usage */}
-                                    <td className="p-6 align-middle min-w-[200px]">
-                                        <div className="w-full">
-                                            <div className="flex justify-between text-xs font-bold text-gray-500 mb-1.5">
-                                                <span>{coupon.used_count} Used</span>
-                                                <span className="opacity-50">Limit: {coupon.usage_limit}</span>
-                                            </div>
-                                            <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                                                <div 
-                                                    className={`h-full rounded-full transition-all duration-500 ${
-                                                        (coupon.used_count/coupon.usage_limit) >= 1 ? 'bg-red-500' 
-                                                        : (coupon.used_count/coupon.usage_limit) > 0.8 ? 'bg-amber-400' 
-                                                        : 'bg-indigo-500'
-                                                    }`} 
-                                                    style={{ width: `${Math.min((coupon.used_count/coupon.usage_limit)*100, 100)}%` }} 
-                                                />
-                                            </div>
-                                            <div className="flex items-center gap-1 mt-2 text-[10px] text-gray-400 font-medium">
-                                                <Clock size={10} />
-                                                <span>End: {new Date(coupon.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year:'2-digit' })}</span>
-                                            </div>
-                                        </div>
-                                    </td>
+                                            {/* 3. Usage */}
+                                            <td className="p-6 align-middle min-w-[200px]">
+                                                <div className="w-full">
+                                                    <div className="flex justify-between text-xs font-bold text-gray-500 mb-1.5">
+                                                        <span>{coupon.used_count} Used</span>
+                                                        <span className="opacity-50">Limit: {coupon.usage_limit}</span>
+                                                    </div>
+                                                    <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className={`h-full rounded-full transition-all duration-500 ${
+                                                                (coupon.used_count/coupon.usage_limit) >= 1 ? 'bg-red-500' 
+                                                                : (coupon.used_count/coupon.usage_limit) > 0.8 ? 'bg-amber-400' 
+                                                                : 'bg-indigo-500'
+                                                            }`} 
+                                                            style={{ width: `${Math.min((coupon.used_count/coupon.usage_limit)*100, 100)}%` }} 
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-1 mt-2 text-[10px] text-gray-400 font-medium">
+                                                        <Clock size={10} />
+                                                        <span>End: {new Date(coupon.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year:'2-digit' })}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
 
-                                    {/* 4. Status */}
-                                    <td className="p-6 align-middle text-center">
-                                        <div className="flex flex-col items-center gap-2">
-                                            {/* Badge */}
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                                                !coupon.active ? 'bg-gray-50 text-gray-400 border-gray-200' : 
-                                                (Number(coupon.used_count) >= Number(coupon.usage_limit)) ? 'bg-red-50 text-red-500 border-red-100' : 
-                                                'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                            }`}>
-                                                {!coupon.active ? 'Inactive' : (Number(coupon.used_count) >= Number(coupon.usage_limit)) ? 'Sold Out' : 'Active'}
-                                            </span>
+                                            {/* 4. Status */}
+                                            <td className="p-6 align-middle text-center">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    {/* Badge */}
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                                        !coupon.active ? 'bg-gray-50 text-gray-400 border-gray-200' : 
+                                                        (Number(coupon.used_count) >= Number(coupon.usage_limit)) ? 'bg-red-50 text-red-500 border-red-100' : 
+                                                        'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                    }`}>
+                                                        {!coupon.active ? 'Inactive' : (Number(coupon.used_count) >= Number(coupon.usage_limit)) ? 'Sold Out' : 'Active'}
+                                                    </span>
 
-                                            {/* Toggle */}
-                                            <label className="relative inline-flex items-center cursor-pointer mt-1">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={coupon.active} 
-                                                    onChange={() => handleStatusToggle(coupon.id, coupon.active)} 
-                                                    className="sr-only peer" 
-                                                />
-                                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 hover:bg-gray-300 peer-checked:hover:bg-emerald-600 transition-colors"></div>
-                                            </label>
-                                        </div>
-                                    </td>
+                                                    {/* Toggle */}
+                                                    <label className="relative inline-flex items-center cursor-pointer mt-1">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={coupon.active} 
+                                                            onChange={() => handleStatusToggle(coupon.id, coupon.active)} 
+                                                            className="sr-only peer" 
+                                                        />
+                                                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 hover:bg-gray-300 peer-checked:hover:bg-emerald-600 transition-colors"></div>
+                                                    </label>
+                                                </div>
+                                            </td>
 
-                                    {/* 5. Manage */}
-                                    <td className="p-6 align-middle text-right">
-                                        <div className="flex items-center justify-end gap-3">
-                                            <button 
-                                                onClick={() => openEdit(coupon)}
-                                                className="w-10 h-10 rounded-xl bg-white text-indigo-600 hover:bg-indigo-600 hover:text-white hover:shadow-lg hover:shadow-indigo-200 transition-all flex items-center justify-center border border-indigo-100 shadow-sm active:scale-95"
-                                                title="Edit"
-                                            >
-                                                <Edit2 size={18} />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDelete(coupon.id)}
-                                                className="w-10 h-10 rounded-xl bg-white text-red-500 hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-200 transition-all flex items-center justify-center border border-red-100 shadow-sm active:scale-95"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan="5" className="p-12 text-center text-gray-400">
-                                        <div className="flex flex-col items-center gap-4">
-                                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
-                                                <Search size={24} className="opacity-50" />
-                                            </div>
-                                            <p className="font-bold">ไม่พบข้อมูลคูปอง</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                            {/* 5. Manage */}
+                                            <td className="p-6 align-middle text-right">
+                                                <div className="flex items-center justify-end gap-3">
+                                                    <button 
+                                                        onClick={() => openEdit(coupon)}
+                                                        className="w-10 h-10 rounded-xl bg-white text-indigo-600 hover:bg-indigo-600 hover:text-white hover:shadow-lg hover:shadow-indigo-200 transition-all flex items-center justify-center border border-indigo-100 shadow-sm active:scale-95"
+                                                        title="Edit"
+                                                    >
+                                                        <Edit2 size={18} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDelete(coupon.id)}
+                                                        className="w-10 h-10 rounded-xl bg-white text-red-500 hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-200 transition-all flex items-center justify-center border border-red-100 shadow-sm active:scale-95"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr>
+                                            <td colSpan="5" className="p-12 text-center text-gray-400">
+                                                <div className="flex flex-col items-center gap-4">
+                                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
+                                                        <Search size={24} className="opacity-50" />
+                                                    </div>
+                                                    <p className="font-bold">ไม่พบข้อมูลคูปอง</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  </>
+                )}
 
             {/* 🌟 Redesigned Glassmorphism Modal */}
             <AnimatePresence>
@@ -905,10 +1080,10 @@ const CouponManagement = () => {
                                         <span className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
                                             <Ticket size={22} />
                                         </span>
-                                        {isEditing ? 'Edit Coupon' : 'New Coupon'}
+                                        {isEditing ? 'แก้ไขคูปอง' : 'สร้างคูปองใหม่'}
                                     </h2>
                                     <p className="text-xs font-bold text-gray-400 mt-1 ml-1 tracking-wide uppercase">
-                                        {isEditing ? 'แก้ไขข้อมูลคูปอง' : 'สร้างคูปองส่วนลดใหม่'}
+                                        {isEditing ? 'อัปเดตข้อมูลและเงื่อนไขคูปอง' : 'สร้างคูปองส่วนลดและแคมเปญใหม่'}
                                     </p>
                                 </div>
                                 <button 
@@ -921,6 +1096,120 @@ const CouponManagement = () => {
                             
                             {/* 📝 Form Content */}
                             <form onSubmit={handleSubmit} className="p-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                                {/* 🛡️ Financial Safety Guard: Real-time Risk Alert */}
+                                {couponRisk && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: -20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className={`mb-8 p-6 rounded-[2rem] border flex items-start gap-4 transition-all duration-500 ${
+                                            couponRisk.level === 'critical' 
+                                            ? 'bg-red-50 border-red-100 text-red-600 shadow-lg shadow-red-100' 
+                                            : couponRisk.level === 'warning' 
+                                                ? 'bg-amber-50 border-amber-100 text-amber-600 shadow-lg shadow-amber-100' 
+                                                : 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-lg shadow-emerald-100'
+                                        }`}
+                                    >
+                                        <div className={`p-3 rounded-2xl ${
+                                            couponRisk.level === 'critical' ? 'bg-red-100' : 
+                                            couponRisk.level === 'warning' ? 'bg-amber-100' : 'bg-emerald-100'
+                                        }`}>
+                                            {couponRisk.level === 'critical' ? <AlertOctagon size={24} /> : 
+                                             couponRisk.level === 'warning' ? <AlertTriangle size={24} /> : <ShieldCheck size={24} />}
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
+                                                    การตรวจสอบความปลอดภัย: <span className="opacity-80">{couponRisk.level === 'critical' ? 'วิกฤต' : couponRisk.level === 'warning' ? 'คำเตือน' : 'ปกติ'}</span>
+                                                </h4>
+                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/50 border border-current">Live Guard</span>
+                                            </div>
+                                            <p className="text-xs font-bold mt-1.5 leading-relaxed">{couponRisk.message}</p>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* 🎨 Cinematic Live Preview */}
+                                <div className="mb-10 relative">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                            <Sparkles size={16} />
+                                        </div>
+                                        <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">ตัวอย่างมุมมองลูกค้า (Live Preview)</h3>
+                                    </div>
+                                    
+                                    <div className="relative group cursor-bottom">
+                                        <div className="absolute inset-0 bg-indigo-100/20 blur-3xl rounded-full -z-10 animate-pulse"></div>
+                                        
+                                        <motion.div 
+                                            layout
+                                            className="relative bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 flex h-32 max-w-lg mx-auto"
+                                        >
+                                            {/* Discount Value Side (Left) */}
+                                            <div className="w-1/3 bg-indigo-600 flex flex-col items-center justify-center p-4 text-white relative overflow-hidden">
+                                                <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -mt-10 -ml-10 blur-xl"></div>
+                                                <div className="absolute bottom-0 right-0 w-16 h-16 bg-white/10 rounded-full -mb-10 -mr-10 blur-xl"></div>
+                                                
+                                                <div className="relative z-10 flex flex-col items-center">
+                                                    {formData.discount_type === 'free_shipping' ? (
+                                                        <Truck size={32} />
+                                                    ) : (
+                                                        <>
+                                                            <div className="flex items-baseline">
+                                                                <span className="text-3xl font-black">{formData.discount_value || '0'}</span>
+                                                                <span className="text-lg font-bold ml-1">{formData.discount_type === 'percent' ? '%' : '฿'}</span>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    <span className="text-[10px] font-black uppercase tracking-widest mt-1 opacity-80">
+                                                        {formData.discount_type === 'free_shipping' ? 'ส่งฟรี' : 'ส่วนลด'}
+                                                    </span>
+                                                </div>
+                                                
+                                                {/* Left Half-circles for ticket effect */}
+                                                <div className="absolute top-1/2 left-0 -translate-y-1/2 -ml-2.5 w-5 h-10 bg-gray-50/50 rounded-r-full border-r border-gray-100"></div>
+                                            </div>
+
+                                            {/* Info Side (Right) */}
+                                            <div className="relative flex-1 p-5 flex flex-col justify-between bg-white">
+                                                {/* Dotted separator line */}
+                                                <div className="absolute top-2 bottom-2 left-0 -ml-[1px] border-l-2 border-dashed border-gray-100"></div>
+                                                
+                                                <div>
+                                                    <div className="flex justify-between items-start">
+                                                        <h4 className="font-black text-indigo-600 text-lg tracking-widest uppercase truncate max-w-[120px]">
+                                                            {formData.code || 'COUPON_CODE'}
+                                                        </h4>
+                                                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                                                            ใหม่ (NEW)
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400 font-bold mt-0.5 truncate uppercase tracking-tight">
+                                                        {formData.name || 'ชื่อแคมเปญตัวอย่าง'}
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex justify-between items-end">
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-lg w-fit">
+                                                            <Clock size={10} /> {formData.end_date ? new Date(formData.end_date).toLocaleDateString('th-TH') : 'ไม่มีวันหมดอายุ'}
+                                                        </div>
+                                                        <div className="text-[9px] font-black text-indigo-400 uppercase tracking-tighter">
+                                                            ขั้นต่ำ: ฿{formData.min_spend || '0'}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="bg-indigo-600 text-white text-[10px] font-black px-4 py-1.5 rounded-xl shadow-lg shadow-indigo-100">
+                                                        เก็บคูปอง
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Right Half-circles for ticket effect */}
+                                                <div className="absolute top-1/2 right-0 -translate-y-1/2 -mr-2.5 w-5 h-10 bg-gray-50/50 rounded-l-full border-l border-gray-100"></div>
+                                            </div>
+                                        </motion.div>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     {/* Left Column: Identity & Schedule */}
                                     <div className="space-y-6">
@@ -933,7 +1222,7 @@ const CouponManagement = () => {
                                                 </label>
                                                 <input 
                                                     type="text" 
-                                                    value={formData.name} 
+                                                    value={formData.name || ''} 
                                                     onChange={e => setFormData({...formData, name: e.target.value})}
                                                     className="w-full bg-gray-50/50 border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl px-4 py-3 font-semibold text-gray-700 outline-none transition-all placeholder-gray-300"
                                                     placeholder="ตั้งชื่อแคมเปญ (Internal Only)"
@@ -948,7 +1237,7 @@ const CouponManagement = () => {
                                                 <div className="relative">
                                                     <input 
                                                         type="text" 
-                                                        value={formData.code} 
+                                                        value={formData.code || ''} 
                                                         onChange={e => setFormData({...formData, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15)})} 
                                                         className="w-full bg-white border-2 border-indigo-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl px-4 py-3 font-black text-lg text-indigo-600 outline-none transition-all tracking-widest text-center shadow-sm placeholder-indigo-200 uppercase"
                                                         placeholder="CODE2026"
@@ -1092,7 +1381,7 @@ const CouponManagement = () => {
                                                             type="number" 
                                                             min="0"
                                                             max={formData.discount_type === 'percent' ? "100" : undefined}
-                                                            value={formData.discount_value} 
+                                                            value={formData.discount_value || ''} 
                                                             onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
                                                             onChange={e => {
                                                                 let val = e.target.value;
@@ -1151,7 +1440,7 @@ const CouponManagement = () => {
                                                     <input 
                                                         type="number" 
                                                         min="0"
-                                                        value={formData.min_spend} 
+                                                        value={formData.min_spend ?? 0} 
                                                         disabled={formData.discount_type === 'free_shipping' && formData.min_spend === 0}
                                                         onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
                                                         onChange={e => {
@@ -1187,7 +1476,7 @@ const CouponManagement = () => {
                                                         <input 
                                                             type="number" 
                                                             min="0"
-                                                            value={formData.max_discount_amount} 
+                                                            value={formData.max_discount_amount || ''} 
                                                             onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
                                                             onChange={e => {
                                                                 let val = e.target.value;
@@ -1440,12 +1729,89 @@ const CouponManagement = () => {
                                                     </div>
                                                 </div>
 
+                                                {/* 🛍️ NEW: Matching Products Live Preview */}
+                                                <div className="col-span-2 pt-6 border-t border-gray-100 mt-2">
+                                                    <div className="flex items-center justify-between mb-4 px-1">
+                                                        <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                            <ShoppingBag size={12} className="text-indigo-500"/> สินค้าที่ร่วมรายการ (Preview)
+                                                        </label>
+                                                        <span className="text-[9px] font-bold text-gray-400">แสดงสูงสุด 10 รายการ</span>
+                                                    </div>
+
+                                                    {matchingProducts.length > 0 ? (
+                                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                                            {matchingProducts.map(product => {
+                                                                // Calculate Discount Badge
+                                                                const price = parseFloat(product.price) || 0;
+                                                                const dType = formData.discount_type;
+                                                                const dVal = parseFloat(formData.discount_value) || 0;
+                                                                
+                                                                let newPrice = price;
+                                                                let badge = "";
+                                                                
+                                                                if (dType === 'fixed' && dVal > 0) {
+                                                                    newPrice = Math.max(0, price - dVal);
+                                                                    badge = `-฿${dVal.toLocaleString()}`;
+                                                                } else if (dType === 'percent' && dVal > 0) {
+                                                                    const discountAmount = price * (dVal / 100);
+                                                                    newPrice = Math.max(0, price - discountAmount);
+                                                                    badge = `-${dVal}%`;
+                                                                } else if (dType === 'free_shipping') {
+                                                                    badge = "ส่งฟรี";
+                                                                }
+
+                                                                return (
+                                                                    <div key={product.id} className="relative group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-indigo-200 transition-all shadow-sm flex flex-col">
+                                                                        {/* Badge */}
+                                                                        {badge && (
+                                                                            <div className="absolute top-1.5 right-1.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-lg shadow-lg">
+                                                                                {badge}
+                                                                            </div>
+                                                                        )}
+                                                                        
+                                                                        <div className="aspect-square bg-gray-50 overflow-hidden">
+                                                                            <img 
+                                                                                src={product.image ? (product.image.startsWith('http') ? product.image : `${API_BASE_URL}${product.image}`) : 'https://placehold.co/100x100?text=Product'} 
+                                                                                alt={product.name} 
+                                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                                                            />
+                                                                        </div>
+                                                                        
+                                                                        <div className="p-2 flex-1 flex flex-col">
+                                                                            <h5 className="text-[9px] font-bold text-gray-800 line-clamp-1 mb-1">{product.name}</h5>
+                                                                            <div className="mt-auto">
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <span className="text-[10px] font-black text-indigo-600">฿{newPrice.toLocaleString()}</span>
+                                                                                    {newPrice < price && (
+                                                                                        <span className="text-[8px] font-medium text-gray-400 line-through">฿{price.toLocaleString()}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-100 p-8 flex flex-col items-center justify-center text-center">
+                                                            <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-gray-300 mb-3 rotate-3 group-hover:rotate-0 transition-transform">
+                                                                <ShoppingBag size={24} />
+                                                            </div>
+                                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-relaxed">
+                                                                {formData.conditions.applicable_tags?.length > 0 
+                                                                    ? "ไม่มีสินค้าที่ติด Tag ที่เลือกอยู่ในขณะนี้" 
+                                                                    : "เลือก Tag ด้านบนเพื่อพรีวิวสินค้าที่ร่วมรายการ"}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
                                                 <div>
                                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block pl-1 font-noto">จำนวนสิทธิ์ทั้งหมด</label>
                                                     <input 
                                                         type="number" 
                                                         min="1"
-                                                        value={formData.usage_limit} 
+                                                        value={formData.usage_limit || ''} 
                                                         onKeyDown={(e) => ["-", "+", "e", "E", "."].includes(e.key) && e.preventDefault()}
                                                         onChange={e => setFormData({...formData, usage_limit: Math.max(1, parseInt(e.target.value) || '')})}
                                                         className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm"
@@ -1459,7 +1825,7 @@ const CouponManagement = () => {
                                                     <input 
                                                         type="number" 
                                                         min="1"
-                                                        value={formData.limit_per_user} 
+                                                        value={formData.limit_per_user || ''} 
                                                         onKeyDown={(e) => ["-", "+", "e", "E", "."].includes(e.key) && e.preventDefault()}
                                                         onChange={e => setFormData({...formData, limit_per_user: Math.max(1, parseInt(e.target.value) || '')})}
                                                         className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm"
@@ -1516,6 +1882,9 @@ const CouponManagement = () => {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* 💰 Financial Impact Simulator */}
+                                <ImpactSimulator couponData={formData} />
 
                                 {/* Submit Button */}
                                 <div className="pt-6 sticky bottom-0 bg-white/50 backdrop-blur-sm pb-2 z-20">

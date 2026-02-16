@@ -84,8 +84,8 @@ class CouponService:
         if not (coupon.start_date <= now <= coupon.end_date):
             return False, "คูปองนี้ยังไม่เปิดให้ใช้งาน หรือหมดเขตไปแล้วครับ", None
             
-        # V2: Total Supply Check
-        global_limit = max(coupon.total_supply, coupon.usage_limit)
+        # V2: Total Supply Check (respect the tighter limit)
+        global_limit = min(coupon.total_supply, coupon.usage_limit)
         if coupon.used_count >= global_limit:
             return False, "เสียใจด้วยครับ สิทธิ์ของคูปองนี้ถูกใช้จองเต็มหมดแล้ว (Fully Redeemed)", None
             

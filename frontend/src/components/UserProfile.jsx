@@ -56,17 +56,24 @@ function UserProfile() {
 
   // Fetch Addresses
   const fetchAddresses = async () => {
-    if (!token) return;
+    if (!token) {
+        console.log("❌ No token available to fetch addresses");
+        return;
+    }
     try {
+      console.log("🔄 Fetching addresses...");
       const res = await fetch(`${API_BASE_URL}/api/addresses/`, {
         headers: { Authorization: `Token ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
+        console.log("✅ Addresses fetched:", data);
         setAddresses(data);
+      } else {
+         console.error("❌ Fetch failed:", res.status, res.statusText);
       }
     } catch (err) {
-      console.error("Error fetching addresses:", err);
+      console.error("❌ Error fetching addresses:", err);
     }
   };
 
@@ -124,8 +131,62 @@ function UserProfile() {
       }
   };
 
-  const handleAddressSaved = () => {
-      fetchAddresses();
+  const handleAddressSaved = async (addressData) => {
+      try {
+          let updatedAddress;
+          
+          if (addressToEdit && addressToEdit.id) {
+              // EDIT Mode
+              const res = await fetch(`${API_BASE_URL}/api/addresses/${addressToEdit.id}/`, {
+                  method: 'PUT',
+                  headers: { 
+                      'Authorization': `Token ${token}`,
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(addressData)
+              });
+              if (res.ok) {
+                   updatedAddress = await res.json();
+                   // Update local state immediately
+                   setAddresses(prev => prev.map(a => a.id === updatedAddress.id ? updatedAddress : a));
+                   Swal.fire('สำเร็จ', 'แก้ไขที่อยู่เรียบร้อยแล้ว', 'success');
+              } else {
+                  throw new Error('Update failed');
+              }
+
+          } else {
+              // CREATE Mode
+              const res = await fetch(`${API_BASE_URL}/api/addresses/`, {
+                  method: 'POST',
+                  headers: { 
+                      'Authorization': `Token ${token}`,
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(addressData)
+              });
+              
+              if (res.ok) {
+                   updatedAddress = await res.json();
+                   // Add to local state immediately
+                   setAddresses(prev => [updatedAddress, ...prev]);
+                   Swal.fire('สำเร็จ', 'เพิ่มที่อยู่ใหม่เรียบร้อยแล้ว', 'success');
+              } else {
+                  const errorData = await res.json();
+                  console.error("❌ Backend Validation Error:", errorData);
+                  throw new Error(JSON.stringify(errorData));
+              }
+          }
+          
+          setShowAddressModal(false);
+          setAddressToEdit(null);
+          
+          // Double check with fetch (background)
+          fetchAddresses();
+          
+      } catch (error) {
+          console.error("Save address error:", error);
+          Swal.fire('เกิดข้อผิดพลาด', `ไม่สามารถบันทึกที่อยู่ได้: ${error.message}`, 'error');
+      }
   };
 
   // Form Data
@@ -590,10 +651,7 @@ function UserProfile() {
               </div>
             </div>
 
-            {/* NEW: Thai Address Picker Replaces Province/Zipcode manually */}
-            <div className="bg-gray-50/30 p-4 rounded-2xl border border-gray-100">
-               <ThaiAddressPicker currentAddress={formData} onSelect={handleAddressSelect} />
-            </div>
+
 
             <div className="group">
               <label className="text-xs font-black text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">เบอร์โทรศัพท์</label>

@@ -2,34 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MapPin, Truck, CreditCard, ChevronLeft, ArrowRight, ShieldCheck, Mail, Phone, User, Upload, Check, X, Image as ImageIcon, Tag, Zap, ArrowLeft, QrCode, Landmark, Package, Home, Briefcase } from 'lucide-react';
+import { MapPin, Truck, CreditCard, ChevronLeft, ArrowRight, ShieldCheck, Mail, Phone, User, Upload, Check, X, Image as ImageIcon, Tag, Zap, ArrowLeft, QrCode, Landmark, Package, Home, Briefcase, AlertCircle, Plus, Navigation } from 'lucide-react';
 import AddressModal from './AddressModal';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 import QRCode from 'react-qr-code';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 
-const RecenterAutomatically = ({ lat, lng }) => {
-    const map = useMap();
-    useEffect(() => {
-        if (lat && lng) {
-            map.setView([lat, lng], map.getZoom());
-        }
-    }, [lat, lng]);
-    return null;
-};
 
-// Fix Leaflet Marker
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+
 
 const DatePickerStyles = () => (
     <style>{`
@@ -146,6 +128,16 @@ function CheckoutPage() {
         if (items.length > 0) {
             localStorage.setItem('checkout_items_persist', JSON.stringify(items));
         }
+
+        // 🎟️ Auto-Apply Coupon from State (If exists)
+        if (location.state?.autoApplyCoupon) {
+            console.log("🎫 Auto-applying coupon from state:", location.state.autoApplyCoupon);
+            setCouponCode(location.state.autoApplyCoupon);
+            // We use a small timeout to ensure the component is fully ready before validation
+            setTimeout(() => {
+                handleApplyCoupon(location.state.autoApplyCoupon);
+            }, 500);
+        }
     }, [location.state, cartItems, selectedItems]);
 
     // Multi-Step State
@@ -219,7 +211,7 @@ function CheckoutPage() {
 
     // UI State
     const [loading, setLoading] = useState(false);
-    const [showMap, setShowMap] = useState(false);
+
     const [mapPosition, setMapPosition] = useState(() => {
         const saved = localStorage.getItem('checkout_map_position');
         if (saved) {
@@ -238,8 +230,9 @@ function CheckoutPage() {
             localStorage.setItem('checkout_map_position', JSON.stringify(mapPosition));
         }
     }, [mapPosition]);
+
     const [qrPayload, setQrPayload] = useState('');
-    const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+
 
 
     // ✅ Debug Logging
@@ -311,15 +304,40 @@ function CheckoutPage() {
     }, [token]);
 
     const handleSelectAddress = (addr) => {
+        console.log('🏠 Selecting address:', addr);
+        
         setSelectedAddressId(addr.id);
+        
+        const fullAddress = [
+            addr.address_detail,
+            addr.sub_district,
+            addr.district,
+            addr.province,
+            addr.zipcode
+        ].filter(Boolean).join(' ');
+        
+        console.log('📍 Full address string:', fullAddress);
+        
         setFormData(prev => ({
             ...prev,
-            first_name: addr.receiver_name.split(' ')[0] || '',
-            last_name: addr.receiver_name.split(' ').slice(1).join(' ') || '',
+            first_name: addr.receiver_name?.split(' ')[0] || '',
+            last_name: addr.receiver_name?.split(' ').slice(1).join(' ') || '',
             phone: addr.phone,
-            address: addr.address_detail + ' ' + (addr.sub_district || '') + ' ' + (addr.district || ''),
+            address: addr.address_detail, // ✅ Use only address_detail (already includes everything from GPS)
             zip_code: addr.zipcode
         }));
+        
+        // 🐛 Debug: Log formData after update
+        setTimeout(() => {
+            console.log('📝 FormData after address selection:', {
+                first_name: addr.receiver_name?.split(' ')[0] || '',
+                last_name: addr.receiver_name?.split(' ').slice(1).join(' ') || '',
+                phone: addr.phone,
+                address: addr.address_detail,
+                zip_code: addr.zipcode
+            });
+        }, 100);
+        
         setProvince(addr.province);
         
         if (addr.latitude && addr.longitude) {
@@ -327,20 +345,59 @@ function CheckoutPage() {
         }
     };
 
-    const handleEditAddress = (addr, e) => {
-        e.stopPropagation();
-        setAddressToEdit(addr);
-        setShowAddressModal(true);
-    };
 
-    const handleAddNewAddress = () => {
-        setAddressToEdit(null);
-        setShowAddressModal(true);
-    };
 
-    const handleAddressSaved = (newAddr) => {
-        fetchAddresses();
-        handleSelectAddress(newAddr); // Auto select the new/updated one
+
+
+
+
+    const handleAddressSaved = async (addressData) => {
+        try {
+            let savedAddress;
+            
+            if (addressToEdit) {
+                // UPDATE existing address
+                const res = await axios.put(
+                    `http://localhost:8000/api/addresses/${addressToEdit.id}/`,
+                    addressData,
+                    { headers: { Authorization: `Token ${token}` } }
+                );
+                savedAddress = res.data;
+            } else {
+                // CREATE new address
+                const res = await axios.post(
+                    'http://localhost:8000/api/addresses/',
+                    addressData,
+                    { headers: { Authorization: `Token ${token}` } }
+                );
+                savedAddress = res.data;
+            }
+            
+            // Refresh address list
+            await fetchAddresses();
+            
+            // Auto-select the saved address
+            handleSelectAddress(savedAddress);
+            
+            // Close modals
+            setShowAddressModal(false);
+            setAddressToEdit(null);
+            
+            Swal.fire({
+                icon: 'success',
+                title: addressToEdit ? 'แก้ไขที่อยู่สำเร็จ' : 'เพิ่มที่อยู่สำเร็จ',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        } catch (error) {
+            console.error('Error saving address:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'เกิดข้อผิดพลาด',
+                text: error.response?.data?.message || 'ไม่สามารถบันทึกที่อยู่ได้',
+                confirmButtonColor: '#1a4d2e'
+            });
+        }
     };
 
     const THAI_PROVINCES = [
@@ -379,89 +436,21 @@ function CheckoutPage() {
         return match || 'กรุงเทพมหานคร';
     };
 
-    const LocationMarker = () => {
-        const map = useMapEvents({
-            click(e) {
-                setMapPosition(e.latlng);
-                map.flyTo(e.latlng, map.getZoom());
-            },
-        });
-        return mapPosition === null ? null : <Marker position={mapPosition}></Marker>;
-    };
 
 
-    const handleConfirmLocation = async () => {
-        if (!mapPosition) {
-            setShowMap(false);
-            return;
-        }
 
-        setIsResolvingAddress(true);
-        try {
-            // ✅ Change to 'th' for Thai Address
-            const res = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${mapPosition.lat}&lon=${mapPosition.lng}&accept-language=th`);
-            if (res.data && res.data.display_name) {
-                setFormData(prev => {
-                    const newFormData = { ...prev, address: res.data.display_name };
 
-                    // Improved ZipCode Extraction
-                    if (res.data.address) {
-                        const zip = res.data.address.postcode || res.data.address.zip;
-                        if (zip) {
-                            newFormData.zip_code = zip;
-                            // Trigger validation for zipcode if needed
-                            validateField('zip_code', zip);
-                        }
-                    }
-                    return newFormData;
-                });
 
-                if (res.data.address) {
-                    const { state, province, city } = res.data.address;
-                    const locationName = state || province || city || '';
 
-                    // 1. Try Direct Thai Match
-                    let thaiMatch = THAI_PROVINCES.find(p => locationName.includes(p));
-
-                    // 2. Fallback: Try English Mapping
-                    if (!thaiMatch) {
-                        for (const [eng, thai] of Object.entries(PROVINCE_MAPPING)) {
-                            if (locationName.toLowerCase().includes(eng.toLowerCase())) {
-                                thaiMatch = thai;
-                                break;
-                            }
-                        }
-                    }
-
-                    // 3. Last Resort: Bangkok
-                    if (locationName.includes('Bangkok') || locationName.includes('กรุงเทพ')) {
-                        thaiMatch = 'กรุงเทพมหานคร';
-                    }
-
-                    if (thaiMatch) {
-                        setProvince(thaiMatch);
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Reverse geocode failed", error);
-        } finally {
-            setIsResolvingAddress(false);
-            setShowMap(false);
-        }
-    };
-
-    const handleMapOpen = () => {
-        setShowMap(true);
-        if (!mapPosition) setMapPosition({ lat: 13.7563, lng: 100.5018 });
-    };
 
     const [couponCode, setCouponCode] = useState('');
     const [discount, setDiscount] = useState(0);
     const [couponData, setCouponData] = useState(null);
     const [availableCoupons, setAvailableCoupons] = useState([]);
     const [showCouponModal, setShowCouponModal] = useState(false);
+    const [showAddressSelection, setShowAddressSelection] = useState(false); // ✅ New Modal State
     const [flashSaleItems, setFlashSaleItems] = useState({});
+
 
     useEffect(() => {
         const fetchFlashSales = async () => {
@@ -510,7 +499,13 @@ function CheckoutPage() {
     // Base - Flash - Discount + Shipping
     // Note: If Free Shipping, shippingCost is 0. If regular discount, discount > 0.
     // 🛡️ Safety Clamp: Discount cannot exceed (Base - Flash)
-    const maxAllowedDiscount = Math.max(0, baseSubtotal - flashSavings);
+    let maxAllowedDiscount = Math.max(0, baseSubtotal - flashSavings);
+
+    // ✅ FIX: Allow Free Shipping to exceed product subtotal (cover shipping)
+    if (isFreeShipping) {
+        maxAllowedDiscount += shippingCost;
+    }
+
     const effectiveDiscount = Math.min(discount, maxAllowedDiscount);
 
     const finalTotal = Math.max(0, baseSubtotal - flashSavings - effectiveDiscount + shippingCost);
@@ -596,6 +591,18 @@ function CheckoutPage() {
                     color: '#065f46',
                     iconColor: '#10b981'
                 });
+            } else {
+                Swal.close();
+                setDiscount(0);
+                setCouponData(null);
+                setCouponCode('');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'คูปองใช้ไม่ได้',
+                    text: res.data.error || 'เงื่อนไขไม่ตรงตามกำหนด',
+                    confirmButtonText: 'ตกลง',
+                    confirmButtonColor: '#333'
+                });
             }
         } catch (error) {
             Swal.close(); // Close Loading first
@@ -639,7 +646,7 @@ function CheckoutPage() {
 
     const handleNextStep = () => {
         // Validate Shipping Info
-        if (!formData.first_name || !formData.last_name || !formData.phone || !formData.address) {
+        if (!formData.first_name || !formData.phone || !formData.address) {
             Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลจัดส่งให้ครบถ้วน', 'warning');
             return;
         }
@@ -800,6 +807,21 @@ function CheckoutPage() {
         return `http://localhost:8000${path}`;
     };
 
+    // ✅ Open AddressModal for Create
+    const handleAddNewAddress = () => {
+        setAddressToEdit(null);
+        setShowAddressModal(true);
+    };
+
+    // ✅ Open AddressModal for Edit
+    const handleEditAddress = (addr, e) => {
+        e?.stopPropagation();
+        setAddressToEdit(addr);
+        setShowAddressModal(true);
+    };
+
+    // 🗑️ Removed manual handleSaveAddress, handleBackToList as they are replaced by AddressModal
+
     const formatPrice = (price) => {
         return '฿' + parseFloat(price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
@@ -887,7 +909,6 @@ function CheckoutPage() {
                                 </h2>
 
                                 {/* 🆕 Address Selection UI (Correct Placement) */}
-                                {user && (
                                     <div className="mb-8">
                                         <div className="flex justify-between items-center mb-4">
                                             <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">เลือกที่อยู่จัดส่ง</h3>
@@ -900,137 +921,186 @@ function CheckoutPage() {
                                             </button>
                                         </div>
                                         
-                                        {addresses.length === 0 ? (
-                                            <div className="p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-center hover:bg-gray-100 transition cursor-pointer group" onClick={handleAddNewAddress}>
-                                                <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-gray-400 mx-auto mb-3 shadow-sm group-hover:scale-110 transition">
-                                                    <MapPin size={24} />
-                                                </div>
-                                                <p className="text-gray-500 font-bold text-sm">คุณยังไม่มีที่อยู่ที่บันทึกไว้</p>
-                                                <p className="text-gray-400 text-xs mt-1">คลิกเพื่อเพิ่มที่อยู่จัดส่ง</p>
-                                            </div>
-                                        ) : (
-                                            <div className="grid gap-3">
-                                                {addresses.map(addr => (
-                                                    <div 
-                                                        key={addr.id}
-                                                        onClick={() => handleSelectAddress(addr)}
-                                                        className={`relative p-4 rounded-2xl border-2 transition cursor-pointer group hover:shadow-md ${
-                                                            selectedAddressId === addr.id 
-                                                            ? 'border-[#1a4d2e] bg-[#f0fdf4]' 
-                                                            : 'border-transparent bg-gray-50 hover:bg-white hover:border-gray-200'
-                                                        }`}
-                                                    >
-                                                        {/* Selection Indicator */}
-                                                        <div className={`absolute top-4 right-4 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${selectedAddressId === addr.id ? 'border-[#1a4d2e] bg-[#1a4d2e] scale-110' : 'border-gray-300 bg-white'}`}>
-                                                            {selectedAddressId === addr.id && <Check size={14} className="text-white" />}
-                                                        </div>
 
-                                                        <div className="flex items-start gap-4">
-                                                            {/* Icon based on Label */}
-                                                            <div className={`p-3 rounded-2xl ${selectedAddressId === addr.id ? 'bg-[#1a4d2e] text-white' : 'bg-gray-200 text-gray-500'}`}>
-                                                                {addr.label === 'Home' && <Home size={20} />}
-                                                                {addr.label === 'Work' && <Briefcase size={20} />}
-                                                                {addr.label === 'Other' && <MapPin size={20} />}
+                                    {showAddressSelection && (
+                                        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+                                            <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
+                                                <div className="p-6 md:p-8 border-b border-gray-100 flex items-center justify-between bg-white z-10 sticky top-0">
+                                                    <div>
+                                                        <h2 className="text-2xl font-black text-[#263A33] flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-green-50 text-[#1a4d2e] flex items-center justify-center">
+                                                                <MapPin size={24} />
                                                             </div>
-                                                            
-                                                            <div className="flex-1 pr-8">
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="font-bold text-gray-800 text-lg">{addr.label === 'Home' ? 'บ้าน' : addr.label === 'Work' ? 'ที่ทำงาน' : 'อี่นๆ'}</span>
-                                                                    {addr.is_default && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">⭐ ค่าเริ่มต้น</span>}
+                                                            เลือกที่อยู่จัดส่ง
+                                                        </h2>
+                                                        <p className="text-gray-400 text-xs font-bold mt-1 ml-14">
+                                                            เลือกที่อยู่ที่คุณต้องการจัดส่งสินค้า
+                                                        </p>
+                                                    </div>
+                                                    <button onClick={() => setShowAddressSelection(false)} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors">
+                                                        <X size={20} />
+                                                    </button>
+                                                </div>
+                                                
+                                                <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar bg-gray-50/50">
+                                                    {addresses.length === 0 ? (
+                                                        <div className="text-center py-12">
+                                                            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mx-auto mb-4">
+                                                                <MapPin size={32} />
+                                                            </div>
+                                                            <p className="text-gray-500 font-bold text-lg mb-2">ยังไม่มีที่อยู่</p>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={handleAddNewAddress}
+                                                                className="bg-[#1a4d2e] text-white px-6 py-2.5 rounded-xl font-bold hover:shadow-lg hover:-translate-y-1 transition-all"
+                                                            >
+                                                                เพิ่มที่อยู่ใหม่
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-4">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={handleAddNewAddress}
+                                                                className="w-full p-4 border-2 border-dashed border-gray-300 rounded-2xl flex items-center justify-center gap-2 text-gray-500 font-bold hover:border-[#1a4d2e] hover:text-[#1a4d2e] hover:bg-white transition-all group mb-6"
+                                                            >
+                                                                <div className="w-8 h-8 rounded-full bg-gray-200 group-hover:bg-[#1a4d2e] text-gray-500 group-hover:text-white flex items-center justify-center transition-colors">
+                                                                    <Plus size={16} />
                                                                 </div>
-                                                                <p className="text-sm font-bold text-gray-700 mb-1">{addr.receiver_name} <span className="text-gray-400 font-normal">|</span> {addr.phone}</p>
-                                                                <p className="text-sm text-gray-500 leading-relaxed max-w-md">
-                                                                    {addr.address_detail} {addr.sub_district} {addr.district} <br/>
-                                                                    จ. {addr.province} {addr.zipcode}
-                                                                </p>
-                                                                
-                                                                <div className="mt-3 flex gap-4 opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0">
-                                                                    <button type="button" onClick={(e) => handleEditAddress(addr, e)} className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1">
-                                                                        แก้ไขที่อยู่
-                                                                    </button>
-                                                                </div>
+                                                                เพิ่มที่อยู่ใหม่
+                                                            </button>
+
+                                                            <div className="grid gap-3">
+                                                                {addresses.map(addr => (
+                                                                    <div 
+                                                                        key={addr.id}
+                                                                        onClick={() => { handleSelectAddress(addr); setShowAddressSelection(false); }}
+                                                                        className={`relative p-5 rounded-2xl border-2 transition cursor-pointer group hover:shadow-md bg-white ${
+                                                                            selectedAddressId === addr.id 
+                                                                            ? 'border-[#1a4d2e] ring-1 ring-[#1a4d2e]' 
+                                                                            : 'border-transparent hover:border-gray-200'
+                                                                        }`}
+                                                                    >
+                                                                        <div className="flex items-start gap-4">
+                                                                            <div className={`p-3 rounded-2xl ${selectedAddressId === addr.id ? 'bg-[#1a4d2e] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                                                                {addr.label === 'Home' && <Home size={24} />}
+                                                                                {addr.label === 'Work' && <Briefcase size={24} />}
+                                                                                {addr.label === 'Other' && <MapPin size={24} />}
+                                                                            </div>
+                                                                            
+                                                                            <div className="flex-1">
+                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                    <span className="font-bold text-gray-800 text-lg">{addr.label === 'Home' ? 'บ้าน' : addr.label === 'Work' ? 'ที่ทำงาน' : 'อื่นๆ'}</span>
+                                                                                    {addr.is_default && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">⭐ ค่าเริ่มต้น</span>}
+                                                                                </div>
+                                                                                <p className="text-sm font-bold text-gray-700 mb-1">{addr.receiver_name} | {addr.phone}</p>
+                                                                                <p className="text-sm text-gray-500 leading-relaxed">
+                                                                                    {addr.address_detail} {addr.sub_district} {addr.district} <br/>
+                                                                                    จ. {addr.province} {addr.zipcode}
+                                                                                </p>
+                                                                                
+                                                                                <div className="mt-3 flex gap-3">
+                                                                                     <button type="button" onClick={(e) => handleEditAddress(addr, e)} className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline">
+                                                                                        แก้ไข
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                            
+                                                                            {selectedAddressId === addr.id && (
+                                                                                <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[#1a4d2e] text-white flex items-center justify-center">
+                                                                                    <Check size={14} />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    )}
+                                                </div>
                                             </div>
-                                        )}
+                                        </div>
+                                    )}
                                     </div>
-                                )}
-                                
-                                {/* Divider if user logged in */}
                                 {user && <div className="h-px bg-gray-100 my-6"></div>}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold text-gray-400 ml-1">ชื่อ</label>
-                                        <input required name="first_name" value={formData.first_name} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#263A33] focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold text-gray-400 ml-1">นามสกุล</label>
-                                        <input required name="last_name" value={formData.last_name} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#263A33] focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all" />
-                                    </div>
-                                    <div className="space-y-1 md:col-span-2">
-                                        <label className="text-xs font-bold text-gray-400 ml-1">ที่อยู่</label>
-                                        <div className="relative">
-                                            <input required name="address" value={formData.address} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#263A33] focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all pr-12" placeholder={isResolvingAddress ? "กำลังค้นหาตำแหน่ง..." : ""} />
-                                            <button type="button" onClick={handleMapOpen} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
-                                                <MapPin size={20} />
+                                {/* ✅ Shipping Address Section - Dynamic View */}
+                                {selectedAddressId ? (
+                                    <div className="bg-[#f0fdf4] border border-[#1a4d2e] rounded-2xl p-6 animate-in fade-in slide-in-from-top-4 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                                            <MapPin size={120} className="text-[#1a4d2e] transform translate-x-1/4 -translate-y-1/4" />
+                                        </div>
+                                        
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="w-10 h-10 rounded-full bg-[#1a4d2e] flex items-center justify-center text-white shadow-lg shadow-green-900/20">
+                                                    <Truck size={20} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-black text-[#1a4d2e] text-lg">ที่อยู่จัดส่งสินค้า</h3>
+                                                    <p className="text-xs text-green-700 font-bold">ข้อมูลจากที่อยู่ที่เลือก</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-green-100 shadow-sm space-y-3">
+                                                <div className="flex items-start gap-3">
+                                                    <User size={18} className="text-[#1a4d2e] mt-1 shrink-0" />
+                                                    <div>
+                                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">ผู้รับ</p>
+                                                        <p className="font-black text-gray-800 text-lg">{formData.first_name} {formData.last_name}</p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex items-start gap-3">
+                                                    <Phone size={18} className="text-[#1a4d2e] mt-1 shrink-0" />
+                                                    <div>
+                                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">เบอร์โทรศัพท์</p>
+                                                        <p className="font-bold text-gray-800 font-mono tracking-wider">{formData.phone}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-start gap-3">
+                                                    <MapPin size={18} className="text-[#1a4d2e] mt-1 shrink-0" />
+                                                    <div>
+                                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">ที่อยู่จัดส่ง</p>
+                                                        <p className="font-bold text-gray-700 leading-relaxed">
+                                                            {formData.address} <br/>
+                                                            จ. {formData.province} {formData.zip_code}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Email Display (if available) */}
+                                                {formData.email && (
+                                                    <div className="flex items-start gap-3 pt-2 border-t border-green-100/50 mt-2">
+                                                        <Mail size={16} className="text-[#1a4d2e] mt-1 shrink-0" />
+                                                        <div>
+                                                            <p className="font-bold text-gray-600 text-sm">{formData.email}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <button 
+                                                type="button"
+                                                onClick={() => setShowAddressSelection(true)}
+                                                className="mt-4 text-xs font-bold text-[#1a4d2e] flex items-center gap-1 hover:underline opacity-60 hover:opacity-100 transition-opacity"
+                                            >
+                                                <ArrowLeft size={14} /> เลือกที่อยู่อื่น / เปลี่ยนที่อยู่
                                             </button>
                                         </div>
-                                        <p className="text-[10px] text-gray-400 ml-1">* คลิกหมุดเพื่อเลือกตำแหน่งจากแผนที่ และอัปเดตจังหวัดอัตโนมัติ</p>
                                     </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold text-gray-400 ml-1">จังหวัด</label>
-                                        <select value={province} onChange={(e) => setProvince(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#263A33] focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all cursor-pointer appearence-none">
-                                            {THAI_PROVINCES.map((p) => (
-                                                <option key={p} value={p}>{p}</option>
-                                            ))}
-                                        </select>
+                                ) : (
+                                    <div 
+                                        onClick={() => setShowAddressSelection(true)}
+                                        className="w-full p-8 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center gap-4 text-gray-400 hover:border-[#1a4d2e] hover:text-[#1a4d2e] hover:bg-green-50/30 transition-all cursor-pointer group animate-in fade-in"
+                                    >
+                                        <div className="w-16 h-16 rounded-full bg-gray-100 group-hover:bg-[#1a4d2e] text-gray-400 group-hover:text-white flex items-center justify-center transition-colors">
+                                            <Plus size={32} />
+                                        </div>
+                                        <p className="font-bold text-lg">เพิ่มที่อยู่จัดส่ง / เลือกที่อยู่</p>
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold text-gray-400 ml-1">รหัสไปรษณีย์</label>
-                                        <input
-                                            required
-                                            name="zip_code"
-                                            value={formData.zip_code}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/\D/g, '');
-                                                if (val.length <= 5) {
-                                                    setFormData({ ...formData, zip_code: val });
-                                                    validateField('zip_code', val);
-                                                }
-                                            }}
-                                            className={`w-full bg-gray-50 border rounded-xl px-4 py-3 font-bold text-[#263A33] outline-none transition-all ${errors.zip_code ? 'border-red-500 focus:ring-red-500/10' : 'border-gray-200 focus:border-[#1a4d2e] focus:ring-green-500/10'}`}
-                                        />
-                                        <ErrorMessage message={errors.zip_code} />
-                                    </div>
-
-                                            <div className="space-y-1">
-                                        <label className="text-xs font-bold text-gray-400 ml-1">เบอร์โทรศัพท์ (10 หลัก)</label>
-                                        <input
-                                            required
-                                            type="tel"
-                                            name="phone"
-                                            value={formData.phone}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/\D/g, '');
-                                                if (val.length <= 10) {
-                                                    setFormData({ ...formData, phone: val });
-                                                    validateField('phone', val);
-                                                }
-                                            }}
-                                            placeholder="0XXXXXXXXX"
-                                            className={`w-full bg-gray-50 border rounded-xl px-4 py-3 font-bold text-[#263A33] outline-none transition-all ${errors.phone ? 'border-red-500 focus:ring-red-500/10' : 'border-gray-200 focus:border-[#1a4d2e] focus:ring-green-500/10'}`}
-                                        />
-                                        <ErrorMessage message={errors.phone} />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold text-gray-400 ml-1">อีเมล</label>
-                                        <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#263A33] focus:border-[#1a4d2e] focus:ring-4 focus:ring-green-500/10 outline-none transition-all" />
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1038,7 +1108,7 @@ function CheckoutPage() {
                     {/* ✅ Step 2: Payment */}
                     {step === 2 && (
                         <div className="lg:col-span-8 space-y-6 animate-in fade-in slide-in-from-right-4">
-                            <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+
                                 <h2 className="text-xl font-black flex items-center gap-3 mb-6 text-[#263A33]">
                                     <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-[#1a4d2e]"><CreditCard size={20} /></div>
                                     วิธีการชำระเงิน
@@ -1193,7 +1263,6 @@ function CheckoutPage() {
                                     </div>
                                 )}
                             </div>
-                        </div>
                     )}
 
                     <div className="lg:col-span-4 transition-all duration-500">
@@ -1354,29 +1423,7 @@ function CheckoutPage() {
                 addressToEdit={addressToEdit}
             />
 
-            {showMap && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
-                        <div className="p-4 bg-[#1a4d2e] text-white flex justify-between items-center">
-                            <h3 className="font-bold text-lg flex items-center gap-2"><MapPin size={20} /> เลือกตำแหน่งที่อยู่</h3>
-                            <button onClick={() => setShowMap(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
-                        </div>
-                        <div className="flex-1 relative">
-                            <MapContainer center={mapPosition || { lat: 13.7563, lng: 100.5018 }} zoom={13} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
-                                <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                                <LocationMarker />
-                                {mapPosition && <RecenterAutomatically lat={mapPosition.lat} lng={mapPosition.lng} />}
-                            </MapContainer>
-                        </div>
-                        <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-                            <button type="button" onClick={() => setShowMap(false)} className="px-6 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-200">ยกเลิก</button>
-                            <button type="button" onClick={handleConfirmLocation} disabled={isResolvingAddress || !mapPosition} className="px-6 py-2.5 rounded-xl font-bold text-white bg-[#1a4d2e] hover:bg-[#143d24] flex items-center gap-2 disabled:bg-gray-300">
-                                {isResolvingAddress ? 'กำลังดึงที่อยู่...' : <><MapPin size={18} /> ยืนยันตำแหน่ง</>}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
         </div>
     );
 }
